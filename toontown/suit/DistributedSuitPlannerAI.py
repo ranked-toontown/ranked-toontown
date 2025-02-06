@@ -1,4 +1,5 @@
-from panda3d.toontown import *
+from toontown.dna.DNAParser import DNASuitPoint
+from toontown.suit.SuitLegList import SuitLeg
 from otp.ai.AIBaseGlobal import *
 from direct.distributed import DistributedObjectAI
 from . import SuitPlannerBase, DistributedSuitAI

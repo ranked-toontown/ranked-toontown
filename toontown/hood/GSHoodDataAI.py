@@ -2,8 +2,8 @@ from direct.directnotify import DirectNotifyGlobal
 from . import HoodDataAI, ZoneUtil
 from toontown.toonbase import ToontownGlobals
 from toontown.racing import DistributedStartingBlockAI
+from toontown.racing.DistributedLeaderBoardAI import DistributedLeaderBoardAI
 from panda3d.core import *
-from panda3d.toontown import *
 from toontown.racing.RaceGlobals import *
 if __debug__:
     import pdb
@@ -41,20 +41,17 @@ class GSHoodDataAI(HoodDataAI.HoodDataAI):
 
     def createLeaderBoards(self):
         self.leaderBoards = []
-        dnaStore = DNAStorage()
-        dnaData = simbase.air.loadDNAFileAI(dnaStore, simbase.air.lookupDNAFileName('goofy_speedway_sz.dna'))
-        if isinstance(dnaData, DNAData):
+        dnaData = self.air.dnaDataMap[self.zoneId]
+        if dnaData.getName() == 'root':
             self.leaderBoards = self.air.findLeaderBoards(dnaData, self.zoneId)
         for distObj in self.leaderBoards:
-            if distObj:
-                if distObj.getName().count('city'):
+            if isinstance(distObj, DistributedLeaderBoardAI):
+                if 'city' in distObj.getName():
                     type = 'city'
-                else:
-                    if distObj.getName().count('stadium'):
-                        type = 'stadium'
-                    else:
-                        if distObj.getName().count('country'):
-                            type = 'country'
+                elif 'stadium' in distObj.getName():
+                    type = 'stadium'
+                elif 'country' in distObj.getName():
+                    type = 'country'
                 for subscription in LBSubscription[type]:
                     distObj.subscribeTo(subscription)
 
@@ -73,15 +70,15 @@ class GSHoodDataAI(HoodDataAI.HoodDataAI):
         self.foundViewingPadGroups = []
         for zone in self.air.zoneTable[self.canonicalHoodId]:
             zoneId = ZoneUtil.getTrueZoneId(zone[0], self.zoneId)
-            dnaData = self.air.dnaDataMap.get(zone[0], None)
-            if isinstance(dnaData, DNAData):
+            dnaData = self.air.dnaDataMap[self.zoneId]
+            if dnaData.getName() == 'root':
                 area = ZoneUtil.getCanonicalZoneId(zoneId)
-                foundRacingPads, foundRacingPadGroups = self.air.findRacingPads(dnaData, zoneId, area)
-                foundViewingPads, foundViewingPadGroups = self.air.findRacingPads(dnaData, zoneId, area, type='viewing_pad')
-                self.racingPads += foundRacingPads
-                self.foundRacingPadGroups += foundRacingPadGroups
-                self.viewingPads += foundViewingPads
-                self.foundViewingPadGroups += foundViewingPadGroups
+                foundRacingPads, foundRacingPadGroups = self.air.findRacingPads(dnaData, zoneId, area, type='racing_pad')
+                foundViewingPads, foundViewingPadGroups = self.air.findRacingPads(dnaData, zoneId, area, type='racing_pad')
+                self.racingPads.extend(foundRacingPads)
+                self.foundRacingPadGroups.extend(foundRacingPadGroups)
+                self.viewingPads.extend(foundViewingPads)
+                self.foundViewingPadGroups.extend(foundViewingPadGroups)
 
         self.startingBlocks = []
         for dnaGroup, distRacePad in zip(self.foundRacingPadGroups, self.racingPads):

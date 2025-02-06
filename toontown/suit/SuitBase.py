@@ -1,4 +1,4 @@
-from panda3d.toontown import *
+from toontown.suit.SuitLegList import SuitLegList
 from direct.distributed.ClockDelta import *
 import math
 import random
@@ -94,4 +94,4 @@ class SuitBase:
             print('\t', self.sp.dnaStore.getSuitPointWithIndex(indexVal))
 
     def makeLegList(self):
-        self.legList = SuitLegList(self.path, self.sp.dnaStore, self.sp.suitWalkSpeed, SuitTimings.fromSky, SuitTimings.toSky, SuitTimings.fromSuitBuilding, SuitTimings.toSuitBuilding, SuitTimings.toToonBuilding)
+        self.legList = SuitLegList(self.path, self.sp.dnaStore)

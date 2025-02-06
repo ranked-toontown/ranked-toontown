@@ -1,6 +1,6 @@
 from toontown.toonbase.ToonBaseGlobal import *
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.dna.DNAParser import DNADoor
 from direct.interval.IntervalGlobal import *
 from direct.distributed.ClockDelta import *
 from toontown.toonbase import ToontownGlobals
@@ -106,7 +106,7 @@ class DistributedToonInterior(DistributedObject.DistributedObject):
             signOrigin = self.interior.find('**/sign_origin;+s')
             newSignNP = sign.copyTo(signOrigin)
             #newSignNP.setDepthWrite(1, 1)
-            mat = self.dnaStore.getSignTransformFromBlockNumber(int(self.block))
+            mat = self.interior.getNetTransform().getMat()
             inv = Mat4(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
             inv.invertFrom(mat)
             newSignNP.setMat(inv)

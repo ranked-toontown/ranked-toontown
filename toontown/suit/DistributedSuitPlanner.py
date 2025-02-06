@@ -1,6 +1,6 @@
 from panda3d.core import *
 from direct.distributed import DistributedObject
-from panda3d.toontown import DNASuitPoint
+from toontown.dna.DNAParser import DNASuitPoint
 
 from . import SuitPlannerBase
 from toontown.toonbase import ToontownGlobals

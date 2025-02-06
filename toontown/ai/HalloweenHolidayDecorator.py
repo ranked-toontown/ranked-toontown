@@ -6,8 +6,7 @@ from toontown.toonbase import ToontownGlobals
 from toontown.safezone import Playground
 from toontown.town import Street
 from toontown.estate import Estate
-from panda3d.core import Vec4, CSDefault, TransformState, NodePath, TransparencyAttrib
-from panda3d.toontown import loadDNAFile
+from panda3d.core import Vec4
 
 class HalloweenHolidayDecorator(HolidayDecorator.HolidayDecorator):
     notify = DirectNotifyGlobal.directNotify.newCategory('HalloweenHolidayDecorator')
@@ -104,7 +103,7 @@ class HalloweenHolidayDecorator(HolidayDecorator.HolidayDecorator):
             return
         storageFile = base.cr.playGame.hood.storageDNAFile
         if storageFile:
-            loadDNAFile(self.dnaStore, storageFile, CSDefault)
+            loader.loadDNAFile(self.dnaStore, storageFile)
         self.swapIval = self.getSwapVisibleIval()
         if self.swapIval:
             self.swapIval.start()

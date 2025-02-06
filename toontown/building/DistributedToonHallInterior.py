@@ -1,4 +1,4 @@
-from panda3d.toontown import *
+from toontown.dna.DNAParser import DNADoor
 from toontown.toonbase.ToonBaseGlobal import *
 from direct.interval.IntervalGlobal import *
 from direct.distributed.ClockDelta import *
