@@ -402,6 +402,8 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.demand('Off')
         if self in self.boss.goons:
             self.boss.goons.remove(self)
+
+        self.requestDelete()
             
     
     ### FSM States ###
