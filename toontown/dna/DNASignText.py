@@ -78,7 +78,5 @@ class DNASignText(DNANode.DNANode):
             signTextNodePath.setColor(self.color)
 
             self.traverseChildren(signTextNodePath, store)
-
-            return signTextNodePath
         else:
             raise DNAError.DNAError('Baseline is not a DNASignBaseline object.')
