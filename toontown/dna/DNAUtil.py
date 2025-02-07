@@ -1,7 +1,12 @@
-from panda3d.core import LVector4f
+from panda3d.core import LVecBase4f
 
 def dgiExtractString8(dgi):
     return dgi.getString()
 
 def dgiExtractColor(dgi):
-    return LVector4f(*(dgi.getUint8() / 255.0 for _ in range(4)))
+    color = LVecBase4f()
+    color[0] = dgi.get_uint8() / 255
+    color[1] = dgi.get_uint8() / 255
+    color[2] = dgi.get_uint8() / 255
+    color[3] = dgi.get_uint8() / 255
+    return color
