@@ -83,6 +83,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
 
         # Add safeDetectionFeelers to cTrav
         self.cTrav.addCollider(self.safeDetectionFeelersPath, self.cQueue)
+        self.isStunned = 0
 
     def __syncEmergePosition(self, task):
         now = globalClock.getFrameTime()
@@ -312,7 +313,10 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def doFree(self, task):
         # This method is fired as a do-later when we enter WaitFree.
         DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.doFree(self, task)
-        self.demand('Walk')
+        if self.isStunned:
+            self.demand('Recovery')
+        else:
+            self.demand('Walk')
         return Task.done
         
     
@@ -398,6 +402,8 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.demand('Off')
         if self in self.boss.goons:
             self.boss.goons.remove(self)
+
+        self.requestDelete()
             
     
     ### FSM States ###
@@ -425,6 +431,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         
         self.avId = 0
         self.craneId = 0
+        self.isStunned = 0
         
         if self.__chooseTarget():
             self.__startWalk()
@@ -516,6 +523,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         taskMgr.remove(self.taskName('resumeWalk'))
 
     def enterStunned(self):
+        self.isStunned = 1
         self.d_setObjectState('S', 0, 0)
 
     def exitStunned(self):
@@ -543,3 +551,32 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def stopSmooth(self):
         self.sendUpdate('stopSmooth')
         DistributedSmoothNodeAI.stopSmooth(self)
+
+    def enterFalling(self):
+        self.avId = 0
+        self.craneId = 0
+        self.isStunned = 1
+        self.d_setObjectState('F', 0, 0)
+        # Schedule recovery after landing
+        taskMgr.doMethodLater(2.0, self.__recoverFromFall, self.uniqueName('recoverFromFall'))
+
+    def exitFalling(self):
+        taskMgr.remove(self.uniqueName('recoverFromFall'))
+
+    def __recoverFromFall(self, task):
+        # Make sure we're at ground level
+        pos = self.getPos()
+        self.setPos(pos[0], pos[1], 0)
+        
+        # Choose initial direction and target before entering Recovery
+        direction = self.__chooseDirection()
+        if direction:
+            heading, dist = direction
+            targetH = PythonUtil.reduceAngle(self.getH() + heading)
+            self.setH(targetH)
+            
+            # Set up initial target point
+            self.target = self.boss.scene.getRelativePoint(self, Point3(0, dist, 0))
+            
+        self.demand('Recovery')
+        return Task.done
