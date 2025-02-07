@@ -672,6 +672,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             # Normal door emergence
             if side is None:
                 side = self.__chooseGoonEmergeSide()
+
+            if side == self.goonCache[0]:
+                self.goonCache = (side, self.goonCache[1] + 1)
+            else:
+                self.goonCache = (side, 1)
             goon.request(side)
 
     def __chooseOldGoon(self):
