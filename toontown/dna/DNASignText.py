@@ -72,8 +72,6 @@ class DNASignText(DNANode.DNANode):
             frame = LVecBase3f(textNode.getWidth(), 0, textNode.getHeight())
             pos, hpr, scale = baseline.baselineNextPosHprScale(blPos, blHpr, blScale, frame)
 
-            print(hpr[2])
-
             signTextNodePath = nodePath.attachNewNode(textNode.generate())
             signTextNodePath.setPosHprScale(nodePath, pos, hpr, scale)
             signTextNodePath.setColorOff()
