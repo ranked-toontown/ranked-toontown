@@ -1973,24 +1973,23 @@ class SafeRushMode(MagicWord):
         return message
 
 
-class LiveGoonMode(MagicWord):
-    aliases = ['livegoon']
-    desc = "Sets goon spawn rate to 4 seconds"
+class GoonPracticeMode(MagicWord):
+    aliases = ['goonpractice', 'practicegoons', 'livegoon', 'lg']
+    desc = "Enters goon practice mode where goons continuously spawn from your side while the CFO is stunned"
     execLocation = MagicWordConfig.EXEC_LOC_SERVER
     accessLevel = "MODERATOR"
 
     def handleWord(self, invoker, avId, toon, *args):
         from toontown.minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
         minigame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
-
         if not minigame:
             return "You aren't in a CFO!"
 
-        on_off = 'OFF' if minigame.practiceCheatHandler.wantLiveGoonPractice else f'ON'
-        message = f"Live Goon Mode => {on_off}"
-
-        minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.LIVE_GOON_PRACTICE)
-        return message
+        on_off = 'OFF' if minigame.practiceCheatHandler.wantGoonPractice else f'ON'
+        message = f"Safe Rush Mode => {on_off}"
+            
+        minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.GOON_PRACTICE)
+        return "Toggled goon practice mode!"
 
 
 class RNGMode(MagicWord):
@@ -3695,3 +3694,5 @@ class SandboxBattle(MagicWord):
 # Loop through every registered subclass of MagicWord and instantiate it.
 for magicWordSubclass in MagicWord.__subclasses__():
     _ = magicWordSubclass()
+
+

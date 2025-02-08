@@ -565,8 +565,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             # Evaluate the toon position and spawn a goon based on it.
             avId = self.avIdList[self.practiceCheatHandler.openingModificationsToonIndex]
             toon = self.air.doId2do.get(avId)
-            pos = toon.getPos()[1]
-            if pos < -315:
+            pos = toon.getPos()
+            if pos[1] < -315:
                 return 'EmergeB'
             return 'EmergeA'
 
@@ -698,7 +698,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         taskMgr.remove(taskName)
 
     def doNextGoon(self, task):
-        if not self.boss.isStunned():
+        # Allow goons to spawn if we're in goon practice mode, even if CFO is stunned
+        if not self.boss.isStunned() or self.practiceCheatHandler.wantGoonPractice:
             self.makeGoon()
 
         # How long to wait for the next goon?

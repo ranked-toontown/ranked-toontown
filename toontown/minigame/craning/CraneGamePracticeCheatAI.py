@@ -19,6 +19,7 @@ class CraneGamePracticeCheatAI:
     SAFE_RUSH_PRACTICE = 2
     LIVE_GOON_PRACTICE = 3
     AIM_PRACTICE = 4
+    GOON_PRACTICE = 5  # New practice mode
 
     """
     Activated via magic words when cheats are enabled for a crane game minigame.
@@ -33,6 +34,7 @@ class CraneGamePracticeCheatAI:
         self.wantSafeRushPractice = False
         self.wantLiveGoonPractice = False
         self.wantAimPractice = False
+        self.wantGoonPractice = False  # New practice mode bool
 
         # Practice mode parameters
         self.wantOpeningModifications = False
@@ -58,6 +60,8 @@ class CraneGamePracticeCheatAI:
             currentState = self.wantLiveGoonPractice
         elif practiceMode == self.AIM_PRACTICE:
             currentState = self.wantAimPractice
+        elif practiceMode == self.GOON_PRACTICE:  # New practice mode
+            currentState = self.wantGoonPractice
         else:
             currentState = False
 
@@ -66,6 +70,7 @@ class CraneGamePracticeCheatAI:
         self.wantSafeRushPractice = False
         self.wantLiveGoonPractice = False
         self.wantAimPractice = False
+        self.wantGoonPractice = False  # New practice mode
 
         # Disable all practice parameters
         self.wantOpeningModifications = False
@@ -84,6 +89,8 @@ class CraneGamePracticeCheatAI:
             self.wantLiveGoonPractice = not currentState
         elif practiceMode == self.AIM_PRACTICE:
             self.wantAimPractice = not currentState
+        elif practiceMode == self.GOON_PRACTICE:  # New practice mode
+            self.wantGoonPractice = not currentState
 
         # Enable the requested mode's params
         if self.wantRNGMode:
@@ -98,6 +105,10 @@ class CraneGamePracticeCheatAI:
         elif self.wantAimPractice:
             self.wantAlwaysStunned = True
             self.setupAimMode()
+        elif self.wantGoonPractice:  # New practice mode setup
+            self.wantOpeningModifications = True
+            self.wantAlwaysStunned = True
+            self.setupGoonPracticeMode()
 
     def setupAimMode(self):
         # Initial setup for aim mode - stun CFO and remove goons
@@ -250,3 +261,25 @@ class CraneGamePracticeCheatAI:
             return False
 
         return True
+
+    def setupGoonPracticeMode(self):
+        # Initial setup for goon practice mode - stun CFO but keep goons spawning
+        self.game.getBoss().stopHelmets()
+        self.game.getBoss().b_setAttackCode(ToontownGlobals.BossCogDizzy)
+        
+        # Remove existing goons and their spawn task
+        taskMgr.remove(self.game.uniqueName('NextGoon'))
+        for goon in self.game.goons:
+            goon.request('Off')
+            goon.requestDelete()
+        self.game.goons = []  # Clear the goon list
+        
+        # Pause the timer
+        self.__pauseTimer()
+        
+        # Set up faster goon spawning (4 seconds)
+        self.game.waitForNextGoon(4.0)  # This will start the goon spawn cycle
+        
+        # Make sure we're using the correct side for spawning
+        self.wantOpeningModifications = True
+        self.wantAlwaysStunned = True
