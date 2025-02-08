@@ -233,14 +233,12 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         self.sendUpdate('destroyGoon')
 
     def b_destroyGoon(self):
-        if not self.isDead:
-            self.resetSpeedCaching()
-            self.d_destroyGoon()
-            self.destroyGoon()
+        self.resetSpeedCaching()
+        self.d_destroyGoon()
+        self.destroyGoon()
 
     def destroyGoon(self):
-        if not self.isDead:
-            self.playCrushMovie(None, None)
+        self.playCrushMovie(None, None)
         self.demand('Off')
         if self in self.boss.goons:
             self.boss.goons.remove(self)

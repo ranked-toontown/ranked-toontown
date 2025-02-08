@@ -1006,7 +1006,7 @@ class DistributedCashbotBoss(DistributedBossCog.DistributedBossCog, FSM.FSM):
         # This is called by the "~bossBattle destroy" magic word only.
         # It destroys all of the goons in the final battle sequence.
         for goon in self.goons:
-            if goon.state != 'Off' and not goon.isDead:
+            if goon.state != 'Off':
                 goon.b_destroyGoon()
 
     def deactivateCranes(self):
