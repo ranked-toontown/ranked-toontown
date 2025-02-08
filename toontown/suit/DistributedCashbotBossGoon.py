@@ -272,7 +272,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def enterEmergeA(self):
         # The goon emerges from door a.
-        self.undead()
         self.reparentTo(render)
         self.stopToonDetect()
         self.boss.getBoss().doorA.request('open')
@@ -287,7 +286,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def enterEmergeB(self):
         # The goon emerges from door b.
-        self.undead()
         self.reparentTo(render)
         self.stopToonDetect()
         self.boss.getBoss().doorB.request('open')
@@ -322,7 +320,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         self.sendUpdate('requestWalk')
 
     def enterFalling(self):
-        self.undead()
         self.stopToonDetect()
         self.radar.hide()
         
@@ -334,7 +331,7 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         
         # Set physics properties for bouncy behavior
         self.handler.setStaticFrictionCoef(0)  # Make it slide
-        self.handler.setDynamicFrictionCoef(0)
+        self.handler.setDynamicFrictionCoef(0.3)
         
         # Add some initial downward velocity
         self.physicsObject.setVelocity(0, 0, -5)  # Start falling at 5 units/sec

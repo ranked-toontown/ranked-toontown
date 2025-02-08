@@ -380,14 +380,6 @@ class ToontownMagicWordManager(MagicWordManager.MagicWordManager):
                 self.setMagicWordResponse('factory not found')
                 return
             factory.warpToZone(zoneId)
-        elif wordIs('~undead'):
-            try:
-                goons = base.cr.doFindAll('Goon')
-                for goon in goons:
-                    goon.undead()
-
-            except:
-                self.notify.warning('Error in undead')
 
         elif wordIs('~resyncGoons'):
             try:

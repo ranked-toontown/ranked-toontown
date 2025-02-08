@@ -642,23 +642,24 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             goon.request(side)
             return
 
-        # Only allow falling goons during overtime mode, with 40% chance
-        if self.currentlyInOvertime and random.random() < 0.4:
+        # Only allow falling goons during overtime mode, with 50% chance
+        if self.currentlyInOvertime and random.random() < 0.5:
             bossPos = self.boss.getPos()
             
             # Keep trying positions until we find a clear one
-            maxAttempts = 10  # Prevent infinite loops
+            maxAttempts = 20  # Prevent infinite loops
             attempts = 0
             while attempts < maxAttempts:
                 # Random position 15-20 units away from CFO
-                xOffset = random.uniform(15, 20) * (1 if random.random() < 0.5 else -1)
-                yOffset = random.uniform(15, 20) * (1 if random.random() < 0.5 else -1)
+                radius = random.uniform(20, 30)
+                theta = random.uniform(-math.pi, math.pi)
+                xPos = bossPos[0] + radius * math.cos(theta)
+                yPos = bossPos[1] + radius * math.sin(theta)
                 
                 # Check if position is clear
-                if self.__isPositionClear(bossPos[0] + xOffset, bossPos[1] + yOffset):
+                if self.__isPositionClear(xPos, yPos):
                     randomH = random.uniform(0, 360)  # Random heading between 0-360 degrees
-                    goon.setPos(bossPos[0] + xOffset, bossPos[1] + yOffset, 40)
-                    goon.d_setPosHpr(bossPos[0] + xOffset, bossPos[1] + yOffset, 40, randomH, 0, 0)
+                    goon.b_setPosHpr(xPos, yPos, 40, randomH, 0, 0)
                     goon.request('Falling')
                     break
                 attempts += 1

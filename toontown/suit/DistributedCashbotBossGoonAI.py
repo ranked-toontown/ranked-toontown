@@ -427,8 +427,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         taskMgr.remove(self.taskName('resumeWalk'))
 
     def enterWalk(self):
-        # The goon is prowling about, looking for trouble.
-        
         self.avId = 0
         self.craneId = 0
         self.isStunned = 0
@@ -567,16 +565,5 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # Make sure we're at ground level
         pos = self.getPos()
         self.setPos(pos[0], pos[1], 0)
-        
-        # Choose initial direction and target before entering Recovery
-        direction = self.__chooseDirection()
-        if direction:
-            heading, dist = direction
-            targetH = PythonUtil.reduceAngle(self.getH() + heading)
-            self.setH(targetH)
-            
-            # Set up initial target point
-            self.target = self.boss.scene.getRelativePoint(self, Point3(0, dist, 0))
-            
         self.demand('Recovery')
         return Task.done
