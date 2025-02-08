@@ -31,7 +31,7 @@ class DNASignText(DNANode.DNANode):
         while not node.isGeomNode() and not geomParent.isSingleton():
             geomParent = geomParent.getParent()
             node = geomParent.node()
-        if node.isGeomNode:
+        if node.isGeomNode():
             node.setEffect(DecalEffect.make())
         
         baseline = self.parent
