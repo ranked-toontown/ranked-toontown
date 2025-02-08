@@ -1,8 +1,9 @@
 from direct.directnotify import DirectNotifyGlobal
-from direct.distributed.AstronInternalRepository import AstronInternalRepository
 from direct.distributed.PyDatagram import PyDatagram
 
 from otp.distributed.OtpDoGlobals import *
+from otp.astron.AstronInternalRepository import AstronInternalRepository
+from otp.astron import MsgTypes
 
 
 class ToontownInternalRepository(AstronInternalRepository):
@@ -29,7 +30,7 @@ class ToontownInternalRepository(AstronInternalRepository):
 
     def setAllowClientSend(self, avId, distObj, fieldNameList=[]):
         dg = PyDatagram()
-        dg.addServerHeader(distObj.GetPuppetConnectionChannel(avId), self.ourChannel, CLIENTAGENT_SET_FIELDS_SENDABLE)
+        dg.addServerHeader(distObj.GetPuppetConnectionChannel(avId), self.ourChannel, MsgTypes.CLIENTAGENT_SET_FIELDS_SENDABLE)
         fieldIds = []
         for fieldName in fieldNameList:
             field = distObj.dclass.getFieldByName(fieldName)
