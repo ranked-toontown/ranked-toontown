@@ -1,5 +1,5 @@
 from direct.gui.DirectGui import DirectFrame, DGG, DirectScrollBar
-from panda3d.core import NodePath, PGScrollFrame
+from panda3d.core import NodePath, PGScrollFrame, PGButton, MouseButton
 
 
 class ToontownScrolledFrame(DirectFrame):
@@ -50,8 +50,10 @@ class ToontownScrolledFrame(DirectFrame):
             self['verticalScroll_value'] = self['verticalScroll_value'] + scrollPercent * direction
 
     def bindToScroll(self, gui):
-        gui.bind(DGG.WHEELUP, lambda _: self.scroll(-1))
-        gui.bind(DGG.WHEELDOWN, lambda _: self.scroll(1))
+        WHEELUP = PGButton.getReleasePrefix() + MouseButton.wheelUp().getName() + '-'
+        WHEELDOWN = PGButton.getReleasePrefix() + MouseButton.wheelDown().getName() + '-'
+        gui.bind(WHEELUP, lambda _: self.scroll(-1))
+        gui.bind(WHEELDOWN, lambda _: self.scroll(1))
 
     def setScrollBarWidth(self):
         if self.fInit:

@@ -1,5 +1,6 @@
 from direct.gui import DirectGuiGlobals
 from direct.gui.DirectScrolledList import DirectScrolledList
+from panda3d.core import PGButton, MouseButton
 
 
 def make_dsl_scrollable(dsl: DirectScrolledList):
@@ -8,6 +9,9 @@ def make_dsl_scrollable(dsl: DirectScrolledList):
         if not isinstance(item, str):
             affected_ui.append(item)
 
+    WHEELUP = PGButton.getReleasePrefix() + MouseButton.wheelUp().getName() + '-'
+    WHEELDOWN = PGButton.getReleasePrefix() + MouseButton.wheelDown().getName() + '-'
     for ui in affected_ui:
-        ui.bind(DirectGuiGlobals.WHEELUP, lambda *_: dsl.scrollTo(dsl.index - 1))
-        ui.bind(DirectGuiGlobals.WHEELDOWN, lambda *_: dsl.scrollTo(dsl.index + 1))
+        ui.bind(WHEELUP, lambda *_: dsl.scrollTo(dsl.index - 1))
+        ui.bind(WHEELDOWN, lambda *_: dsl.scrollTo(dsl.index + 1))
+
