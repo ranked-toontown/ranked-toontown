@@ -39,7 +39,7 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.toonDmgMultipliers = {}
 
         # The index order to spawn toons
-        self.toonSpawnpointOrder = [i for i in range(8)]
+        self.toonSpawnpointOrder = [i for i in range(16)]
 
         # The intentional safe helmet cooldowns. These are used to prevent safe helmet abuse.
         # Maps toon id -> next available safe helmet timestamp.

@@ -64,7 +64,7 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.latency = 0.5  # default latency for updating object posHpr
 
-        self.toonSpawnpointOrder = [i for i in range(8)]
+        self.toonSpawnpointOrder = [i for i in range(16)]
         self.stunEndTime = 0
         self.myHits = []
         self.tempHp = self.ruleset.CFO_MAX_HP
@@ -334,7 +334,8 @@ class DistributedCraneGame(DistributedMinigame):
                     toonWantedPosition = self.customSpawnPositions[toon]
                 else:
                     # Or pick a random spot if it doesn't exist
-                    toonWantedPosition = random.randrange(0, 7)
+                    stop = 7 if len(self.getParticipantIdsNotSpectating()) <= 8 else 15
+                    toonWantedPosition = random.randrange(0, stop)
 
                 # Retrieve the position/HPR from the global constants
                 posHpr = CraneLeagueGlobals.TOON_SPAWN_POSITIONS[toonWantedPosition]

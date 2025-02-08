@@ -56,17 +56,17 @@ class CraneGameSettingsPanel(DirectFrame):
 
         # Calculate grid layout
         spotWidth = 0.35  # Width of each spot
-        spotHeight = 0.35  # Increased height
+        spotHeight = 0.175  # Increased height
         verticalSpacing = 0.1  # Reduced vertical spacing
         horizontalSpacing = 0.05  # Horizontal spacing between spots
 
         # Create two rows of four spots
-        for i in range(8):
-            row = i // 4  # 0 for first row, 1 for second row
+        for i in range(16):
+            row = i // 4  # 0-3 = row 1-4 respectively
             col = i % 4  # 0-3 for position in row
 
             xPos = (col - 1.5) * (spotWidth + horizontalSpacing)
-            yPos = 0.3 - (row * (spotHeight + verticalSpacing))
+            yPos = .5 - (row * (spotHeight + verticalSpacing))
 
             # All spots start as player spots by default
             spot = self.createPlayerSpot(i, True, xPos, yPos, spotWidth, spotHeight)
@@ -142,15 +142,16 @@ class CraneGameSettingsPanel(DirectFrame):
         # Name label (empty until occupied)
         nameLabel = DirectLabel(parent=frame,
                                 text='',
-                                text_scale=0.05,
+                                text_scale=0.035,
                                 text_fg=(0.2, 0.2, 0.2, 1),
-                                text_pos=(0, -height / 3),
-                                text_wordwrap=width * 20)
+                                text_pos=(.06, -height / 8),
+                                text_wordwrap=16)
 
         # Create a separate frame for the toon head
         headFrame = DirectFrame(parent=frame,
                                 relief=None,
-                                pos=(0, 0, 0))
+                                scale=.5,
+                                pos=(-0.1, 0, -0.05))
 
         return {'frame': frame,
                 'label': label,

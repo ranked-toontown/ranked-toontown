@@ -39,7 +39,7 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.heldObject = None
 
         self.latency = 0.5  # default latency for updating object posHpr
-        self.toonSpawnpointOrder = [i for i in range(8)]
+        self.toonSpawnpointOrder = [i for i in range(16)]
         self.stunEndTime = 0
         self.myHits = []
         self.tempHp = self.ruleset.CFO_MAX_HP
