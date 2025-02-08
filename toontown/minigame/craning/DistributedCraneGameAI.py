@@ -980,7 +980,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         for toon, score in self.scoreDict.items():
             self.scoreDict[toon] = 0
-        self.currentWinners.clear()
+        self.currentWinners = self.getHighestScorers()
 
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
 
