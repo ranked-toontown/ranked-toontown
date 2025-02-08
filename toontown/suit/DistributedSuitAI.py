@@ -1,6 +1,6 @@
 from otp.ai.AIBaseGlobal import *
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.suit.SuitLegList import SuitLeg
 from direct.distributed.ClockDelta import *
 from otp.avatar import DistributedAvatarAI
 from . import SuitTimings
@@ -264,9 +264,9 @@ class DistributedSuitAI(DistributedSuitBaseAI.DistributedSuitBaseAI):
             self.openToonDoor()
         elif legType == SuitLeg.TToSuitBuilding:
             self.openSuitDoor()
-        elif legType == SuitLeg.TToCoghq:
+        elif legType == SuitLeg.TToCogHQ:
             self.openCogHQDoor(1)
-        elif legType == SuitLeg.TFromCoghq:
+        elif legType == SuitLeg.TFromCogHQ:
             self.openCogHQDoor(0)
 
     def resume(self):

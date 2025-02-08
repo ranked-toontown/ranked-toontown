@@ -71,7 +71,7 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
         self.ignore('clearOutToonInterior')
         self.fsm.request('off')
         self.exitDoorFSM.request('off')
-        if 'building' in self.__dict__:
+        if not hasattr(self, 'building'):
             del self.building
         self.finishAllTracks()
         self.avatarIDList = []
@@ -201,7 +201,7 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
         self.setupNametag()
 
     def getBuilding(self):
-        if 'building' not in self.__dict__:
+        if not hasattr(self, 'building'):
             if self.doorType == DoorTypes.INT_STANDARD:
                 door = render.find('**/leftDoor;+s')
                 self.building = door.getParent()
@@ -221,8 +221,8 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
         return self.building
 
     def getBuilding_wip(self):
-        if 'building' not in self.__dict__:
-            if 'block' in self.__dict__:
+        if not hasattr(self, 'building'):
+            if hasattr(self, 'block'):
                 self.building = self.cr.playGame.hood.loader.geom.find('**/??' + str(self.block) + ':*_landmark_*_DNARoot;+s')
             else:
                 self.building = self.cr.playGame.hood.loader.geom
@@ -393,14 +393,7 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
         if self.doorType == DoorTypes.INT_STANDARD:
             otherNP = render.find('**/door_origin')
         elif self.doorType == DoorTypes.EXT_STANDARD:
-            if hasattr(self, 'tempDoorNodePath'):
-                return self.tempDoorNodePath
-            else:
-                posHpr = self.cr.playGame.dnaStore.getDoorPosHprFromBlockNumber(self.block)
-                otherNP = NodePath('doorOrigin')
-                otherNP.setPos(posHpr.getPos())
-                otherNP.setHpr(posHpr.getHpr())
-                self.tempDoorNodePath = otherNP
+            otherNP = self.getBuilding().find('**/*door_origin')
         elif self.doorType in self.specialDoorTypes:
             building = self.getBuilding()
             otherNP = building.find('**/door_origin_' + str(self.doorIndex))

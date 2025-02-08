@@ -1,5 +1,5 @@
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.dna.DNAParser import loadDNAFileAI, loadDNAFile
 from direct.directnotify.DirectNotifyGlobal import *
 from direct.showbase import Loader
 from toontown.toontowngui import ToontownLoadingScreen
@@ -93,11 +93,11 @@ class ToontownLoader(Loader.Loader):
         return ret
 
     def loadDNAFileAI(self, dnaStore, dnaFile):
-        ret = loadDNAFileAI(dnaStore, dnaFile, CSDefault)
+        ret = loadDNAFileAI(dnaStore, dnaFile)
         self.tick()
         return ret
 
     def loadDNAFile(self, dnaStore, dnaFile):
-        ret = loadDNAFile(dnaStore, dnaFile, CSDefault, 0)
+        ret = loadDNAFile(dnaStore, dnaFile)
         self.tick()
         return ret

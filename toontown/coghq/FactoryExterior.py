@@ -7,7 +7,7 @@ from toontown.toonbase import ToontownGlobals
 from toontown.hood import ZoneUtil
 from toontown.building import Elevator
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.dna.DNAParser import DNAStorage
 from libotp import *
 
 class FactoryExterior(BattlePlace.BattlePlace):
@@ -165,7 +165,7 @@ class FactoryExterior(BattlePlace.BattlePlace):
         # First, we need to load the DNA file for this Cog HQ.
         dnaStore = DNAStorage()
         dnaFileName = self.genDNAFileName(branchZone)
-        loadDNAFile(dnaStore, dnaFileName)
+        loader.loadDNAFile(dnaStore, dnaFileName)
 
         # Next, we need to collect all of the visgroup zone IDs.
         self.zoneVisDict = {}

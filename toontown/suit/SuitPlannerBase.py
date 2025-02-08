@@ -1,5 +1,5 @@
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.dna.DNAParser import DNASuitPoint, DNAStorage, DNAInteractiveProp, loadDNAFileAI
 import random
 import string
 from direct.directnotify import DirectNotifyGlobal
@@ -98,10 +98,9 @@ class SuitPlannerBase:
             return None
         self.dnaStore = DNAStorage()
         dnaFileName = self.genDNAFileName()
-        try:
-            simbase.air.loadDNAFileAI(self.dnaStore, dnaFileName)
-        except:
-            loader.loadDNAFileAI(self.dnaStore, dnaFileName)
+
+        self.dnaStore = DNAStorage()
+        loadDNAFileAI(self.dnaStore, self.genDNAFileName())
 
         self.initDNAInfo()
         return None
@@ -136,7 +135,7 @@ class SuitPlannerBase:
         self.battlePosDict = {}
         self.cellToGagBonusDict = {}
         for i in range(self.dnaStore.getNumDNAVisGroupsAI()):
-            vg = self.dnaStore.getDNAVisGroupAI(i)
+            vg = self.dnaStore.getDNAVisGroup(i)
             zoneId = int(self.extractGroupName(vg.getName()))
             if vg.getNumBattleCells() == 1:
                 battleCell = vg.getBattleCell(0)

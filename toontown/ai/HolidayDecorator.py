@@ -1,7 +1,5 @@
-from toontown.toonbase import ToontownGlobals
 from direct.interval.IntervalGlobal import Parallel, Sequence, Func, Wait
-from panda3d.core import Vec4, CSDefault, TransformState, NodePath, TransparencyAttrib
-from panda3d.toontown import loadDNAFile
+from panda3d.core import Vec4, TransformState, NodePath, TransparencyAttrib
 
 class HolidayDecorator:
 
@@ -28,7 +26,7 @@ class HolidayDecorator:
             return
         storageFile = base.cr.playGame.hood.storageDNAFile
         if storageFile:
-            loadDNAFile(self.dnaStore, storageFile, CSDefault)
+            loader.loadDNAFile(self.dnaStore, storageFile)
         self.swapIval = self.getSwapVisibleIval()
         if self.swapIval:
             self.swapIval.start()
@@ -38,7 +36,7 @@ class HolidayDecorator:
         holidayIds = base.cr.newsManager.getDecorationHolidayId()
         for holiday in holidayIds:
             for storageFile in hood.holidayStorageDNADict.get(holiday, []):
-                loadDNAFile(self.dnaStore, storageFile, CSDefault)
+                loader.loadDNAFile(self.dnaStore, storageFile)
 
     def getSwapVisibleIval(self, wait = 5.0, tFadeOut = 3.0, tFadeIn = 3.0):
         loader = base.cr.playGame.hood.loader
