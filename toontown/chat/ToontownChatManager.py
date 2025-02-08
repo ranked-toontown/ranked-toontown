@@ -1,7 +1,6 @@
 import sys
 from direct.showbase import DirectObject
 from direct.showbase.MessengerGlobal import messenger
-from direct.showbase.PythonUtil import traceFunctionCall
 from otp.otpbase import OTPGlobals
 from otp.otpbase import OTPLocalizer
 from toontown.toonbase import TTLocalizer

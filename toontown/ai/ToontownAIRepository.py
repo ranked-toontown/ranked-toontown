@@ -4,7 +4,7 @@ from typing import Dict
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.PyDatagram import *
 from panda3d.core import *
-from panda3d.toontown import *
+from toontown.dna.DNAParser import loadDNAFileAI, DNAStorage, DNAGroup, DNAVisGroup
 
 from otp.ai.AIZoneData import AIZoneDataStore
 from otp.ai.TimeManagerAI import TimeManagerAI
@@ -376,8 +376,8 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.zoneTable[ToontownGlobals.LawbotHQ] = (
             (ToontownGlobals.LawbotHQ, 0, 1), (ToontownGlobals.LawbotOfficeExt, 0, 1),
         )
-        self.createHood(LawbotHQDataAI, ToontownGlobals.LawbotHQ)
-        NPCToons.createNpcsInZone(self, ToontownGlobals.LawbotHQ)
+        #self.createHood(LawbotHQDataAI, ToontownGlobals.LawbotHQ)
+        #NPCToons.createNpcsInZone(self, ToontownGlobals.LawbotHQ)
 
         # Bossbot HQ
         self.zoneTable[ToontownGlobals.BossbotHQ] = (
@@ -443,7 +443,7 @@ class ToontownAIRepository(ToontownInternalRepository):
     def findFishingPonds(self, dnaData, zoneId, area):
         fishingPonds = []
         fishingPondGroups = []
-        if isinstance(dnaData, DNAGroup) and ('fishing_pond' in dnaData.getName()):
+        if isinstance(dnaData, DNAGroup.DNAGroup) and ('fishing_pond' in dnaData.getName()):
             fishingPondGroups.append(dnaData)
             pond = self.fishManager.generatePond(area, zoneId)
             fishingPonds.append(pond)
@@ -459,7 +459,7 @@ class ToontownAIRepository(ToontownInternalRepository):
 
     def findFishingSpots(self, dnaData, fishingPond):
         fishingSpots = []
-        if isinstance(dnaData, DNAGroup) and ('fishing_spot' in dnaData.getName()):
+        if isinstance(dnaData, DNAGroup.DNAGroup) and ('fishing_spot' in dnaData.getName()):
             spot = self.fishManager.generateSpots(dnaData, fishingPond)
             fishingSpots.append(spot)
 
@@ -493,7 +493,7 @@ class ToontownAIRepository(ToontownInternalRepository):
 
     def findRacingPads(self, dnaData, zoneId, area, type='racing_pad', overrideDNAZone=False):
         racingPads, racingPadGroups = [], []
-        if type in dnaData.getName():
+        if isinstance(dnaData, DNAGroup.DNAGroup) and (type in dnaData.getName()):
             if type == 'racing_pad':
                 nameSplit = dnaData.getName().split('_')
                 racePad = DistributedRacePadAI(self)
@@ -562,6 +562,8 @@ class ToontownAIRepository(ToontownInternalRepository):
             return filename.getFullpath()
 
     def findLeaderBoards(self, dnaData, zoneId):
+        return [] # TODO
+        '''
         leaderboards = []
         if 'leaderBoard' in dnaData.getName():
             x, y, z = dnaData.getPos()
@@ -575,6 +577,7 @@ class ToontownAIRepository(ToontownInternalRepository):
             leaderboards.extend(foundLeaderBoards)
 
         return leaderboards
+        '''
 
     def cacheArchipelagoConnectInformation(self, avId, slotName, address):
         self.archipelagoConnectionCache[avId] = (slotName, address)

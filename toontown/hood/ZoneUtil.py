@@ -75,47 +75,37 @@ def isPetshop(zoneId):
 
 
 def getWhereName(zoneId, isToon):
-    if tutorialDict:
-        if zoneId in tutorialDict['interiors']:
-            where = 'toonInterior'
-        elif zoneId in tutorialDict['exteriors']:
-            where = 'street'
-        elif zoneId == ToontownCentral or zoneId == WelcomeValleyToken:
-            where = 'playground'
-        else:
-            zoneUtilNotify.error('No known zone: ' + str(zoneId))
-    else:
-        suffix = zoneId % 1000
-        suffix = suffix - suffix % 100
-        if isCogHQZone(zoneId):
-            if suffix == 0:
-                where = 'cogHQExterior'
-            elif suffix == 100:
-                where = 'cogHQLobby'
-            elif suffix == 200:
-                where = 'factoryExterior'
-            elif getHoodId(zoneId) == LawbotHQ and suffix in (300, 400, 500, 600):
-                where = 'stageInterior'
-            elif getHoodId(zoneId) == BossbotHQ and suffix in (500, 600, 700):
-                where = 'countryClubInterior'
-            elif suffix >= 500:
-                if getHoodId(zoneId) == SellbotHQ:
-                    where = 'factoryInterior'
-                elif getHoodId(zoneId) == CashbotHQ:
-                    where = 'mintInterior'
-                else:
-                    zoneUtilNotify.error('unknown cogHQ interior for hood: ' + str(getHoodId(zoneId)))
-            else:
-                zoneUtilNotify.error('unknown cogHQ where: ' + str(zoneId))
-        elif suffix == 0:
-            where = 'playground'
+    suffix = zoneId % 1000
+    suffix = suffix - suffix % 100
+    if isCogHQZone(zoneId):
+        if suffix == 0:
+            where = 'cogHQExterior'
+        elif suffix == 100:
+            where = 'cogHQLobby'
+        elif suffix == 200:
+            where = 'factoryExterior'
+        elif getHoodId(zoneId) == LawbotHQ and suffix in (300, 400, 500, 600):
+            where = 'stageInterior'
+        elif getHoodId(zoneId) == BossbotHQ and suffix in (500, 600, 700):
+            where = 'countryClubInterior'
         elif suffix >= 500:
-            if isToon:
-                where = 'toonInterior'
+            if getHoodId(zoneId) == SellbotHQ:
+                where = 'factoryInterior'
+            elif getHoodId(zoneId) == CashbotHQ:
+                where = 'mintInterior'
             else:
-                where = 'suitInterior'
+                zoneUtilNotify.error('unknown cogHQ interior for hood: ' + str(getHoodId(zoneId)))
         else:
-            where = 'street'
+            zoneUtilNotify.error('unknown cogHQ where: ' + str(zoneId))
+    elif suffix == 0:
+        where = 'playground'
+    elif suffix >= 500:
+        if isToon:
+            where = 'toonInterior'
+        else:
+            where = 'suitInterior'
+    else:
+        where = 'street'
     return where
 
 

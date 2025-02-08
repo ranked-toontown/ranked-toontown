@@ -7,7 +7,6 @@ from toontown.suit import DistributedSuitPlannerAI
 from toontown.safezone import ButterflyGlobals
 from toontown.safezone import DistributedButterflyAI
 from panda3d.core import *
-from panda3d.toontown import *
 from toontown.toon import NPCToons
 from toontown.toonbase import ToontownGlobals, TTLocalizer
 from ..safezone.TreasurePlannerAI import TreasurePlannerAI
@@ -78,15 +77,13 @@ class HoodDataAI:
     def removeDistObj(self, distObj):
         del self.doId2do[distObj.doId]
 
-
-
     def createFishingPonds(self):
         self.fishingPonds = []
         fishingPondGroups = []
         for zone in self.air.zoneTable[self.canonicalHoodId]:
             zoneId = ZoneUtil.getTrueZoneId(zone[0], self.zoneId)
-            dnaData = self.air.dnaDataMap.get(zone[0], None)
-            if isinstance(dnaData, DNAData):
+            dnaData = self.air.dnaDataMap[self.zoneId]
+            if dnaData.getName() == 'root':
                 area = ZoneUtil.getCanonicalZoneId(zoneId)
                 foundFishingPonds, foundFishingPondGroups = self.air.findFishingPonds(dnaData, zoneId, area)
                 self.fishingPonds += foundFishingPonds
@@ -108,7 +105,6 @@ class HoodDataAI:
         return
 
     def createStreetClerks(self):
-
         for zoneId in self.getStreetClerkZoneIds():
             npcs = NPCToons.createNpcsInZone(self.air, zoneId)
             for npc in npcs:
