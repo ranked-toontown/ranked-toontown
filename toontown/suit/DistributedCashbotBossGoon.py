@@ -320,7 +320,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
     def enterFalling(self):
         self.stopToonDetect()
         self.radar.hide()
-        self.pose('collapse', 48)
         self.isStunned = 1
 
         # Activate physics to handle collisions and bouncing

@@ -180,11 +180,20 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         self.collisionNodePath.unstash()
 
     def __hitFloor(self, entry):
+        if self.state == 'Falling':
+            self.animTrack = Parallel(Sequence(ActorInterval(self, 'collapse'), Func(self.pose, 'collapse', 48)),
+                                      SoundInterval(self.collapseSound, node=self))
+            self.animTrack.start(0)
+
         if self.state == 'Dropped' or self.state == 'LocalDropped':
             self.d_hitFloor()
             self.demand('SlidingFloor', localAvatar.doId)
 
     def __hitGoon(self, entry):
+        if self.state == 'Falling':
+            self.animTrack = Parallel(Sequence(ActorInterval(self, 'collapse'), Func(self.pose, 'collapse', 48)),
+                                      SoundInterval(self.collapseSound, node=self))
+            self.animTrack.start(0)
         if self.state == 'Dropped' or self.state == 'LocalDropped':
             goonId = int(entry.getIntoNodePath().getNetTag('doId'))
             goon = self.cr.doId2do.get(goonId)
