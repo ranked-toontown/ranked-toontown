@@ -376,8 +376,8 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.zoneTable[ToontownGlobals.LawbotHQ] = (
             (ToontownGlobals.LawbotHQ, 0, 1), (ToontownGlobals.LawbotOfficeExt, 0, 1),
         )
-        #self.createHood(LawbotHQDataAI, ToontownGlobals.LawbotHQ)
-        #NPCToons.createNpcsInZone(self, ToontownGlobals.LawbotHQ)
+        self.createHood(LawbotHQDataAI, ToontownGlobals.LawbotHQ)
+        NPCToons.createNpcsInZone(self, ToontownGlobals.LawbotHQ)
 
         # Bossbot HQ
         self.zoneTable[ToontownGlobals.BossbotHQ] = (
@@ -447,8 +447,6 @@ class ToontownAIRepository(ToontownInternalRepository):
             fishingPondGroups.append(dnaData)
             pond = self.fishManager.generatePond(area, zoneId)
             fishingPonds.append(pond)
-        elif isinstance(dnaData, DNAVisGroup):
-            zoneId = ZoneUtil.getTrueZoneId(int(dnaData.getName().split(':')[0]), zoneId)
 
         for i in range(dnaData.getNumChildren()):
             foundFishingPonds, foundFishingPondGroups = self.findFishingPonds(dnaData.at(i), zoneId, area)

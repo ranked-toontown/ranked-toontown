@@ -30,3 +30,6 @@ class BRHoodDataAI(HoodDataAI.HoodDataAI):
 
     def getStreetClerkZoneIds(self) -> List[int]:
         return [3115, 3235, 3309]  # Walrus, Sleet, Polar
+
+    def getFishingZoneIds(self) -> List[int]:
+        return [3136, 3236, 3329]  # Walrus, Sleet, Polar

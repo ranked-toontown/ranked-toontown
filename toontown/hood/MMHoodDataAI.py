@@ -30,3 +30,6 @@ class MMHoodDataAI(HoodDataAI.HoodDataAI):
 
     def getStreetClerkZoneIds(self) -> List[int]:
         return [4115, 4214, 4343]  # Alto, Baritone, Tenor
+
+    def getFishingZoneIds(self) -> List[int]:
+        return [4148, 4240, 4345]  # Alto, Baritone, Tenor

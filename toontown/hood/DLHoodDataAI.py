@@ -30,3 +30,6 @@ class DLHoodDataAI(HoodDataAI.HoodDataAI):
 
     def getStreetClerkZoneIds(self) -> List[int]:
         return [9130, 9223]  # Lullaby, Pajama
+
+    def getFishingZoneIds(self) -> List[int]:
+        return [9153, 9255]  # Lullaby, Pajama

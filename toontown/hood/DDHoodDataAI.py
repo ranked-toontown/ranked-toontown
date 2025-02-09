@@ -36,3 +36,6 @@ class DDHoodDataAI(HoodDataAI.HoodDataAI):
 
     def getStreetClerkZoneIds(self) -> List[int]:
         return [1128, 1218, 1309]  # Barnacle, Seaweed, Lighthouse
+
+    def getFishingZoneIds(self) -> List[int]:
+        return [1129, 1236, 1330]  # Barnacle, Seaweed, Lighthouse

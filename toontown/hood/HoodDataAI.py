@@ -36,6 +36,9 @@ class HoodDataAI:
     def getStreetClerkZoneIds(self) -> List[int]:
         return []
 
+    def getFishingZoneIds(self) -> List[int]:
+        return []
+
     def startup(self):
         for zone in self.air.zoneTable[self.canonicalHoodId]:
             zoneId = ZoneUtil.getTrueZoneId(zone[0], self.zoneId)
@@ -95,7 +98,10 @@ class HoodDataAI:
             for npc in npcs:
                 self.addDistObj(npc)
 
+        self.createStreetFisherman()
+
         fishingSpots = []
+
         for dnaGroup, distPond in zip(fishingPondGroups, self.fishingPonds):
             fishingSpots += self.air.findFishingSpots(dnaGroup, distPond)
 
@@ -106,6 +112,12 @@ class HoodDataAI:
 
     def createStreetClerks(self):
         for zoneId in self.getStreetClerkZoneIds():
+            npcs = NPCToons.createNpcsInZone(self.air, zoneId)
+            for npc in npcs:
+                self.addDistObj(npc)
+
+    def createStreetFisherman(self):
+        for zoneId in self.getFishingZoneIds():
             npcs = NPCToons.createNpcsInZone(self.air, zoneId)
             for npc in npcs:
                 self.addDistObj(npc)

@@ -63,3 +63,6 @@ class TTHoodDataAI(HoodDataAI.HoodDataAI):
 
     def getStreetClerkZoneIds(self) -> List[int]:
         return [2114, 2218, 2326]  # Silly, Loopy, Punchline
+
+    def getFishingZoneIds(self) -> List[int]:
+        return [2156, 2236, 2341]  # Silly, Loopy, Punchline
