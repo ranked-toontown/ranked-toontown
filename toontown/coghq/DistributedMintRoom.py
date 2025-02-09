@@ -51,7 +51,6 @@ class DistributedMintRoom(DistributedLevel.DistributedLevel, MintRoomBase.MintRo
     def setMintId(self, mintId):
         self.notify.debug('mintId: %s' % mintId)
         MintRoomBase.MintRoomBase.setMintId(self, mintId)
-        base.discord.setZone(mintId)
 
     def setRoomId(self, roomId):
         self.notify.debug('roomId: %s' % roomId)

@@ -233,14 +233,12 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         self.sendUpdate('destroyGoon')
 
     def b_destroyGoon(self):
-        if not self.isDead:
-            self.resetSpeedCaching()
-            self.d_destroyGoon()
-            self.destroyGoon()
+        self.resetSpeedCaching()
+        self.d_destroyGoon()
+        self.destroyGoon()
 
     def destroyGoon(self):
-        if not self.isDead:
-            self.playCrushMovie(None, None)
+        self.playCrushMovie(None, None)
         self.demand('Off')
         if self in self.boss.goons:
             self.boss.goons.remove(self)
@@ -272,7 +270,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def enterEmergeA(self):
         # The goon emerges from door a.
-        self.undead()
         self.reparentTo(render)
         self.stopToonDetect()
         self.boss.getBoss().doorA.request('open')
@@ -287,7 +284,6 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def enterEmergeB(self):
         # The goon emerges from door b.
-        self.undead()
         self.reparentTo(render)
         self.stopToonDetect()
         self.boss.getBoss().doorB.request('open')
@@ -322,19 +318,16 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         self.sendUpdate('requestWalk')
 
     def enterFalling(self):
-        self.undead()
         self.stopToonDetect()
         self.radar.hide()
-        
-        # Use stunned animation during fall
-        self.pose('collapse', 48)
-        
+        self.isStunned = 1
+
         # Activate physics to handle collisions and bouncing
         self.activatePhysics()
-        
+
         # Set physics properties for bouncy behavior
         self.handler.setStaticFrictionCoef(0)  # Make it slide
-        self.handler.setDynamicFrictionCoef(0)
+        self.handler.setDynamicFrictionCoef(0.3)
         
         # Add some initial downward velocity
         self.physicsObject.setVelocity(0, 0, -5)  # Start falling at 5 units/sec
@@ -342,9 +335,18 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
     def exitFalling(self):
         self.deactivatePhysics()
 
-    def __hitFloor(self, entry):
+    def __playHitFloorAnimation(self):
+        if self.animTrack is not None:
+            self.animTrack.finish()
+            self.animTrack = None
+
+        self.demand('Stunned')
+
+    def doHitFloor(self):
+        super().doHitFloor()
+        self.__playHitFloorAnimation()
+
+    def doHitGoon(self, goon):
+        super().doHitGoon(goon)
         if self.state == 'Falling':
-            self.d_hitFloor()
-            self.demand('Recovery')
-        else:
-            DistributedCashbotBossObject.DistributedCashbotBossObject.__hitFloor(self, entry)
+            self.__playHitFloorAnimation()

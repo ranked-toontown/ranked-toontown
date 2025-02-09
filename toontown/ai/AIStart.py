@@ -5,7 +5,7 @@ import os
 
 import argparse
 
-from toontown.toonbase.ErrorTrackingService import ErrorTrackingService, ServiceType, SentryErrorTrackingService
+from toontown.toonbase.ErrorTrackingService import ErrorTrackingService, ServiceType, BasicErrorTrackingService
 
 parser = argparse.ArgumentParser(description='Toontown Ranked - AI Server')
 parser.add_argument(
@@ -78,7 +78,7 @@ from otp.ai.AIBaseGlobal import *
 from toontown.ai.ToontownAIRepository import ToontownAIRepository
 
 version = simbase.config.GetString('version', 'v???')
-simbase.errorReportingService = SentryErrorTrackingService(ServiceType.AI, version)
+simbase.errorReportingService = BasicErrorTrackingService(ServiceType.AI, version)
 
 simbase.air = ToontownAIRepository(
     config.ConfigVariableInt('air-base-channel', 401000000).getValue(),

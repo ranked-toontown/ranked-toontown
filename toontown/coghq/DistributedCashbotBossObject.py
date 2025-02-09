@@ -180,12 +180,15 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         self.collisionNodePath.unstash()
 
     def __hitFloor(self, entry):
-        if self.state == 'Dropped' or self.state == 'LocalDropped':
+        if self.state == 'Falling':
+            self.doHitFloor()
+
+        if self.state in ('Dropped', 'LocalDropped'):
             self.d_hitFloor()
             self.demand('SlidingFloor', localAvatar.doId)
 
     def __hitGoon(self, entry):
-        if self.state == 'Dropped' or self.state == 'LocalDropped':
+        if self.state in ('Dropped', 'LocalDropped', 'Falling'):
             goonId = int(entry.getIntoNodePath().getNetTag('doId'))
             goon = self.cr.doId2do.get(goonId)
             if goon:
@@ -194,6 +197,13 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
     def doHitGoon(self, goon):
         # Override in a derived class to do something if the object is
         # dropped on a goon.
+        pass
+
+    def doHitFloor(self):
+        """
+        Override in a derived class to do something if this object hits the floor.
+        Note that this function is only called if the previous state was falling, dropped, or local dropped.
+        """
         pass
 
     def __hitBoss(self, entry):

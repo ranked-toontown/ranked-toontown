@@ -670,7 +670,6 @@ class DistributedSellbotBoss(DistributedBossCog.DistributedBossCog, FSM.FSM):
         self.cagedToon.addActive()
 
     def enterElevator(self):
-        base.discord.vp()
         DistributedBossCog.DistributedBossCog.enterElevator(self)
         self.rampA.request('extended')
         self.rampB.request('extended')

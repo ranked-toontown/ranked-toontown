@@ -755,8 +755,7 @@ class OptionElement(DirectFrame):
         elif self.optionName == "fovEffects":
             base.WANT_FOV_EFFECTS = newSetting
         elif self.optionName == 'discord-rich-presence':
-            base.wantRichPresence = newSetting
-            base.setRichPresence()
+            pass
         elif self.optionName == "cam-toggle-lock":
             base.CAM_TOGGLE_LOCK = newSetting
         elif self.optionName == "color-blind-mode":

@@ -42,7 +42,6 @@ class DistributedGoon(DistributedCrushableEntity.DistributedCrushableEntity, Goo
         self.path = None
         self.dir = GOON_FORWARD
         self.animMultiplier = 1.0
-        self.isDead = 0
         self.isStunned = 0
         self.collapseSound = loader.loadSfx('phase_9/audio/sfx/CHQ_GOON_hunker_down.ogg')
         self.recoverSound = loader.loadSfx('phase_9/audio/sfx/CHQ_GOON_rattle_shake.ogg')
@@ -208,7 +207,6 @@ class DistributedGoon(DistributedCrushableEntity.DistributedCrushableEntity, Goo
         self.hideNametag2d()
         self.hide()
         self.isStunned = 0
-        self.isDead = 0
         if self.animTrack:
             self.animTrack.finish()
             self.animTrack = None
@@ -335,26 +333,6 @@ class DistributedGoon(DistributedCrushableEntity.DistributedCrushableEntity, Goo
     def doAttack(self, avId):
         pass
 
-    # def __startResumeWalkTask(self, ts):
-    #     resumeTime = 1.5
-    #     if ts < resumeTime:
-    #         taskMgr.remove(self.taskName('resumeWalk'))
-    #         taskMgr.doMethodLater(resumeTime - ts, self.request, self.taskName('resumeWalk'), extraArgs=('Walk',))
-    #     else:
-    #         self.request('Walk', ts - resumeTime)
-    #
-    # def __reverseWalk(self, task):
-    #     self.request('Walk')
-    #     return Task.done
-    #
-    # def __startRecoverTask(self, ts):
-    #     stunTime = 4.0
-    #     if ts < stunTime:
-    #         taskMgr.remove(self.taskName('resumeWalk'))
-    #         taskMgr.doMethodLater(stunTime - ts, self.request, self.taskName('resumeWalk'), extraArgs=('Recovery',))
-    #     else:
-    #         self.request('Recovery', ts - stunTime)
-
     def startToonDetect(self):
         if self.triggerEvent:
             self.accept(self.triggerEvent, self.handleToonDetect)
@@ -394,8 +372,6 @@ class DistributedGoon(DistributedCrushableEntity.DistributedCrushableEntity, Goo
         self.sendUpdate('requestStunned', [self.pauseTime])
 
     def setMovie(self, mode, avId, pauseTime, timestamp):
-        if self.isDead:
-            return
         ts = ClockDelta.globalClockDelta.localElapsedTime(timestamp)
         self.notify.debug('%s: setMovie(%s,%s,%s,%s)' % (self.doId,
          mode,
@@ -457,19 +433,12 @@ class DistributedGoon(DistributedCrushableEntity.DistributedCrushableEntity, Goo
         self.setPlayRate(self.animMultiplier, 'walk')
 
     def dead(self):
-        if not self.isDead and not self.isDisabled():
+        if not self.isDisabled():
             self.stopToonDetect()
             self.detachNode()
-            self.isDead = 1
-
-    def undead(self):
-        if self.isDead:
-            self.reparentTo(render)
-            self.isDead = 0
 
     def resync(self):
-        if not self.isDead:
-            self.sendUpdate('requestResync')
+        self.sendUpdate('requestResync')
 
     def setHFov(self, hFov):
         if hFov != self.hFov:

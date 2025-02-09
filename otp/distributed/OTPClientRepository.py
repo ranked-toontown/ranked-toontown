@@ -860,8 +860,6 @@ class OTPClientRepository(ClientRepositoryBase):
     def enterAfkTimeout(self):
         self.sendSetAvatarIdMsg(0)
         msg = OTPLocalizer.AfkForceAcknowledgeMessage
-        if hasattr(base, 'discord'):
-            base.discord.setData(details='Sleeping', image="https://avatars.githubusercontent.com/u/164748629", imageTxt='AFK')
         dialogClass = OTPGlobals.getDialogClass()
         self.afkDialog = dialogClass(text=msg, command=self.__handleAfkOk, style=OTPDialog.Acknowledge)
         self.handler = self.handleMessageType
@@ -876,8 +874,6 @@ class OTPClientRepository(ClientRepositoryBase):
             self.afkDialog.cleanup()
             self.afkDialog = None
         self.handler = None
-        if hasattr(base, 'discord'):
-            base.discord.setData()
         return
 
     @report(types=['args', 'deltaStamp'], dConfigParam='teleport')

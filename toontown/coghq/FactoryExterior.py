@@ -61,7 +61,6 @@ class FactoryExterior(BattlePlace.BattlePlace):
 
     def enter(self, requestStatus):
         self.zoneId = requestStatus['zoneId']
-        base.discord.setZone(self.zoneId)
         BattlePlace.BattlePlace.enter(self)
         self.fsm.enterInitialState()
         base.playMusic(self.loader.music, looping=1, volume=0.8)
