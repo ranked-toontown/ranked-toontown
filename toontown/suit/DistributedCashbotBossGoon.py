@@ -334,3 +334,19 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def exitFalling(self):
         self.deactivatePhysics()
+
+    def __playHitFloorAnimation(self):
+        if self.animTrack is not None:
+            self.animTrack.finish()
+            self.animTrack = None
+
+        self.demand('Stunned')
+
+    def doHitFloor(self):
+        super().doHitFloor()
+        self.__playHitFloorAnimation()
+
+    def doHitGoon(self, goon):
+        super().doHitGoon(goon)
+        if self.state == 'Falling':
+            self.__playHitFloorAnimation()

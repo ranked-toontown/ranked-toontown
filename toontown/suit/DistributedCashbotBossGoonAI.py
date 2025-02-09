@@ -556,7 +556,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.isStunned = 1
         self.d_setObjectState('F', 0, 0)
         # Schedule recovery after landing
-        taskMgr.doMethodLater(2.0, self.__recoverFromFall, self.uniqueName('recoverFromFall'))
+        taskMgr.doMethodLater(2.5, self.__recoverFromFall, self.uniqueName('recoverFromFall'))
 
     def exitFalling(self):
         taskMgr.remove(self.uniqueName('recoverFromFall'))
@@ -565,5 +565,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # Make sure we're at ground level
         pos = self.getPos()
         self.setPos(pos[0], pos[1], 0)
+        self.d_setPos(pos[0], pos[1], 0)
         self.demand('Recovery')
         return Task.done
