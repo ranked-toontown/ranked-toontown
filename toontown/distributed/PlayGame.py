@@ -108,7 +108,6 @@ class PlayGame(StateData.StateData):
         return
 
     def enter(self, hoodId, zoneId, avId):
-        base.discord.setZone(zoneId)
         # Always spawn in Toontown Central
         # todo: preferred playground setting?
         hoodId = ToontownGlobals.ToontownCentral

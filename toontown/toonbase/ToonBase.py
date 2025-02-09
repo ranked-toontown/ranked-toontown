@@ -17,7 +17,6 @@ from libotp import *
 import sys
 import os
 import math
-from toontown.discord.DiscordRPC import DiscordRPC
 from toontown.toonbase import ToontownAccess
 from toontown.toonbase import TTLocalizer
 from toontown.toonbase import ToontownBattleGlobals
@@ -28,7 +27,7 @@ import shutil
 import time
 
 import toontown.archipelago.util.global_text_properties as global_text_properties
-from .ErrorTrackingService import ErrorTrackingService, SentryErrorTrackingService, ServiceType
+from .ErrorTrackingService import ErrorTrackingService, ServiceType, BasicErrorTrackingService
 from ..settings.Settings import Settings, ControlSettings
 
 if typing.TYPE_CHECKING:
@@ -41,7 +40,7 @@ class ToonBase(OTPBase.OTPBase):
     def __init__(self):
 
         version = self.config.GetString('version', 'v???')
-        self.errorReportingService: ErrorTrackingService = SentryErrorTrackingService(ServiceType.CLIENT, version)
+        self.errorReportingService: ErrorTrackingService = BasicErrorTrackingService(ServiceType.CLIENT, version)
 
         self.global_text_properties = global_text_properties
 
@@ -195,12 +194,9 @@ class ToonBase(OTPBase.OTPBase):
         self.WANT_FOV_EFFECTS = self.settings.get('fovEffects')
         self.CAM_TOGGLE_LOCK = self.settings.get('cam-toggle-lock')
         self.WANT_LEGACY_MODELS = self.settings.get('want-legacy-models')
-        self.wantRichPresence = self.settings.get('discord-rich-presence')
         self.colorBlindMode = self.settings.get('color-blind-mode')
         # do they want laff meter on or off?
         self.laffMeterDisplay = self.settings.get('laff-display')
-        self.discord = DiscordRPC()
-        self.discord.launching()
         self.ap_version_text = OnscreenText(text=f"Toontown Ranked Client {version}", parent=self.a2dBottomLeft, pos=(.3, .05), mayChange=False, sort=-100, scale=.04, fg=(1, 1, 1, .3), shadow=(0, 0, 0, .3), align=TextNode.ALeft)
 
         self.enableHotkeys()
@@ -208,7 +204,6 @@ class ToonBase(OTPBase.OTPBase):
         self.setAntiAliasing()
         self.setAnisotropicFilter()
         self.setVerticalSync()
-        self.setRichPresence()
 
         if base.config.GetBool('want-injector', False):
             from ..util.dev.Injector import DeveloperInjector
@@ -626,12 +621,6 @@ class ToonBase(OTPBase.OTPBase):
         self.ignore("disable-hotkeys")
         self.ignoreHotkeys()
         self.accept("enable-hotkeys", self.enableHotkeys)
-
-    def setRichPresence(self) -> None:
-        if self.wantRichPresence:
-            self.discord.enable()
-        else:
-            self.discord.disable()
 
     def setAntiAliasing(self) -> None:
         antialias = self.settings.get("anti-aliasing")

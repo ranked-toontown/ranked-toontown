@@ -79,7 +79,6 @@ class DistributedCountryClub(DistributedObject.DistributedObject):
     def setCountryClubId(self, id):
         DistributedCountryClub.notify.debug('setCountryClubId: %s' % id)
         self.countryClubId = id
-        base.discord.setZone(id)
 
     def setFloorNum(self, num):
         DistributedCountryClub.notify.debug('floorNum: %s' % num)

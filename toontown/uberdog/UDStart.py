@@ -4,7 +4,7 @@ import os
 
 import argparse
 
-from toontown.toonbase.ErrorTrackingService import SentryErrorTrackingService, ServiceType
+from toontown.toonbase.ErrorTrackingService import BasicErrorTrackingService, ServiceType
 
 parser = argparse.ArgumentParser(description="Toontown Ranked - UberDOG Server")
 parser.add_argument(
@@ -70,7 +70,7 @@ from otp.ai.AIBaseGlobal import *
 from toontown.uberdog.ToontownUberRepository import ToontownUberRepository
 
 version = simbase.config.GetString('version', 'v???')
-simbase.errorReportingService = SentryErrorTrackingService(ServiceType.UBERDOG, version)
+simbase.errorReportingService = BasicErrorTrackingService(ServiceType.UBERDOG, version)
 
 simbase.air = ToontownUberRepository(config.ConfigVariableInt('air-base-channel', 400000000).getValue(),
                                      config.ConfigVariableInt('air-stateserver', 10000).getValue())

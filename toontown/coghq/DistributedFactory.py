@@ -55,7 +55,6 @@ class DistributedFactory(DistributedLevel.DistributedLevel, FactoryBase.FactoryB
 
     def setFactoryId(self, id):
         FactoryBase.FactoryBase.setFactoryId(self, id)
-        base.discord.setZone(id)
 
     def setForemanConfronted(self, avId):
         if avId == base.localAvatar.doId:
