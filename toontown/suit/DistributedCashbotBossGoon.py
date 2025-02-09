@@ -320,13 +320,12 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
     def enterFalling(self):
         self.stopToonDetect()
         self.radar.hide()
-        
-        # Use stunned animation during fall
         self.pose('collapse', 48)
-        
+        self.isStunned = 1
+
         # Activate physics to handle collisions and bouncing
         self.activatePhysics()
-        
+
         # Set physics properties for bouncy behavior
         self.handler.setStaticFrictionCoef(0)  # Make it slide
         self.handler.setDynamicFrictionCoef(0.3)
@@ -336,10 +335,3 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
 
     def exitFalling(self):
         self.deactivatePhysics()
-
-    def __hitFloor(self, entry):
-        if self.state == 'Falling':
-            self.d_hitFloor()
-            self.demand('Recovery')
-        else:
-            DistributedCashbotBossObject.DistributedCashbotBossObject.__hitFloor(self, entry)
