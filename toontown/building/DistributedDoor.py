@@ -91,7 +91,7 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
     def wantsNametag(self):
         return not ZoneUtil.isInterior(self.zoneId)
 
-    def setupNametag(self):
+    def setupNametag(self, parent):
         if not self.wantsNametag():
             return
         if self.nametag == None:
@@ -102,7 +102,7 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
             self.nametag.setContents(Nametag.CName)
             self.nametag.setColorCode(NametagGroup.CCToonBuilding)
             self.nametag.setActive(0)
-            self.nametag.setAvatar(self.getDoorNodePath())
+            self.nametag.setAvatar(parent)
             self.nametag.setObjectCode(self.block)
             name = self.cr.playGame.dnaStore.getTitleFromBlockNumber(self.block)
             self.nametag.setName(name)
@@ -198,7 +198,8 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
         self.setTriggerName()
         self.accept(self.getEnterTriggerEvent(), self.doorTrigger)
         self.acceptOnce('clearOutToonInterior', self.doorTrigger)
-        self.setupNametag()
+        if self.getDoorNodePath().getName().endswith('0'):
+            self.setupNametag(self.getDoorNodePath())
 
     def getBuilding(self):
         if not hasattr(self, 'building'):
