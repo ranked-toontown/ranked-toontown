@@ -565,6 +565,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # Make sure we're at ground level
         pos = self.getPos()
         self.setPos(pos[0], pos[1], 0)
-        self.d_setPos(pos[0], pos[1], 0)
+        self.d_setXY(pos[0], pos[1])
         self.demand('Recovery')
         return Task.done
