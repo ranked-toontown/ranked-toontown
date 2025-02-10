@@ -57,6 +57,7 @@ want-news-tab false
 # Gameplay settings
 want-gardening true
 want-emblems true
+threading-model /Draw
 
 # Misc. settings
 respect-prev-transform true
