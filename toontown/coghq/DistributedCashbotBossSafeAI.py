@@ -42,6 +42,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         self.cTrav = CollisionTraverser('safe')
         self.cQueue = CollisionHandlerQueue()
         self.cTrav.addCollider(self.safeToSafeNodePath, self.cQueue)
+        self.wantsWatchDrift = 0
 
     def announceGenerate(self):
         DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.announceGenerate(self)
