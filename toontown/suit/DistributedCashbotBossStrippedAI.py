@@ -11,7 +11,6 @@ from toontown.coghq import DistributedCashbotBossSideCraneAI
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from .DistributedBossCogStrippedAI import DistributedBossCogStrippedAI
-from ..coghq.CraneLeagueGlobals import CraneGameRuleset
 
 
 class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
