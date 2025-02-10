@@ -430,7 +430,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.craneId = 0
         self.isStunned = 0
 
-        if self.__chooseDirection():
+        if self.__chooseTarget():
             self.__startWalk()
             self.d_setObjectState('W', 0, 0)
 
@@ -459,6 +459,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.d_setTarget(self.target[0], self.target[1], h, walkTime)
 
         self.__startWalk()
+        taskMgr.remove(self.uniqueName('reachedTarget'))
         self.d_setObjectState('a', 0, 0)
 
         # Start synchronization task
@@ -497,6 +498,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.d_setTarget(self.target[0], self.target[1], h, walkTime)
         
         self.__startWalk()
+        taskMgr.remove(self.uniqueName('reachedTarget'))
         self.d_setObjectState('b', 0, 0)
 
         # Start synchronization task
