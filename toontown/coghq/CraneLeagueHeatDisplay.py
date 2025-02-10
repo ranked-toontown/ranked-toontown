@@ -121,7 +121,6 @@ class CraneLeagueHeatDisplay:
 
         s = LOWEST_HEAT_S_VALUE + ((HIGHEST_HEAT_S_VALUE-LOWEST_HEAT_S_VALUE)*heat_factor)
         r, g, b = ColorSpace.hsv2rgb(h, s, V_HEAT_VALUE)
-        print(('setting to %s %s %s (%s %s %s)' % (r, g, b, h, s, V_HEAT_VALUE)))
         return r, g, b, 1
 
     # Take in an integer and set the heat to display, update the color
@@ -147,5 +146,16 @@ class CraneLeagueHeatDisplay:
         self.modifiers_desc.setFrameColor(self.calculate_color())
 
     def cleanup(self):
-        self.frame.destroy()
+        self.hover_button.destroy()
+        self.hover_button.removeNode()
+        del self.hover_button
+        self.flame_image.removeNode()
+        del self.flame_image
+        self.heat_number.removeNode()
+        del self.heat_number
+        del self.modifiers_desc
         self.modifiers_desc_path.removeNode()
+        del self.modifiers_desc_path
+        self.frame.destroy()
+        self.frame.removeNode()
+        del self.frame

@@ -449,22 +449,33 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.flushQueuedPoints()
         if self.isBeingSpectated:
             self.stopSpectating()
+        self.cancel_inc_ival()
+        del self.inc_ival
         self.toon_head.cleanup()
+        self.toon_head.removeNode()
         del self.toon_head
         self.points_text.cleanup()
+        self.points_text.removeNode()
         del self.points_text
         self.combo_text.cleanup()
+        self.combo_text.removeNode()
         del self.combo_text
         taskMgr.remove('sadtimer-' + str(self.avId))
         self.sad_text.cleanup()
+        self.sad_text.removeNode()
         del self.sad_text
         self.toon_head_button.destroy()
+        self.toon_head_button.removeNode()
         del self.toon_head_button
         self.extra_stats_text.cleanup()
+        self.extra_stats_text.removeNode()
         del self.extra_stats_text
-        self.cancel_inc_ival()
-        del self.inc_ival
+        del self.ruleset
+        self.frame.destroy()
+        self.frame.removeNode()
+        del self.frame
         self.INSTANCES.remove(self)
+        self.ignoreAll()
 
     def show(self):
         self.points_text.show()
@@ -554,7 +565,6 @@ class CashbotBossScoreboard(DirectObject):
         for row in list(self.rows.values()):
             row.cleanup()
             del self.rows[row.avId]
-
         self.hide()
 
     def addScore(self, avId, amount, reason: CraneLeagueGlobals.ScoreReason = CraneLeagueGlobals.ScoreReason.DEFAULT):
@@ -586,11 +596,15 @@ class CashbotBossScoreboard(DirectObject):
         return [avId for avId in list(self.rows.keys())]
 
     def cleanup(self):
-
         self.clearToons()
-
+        del self.default_row
         self.default_row_path.removeNode()
-        self.ignore('f1')
+        del self.default_row_path
+        self.frame.destroy()
+        self.frame.removeNode()
+        del self.frame
+        self.ignoreAll()
+        taskMgr.remove('expand-tip')
 
     def hide_tip_later(self):
         taskMgr.remove('expand-tip')

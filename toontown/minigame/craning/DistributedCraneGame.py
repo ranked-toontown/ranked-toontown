@@ -22,7 +22,6 @@ from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.BossSpeedrunTimer import BossSpeedrunTimedTimer, BossSpeedrunTimer
 from toontown.coghq.CashbotBossScoreboard import CashbotBossScoreboard
 from toontown.coghq.CraneLeagueHeatDisplay import CraneLeagueHeatDisplay
-from toontown.coghq.DistributedCashbotBossSideCrane import DistributedCashbotBossSideCrane
 from toontown.minigame.DistributedMinigame import DistributedMinigame
 from toontown.minigame.craning import CraneGameGlobals
 from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORANGE_COUNTDOWN_COLOR, \
@@ -412,15 +411,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.geom.removeNode()
         del self.geom
 
-        self.bossSpeedrunTimer.cleanup()
-        del self.bossSpeedrunTimer
-
         self.fnp.removeNode()
         self.physicsMgr.clearLinearForces()
         self.music.stop()
-        self.scoreboard.cleanup()
-        self.heatDisplay.cleanup()
-
         base.cr.forbidCheesyEffects(0)
         localAvatar.setCameraFov(ToontownGlobals.CogHQCameraFov)
         self.music.stop()
@@ -602,6 +595,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.__hideOverlayText()
 
     def enterPlay(self):
+        self.__cleanupRulesPanel()
         taskMgr.remove(self.uniqueName("craneGameVictory"))
         self.notify.debug("enterPlay")
         self.evWalls.unstash()
@@ -667,10 +661,18 @@ class DistributedCraneGame(DistributedMinigame):
 
     def enterCleanup(self):
         self.notify.debug("enterCleanup")
+        self.__cleanupRulesPanel()
         for toon in self.getParticipants():
             toon.setGhostMode(False)
             toon.show()
         self.overlayText.removeNode()
+        self.bossSpeedrunTimer.cleanup()
+        del self.bossSpeedrunTimer
+        self.scoreboard.cleanup()
+        self.scoreboard = None
+        self.heatDisplay.cleanup()
+        self.heatDisplay = None
+        self.boss = None
 
     def exitCleanup(self):
         pass

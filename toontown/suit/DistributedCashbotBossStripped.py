@@ -16,21 +16,11 @@ from toontown.coghq import BossHealthBar
 
 class DistributedCashbotBossStripped(DistributedBossCogStripped):
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedCashbotBoss')
-    numFakeGoons = 3
-
-    BASE_HEAT = 500
 
     def __init__(self, cr):
         super().__init__(cr)
-
-        # hack for quick access while debugging
-        base.boss = self
-
-        self.wantCustomCraneSpawns = False
-        self.customSpawnPositions = {}
         self.ruleset = CraneLeagueGlobals.CraneGameRuleset()  # Setup a default ruleset as a fallback
         self.modifiers = []
-        self.endVault = None
         self.warningSfx = None
         # By "heldObject", we mean the safe he's currently wearing as
         # a helmet, if any.  It's called a heldObject because this is
@@ -39,15 +29,11 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.heldObject = None
 
         self.latency = 0.5  # default latency for updating object posHpr
-        self.toonSpawnpointOrder = [i for i in range(16)]
         self.stunEndTime = 0
         self.myHits = []
         self.tempHp = self.ruleset.CFO_MAX_HP
         self.processingHp = False
         return
-
-    def setToonSpawnpoints(self, order):
-        self.toonSpawnpointOrder = order
 
     def announceGenerate(self):
         super().announceGenerate()
@@ -83,16 +69,12 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.eyes.reparentTo(self.neck)
         self.eyes.hide()
 
+    def delete(self):
+        super().delete()
+        self.ruleset = None
+
     def getBossMaxDamage(self):
         return self.ruleset.CFO_MAX_HP
-
-    def calculateHeat(self):
-        bonusHeat = 0
-        # Loop through all modifiers present and calculate the bonus heat
-        for modifier in self.modifiers:
-            bonusHeat += modifier.getHeat()
-
-        return self.BASE_HEAT + bonusHeat
 
     def setModifiers(self, mods):
         modsToSet = []  # A list of CFORulesetModifierBase subclass instances
@@ -101,14 +83,6 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
 
         self.modifiers = modsToSet
         self.modifiers.sort(key=lambda m: m.MODIFIER_TYPE)
-
-    def disable(self):
-        """
-        This method is called when the DistributedObject
-        is removed from active duty and stored in a cache.
-        """
-        super().disable()
-        del base.boss
 
     def setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
 
@@ -131,10 +105,6 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.bossHealthBar.update(self.ruleset.CFO_MAX_HP - bossDamage, self.ruleset.CFO_MAX_HP)
         self.processingHp = False
         self.tempHp = self.ruleset.CFO_MAX_HP - self.bossDamage
-
-    def setCraneSpawn(self, want, spawn, toonId):
-        self.wantCustomCraneSpawns = want
-        self.customSpawnPositions[toonId] = spawn
 
     def prepareBossForBattle(self):
         if self.bossHealthBar:

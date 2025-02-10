@@ -61,9 +61,6 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def clearSafeHelmetCooldowns(self):
         self.safeHelmetCooldownsDict.clear()
 
-    def d_setToonSpawnpointOrder(self):
-        self.sendUpdate('setToonSpawnpoints', [self.toonSpawnpointOrder])
-
     def getToonOutgoingMultiplier(self, avId):
         n = self.toonDmgMultipliers.get(avId)
         if not n:

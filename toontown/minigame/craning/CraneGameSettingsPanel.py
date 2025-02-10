@@ -28,10 +28,8 @@ class CraneGameSettingsPanel(DirectFrame):
         self.gameTitle = gameTitle
         self.playerSpots = []
         self.timer: ToontownTimer | None = None
-        self.selectedSpot = None
         self.isLeader = True  # Will be set based on if player is first to join
         self.toonHeads = {}  # Store toon head nodes
-        self.TIMEOUT = MinigameGlobals.rulesDuration  # Default 16 seconds
 
         self.load()
 
@@ -222,6 +220,7 @@ class CraneGameSettingsPanel(DirectFrame):
         # Remove toon head if it exists
         if index in self.toonHeads:
             if self.toonHeads[index]:
+                self.toonHeads[index].cleanup()
                 self.toonHeads[index].removeNode()
                 self.toonHeads[index] = None
             del self.toonHeads[index]
@@ -241,6 +240,7 @@ class CraneGameSettingsPanel(DirectFrame):
         if self.timer is not None:
             self.timer.stop()
             self.timer.destroy()
+            self.timer.removeNode()
             self.timer = None
 
         # Cleanup toon heads
@@ -248,19 +248,24 @@ class CraneGameSettingsPanel(DirectFrame):
             self.clearSpot(index)
         self.toonHeads = {}
 
-        if hasattr(self, 'playerSpots') and self.playerSpots:
+        if self.playerSpots:
             for spot in self.playerSpots:
                 if spot['frame']:
                     spot['frame'].destroy()
+                    spot['frame'].removeNode()
+                    spot['frame'] = None
         self.playerSpots = None
 
         # Remove enter key handler
-        self.ignore('enter')
+        self.ignoreAll()
 
         if self.frame is not None:
             self.titleText.destroy()
+            self.titleText.removeNode()
             self.playButton.destroy()
+            self.playButton.removeNode()
             self.frame.destroy()
+            self.frame.removeNode()
             self.titleText = None
             self.playButton = None
             self.frame = None
