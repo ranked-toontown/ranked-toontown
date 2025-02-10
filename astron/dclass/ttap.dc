@@ -1557,7 +1557,7 @@ dclass DistributedCashbotBossGoon : DistributedCashbotBossObject {
   setStrength(uint32) broadcast ram;
   setGoonScale(uint16/50) broadcast ram;
   setupGoon : setVelocity, setHFov, setAttackRadius, setStrength, setGoonScale;
-  setTarget(int16/10, int16/10, uint16%360/100, int16) broadcast ram;
+  setTarget(int16/10, int16/10, uint16%360/100, int16/100) broadcast ram;
   destroyGoon() broadcast clsend airecv;
 };
 

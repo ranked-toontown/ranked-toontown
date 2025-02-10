@@ -127,7 +127,7 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
                 # And how long will it take to walk to position?
                 dist = Vec3(self.target - self.getPos()).length()
                 walkTime = dist / self.velocity
-                
+
                 denom = turnTime + walkTime
                 if denom != 0:
                     # Fit that within our available time.
@@ -159,7 +159,7 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         # We've successfully wiggled free after being picked up.
         if self.crane:
             self.crane.releaseObject()
-        
+
         # And we can't be picked up again until we land.
         self.stashCollisions()
         return Task.done
@@ -197,7 +197,7 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         taskMgr.remove(self.wiggleTaskName)
         taskMgr.remove(self.wiggleFreeName)
         self.setPlayRate(self.animMultiplier, 'walk')
-        
+
     ##### Messages To/From The Server #####
 
     def setObjectState(self, state, avId, craneId):
@@ -221,11 +221,11 @@ class DistributedCashbotBossGoon(DistributedGoon.DistributedGoon, DistributedCas
         else:
             DistributedCashbotBossObject.DistributedCashbotBossObject.setObjectState(self, state, avId, craneId)
 
-    def setTarget(self, x, y, h, arrivalTime):
+    def setTarget(self, x, y, h, travelTime):
         self.target = Point3(x, y, 0)
         self.targetH = h
         now = globalClock.getFrameTime()
-        self.arrivalTime = globalClockDelta.networkToLocalTime(arrivalTime, now)
+        self.arrivalTime = now + travelTime
         if self.state == 'Walk':
             self.__startWalk()
 
