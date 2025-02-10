@@ -893,8 +893,6 @@ class KartShopGuiMgr(DirectObject.DirectObject):
 
     def __handleBoughtKartDlg(self, exitType):
         self.notify.debug('__handleBoughtKartDlg: Telling the player their purchase was successful')
-        if not hasattr(base.localAvatar, 'kartPage'):
-            base.localAvatar.addKartPage()
         self.kartID = -1
         self.__doDialog(MENUS.MainMenu)
 

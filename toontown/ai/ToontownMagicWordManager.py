@@ -429,7 +429,6 @@ class ToontownMagicWordManager(MagicWordManager.MagicWordManager):
             if base.wantKarts:
 
                 def doShtikerLater(task):
-                    base.localAvatar.addKartPage()
                     return 0
 
                 if base.localAvatar.hasKart():

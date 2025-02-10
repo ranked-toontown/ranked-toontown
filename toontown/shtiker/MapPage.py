@@ -69,13 +69,6 @@ class MapPage(ShtikerPage.ShtikerPage):
         self.clouds = []
         self.cloudAlphas = []
 
-        self.questsAvailableIcons: List[QuestsAvailablePoster] = []
-        self.fishAvailableIcons: List[FishAvailablePoster] = []
-        self.treasureAvailableIcons: List[TreasureAvailablePoster] = []
-        self.petsAvailableIcons: List[PetsAvailablePoster] = []
-        self.raceIcons: List[CanRacePoster] = []
-        self.golfIcons: List[CanGolfPoster] = []
-
         guiButton = loader.loadModel('phase_3/models/gui/quit_button')
         buttonLoc = (0.45, 0, - 0.74)
         if base.housingEnabled:
@@ -139,14 +132,6 @@ class MapPage(ShtikerPage.ShtikerPage):
                 extraArgs=[hood],
                 sortOrder=5)
             label.resetFrameSize()
-            self.questsAvailableIcons.append(QuestsAvailablePoster(hood, parent=label, pos=(0.06, 0, 0.08), scale=.1, sortOrder=1))
-            self.fishAvailableIcons.append(FishAvailablePoster(hood, parent=label, pos=(0.19, 0, 0.08), scale=.1, sortOrder=1))
-            self.treasureAvailableIcons.append(TreasureAvailablePoster(hood, parent=label, pos=(-0.06, 0, 0.09), scale=.1, sortOrder=1))
-            self.petsAvailableIcons.append(PetsAvailablePoster(hood, parent=label, pos=(-0.16, 0, 0.09), scale=.1, sortOrder=1))
-            self.raceIcons.append(CanRacePoster(hood, parent=label, pos=(0.06, 0, 0.09), scale=.1, sortOrder=1))
-            self.golfIcons.append(CanGolfPoster(hood, parent=label, pos=(0.06, 0, 0.09), scale=.1, sortOrder=1))
-            label.bind(DGG.WITHIN, self.showTasksAvailableFrame, extraArgs=[hood, hoodIndex])
-            label.bind(DGG.WITHOUT, self.hideTasksAvailableFrame, extraArgs=[hood, hoodIndex])
             self.labels.append(label)
             hoodClouds = []
             for cloudScale, cloudPos in zip(self.cloudScaleList[hoodIndex], self.cloudPosList[hoodIndex]):
@@ -167,54 +152,9 @@ class MapPage(ShtikerPage.ShtikerPage):
         self.resetFrameSize()
         return
 
-    def showTasksAvailableFrame(self, hood, hoodIndex, pos):
-        self.__hoverCallback(1, hoodIndex, pos)
-        for questPoster, fishPoster, treasurePoster, petPoster, racePoster, golfPoster in zip(self.questsAvailableIcons, self.fishAvailableIcons, self.treasureAvailableIcons, self.petsAvailableIcons, self.raceIcons, self.golfIcons):
-            if hood == questPoster.getHoodId():
-                treasurePoster.show()
-                # Only show if we need to.
-                if hood == ToontownGlobals.OutdoorZone and base.localAvatar.slotData.get("golfing_logic"):
-                    golfPoster.show()
-                if hood == ToontownGlobals.GoofySpeedway and base.localAvatar.slotData.get("racing_logic"):
-                    racePoster.show()
-                if hood in FADoorCodes.PLAYGROUND_ZONES:
-                    questPoster.show()
-                    fishPoster.show()
-                    petPoster.show()
-            else:
-                continue
-
-    def hideTasksAvailableFrame(self, hood, hoodIndex, pos):
-        self.__hoverCallback(0, hoodIndex, pos)
-        for questPoster, fishPoster, treasurePoster, petPoster, racePoster, golfPoster in zip(self.questsAvailableIcons, self.fishAvailableIcons, self.treasureAvailableIcons, self.petsAvailableIcons, self.raceIcons, self.golfIcons):
-            if hood == questPoster.getHoodId():
-                treasurePoster.hide()
-                # Only hide if we need to.
-                if hood == ToontownGlobals.OutdoorZone and base.localAvatar.slotData.get("golfing_logic"):
-                    golfPoster.hide()
-                if hood == ToontownGlobals.GoofySpeedway and base.localAvatar.slotData.get("racing_logic"):
-                    racePoster.hide()
-                if hood in FADoorCodes.PLAYGROUND_ZONES:
-                    questPoster.hide()
-                    fishPoster.hide()
-                    petPoster.hide()
-            else:
-                continue
-
     def unload(self):
         for labelButton in self.labels:
             labelButton.destroy()
-
-        for questPoster, fishPoster, treasurePoster, petPoster in zip(self.questsAvailableIcons, self.fishAvailableIcons, self.treasureAvailableIcons, self.petsAvailableIcons):
-            questPoster.destroy()
-            fishPoster.destroy()
-            treasurePoster.destroy()
-            petPoster.destroy()
-        self.questsAvailableIcons.clear()
-        self.fishAvailableIcons.clear()
-        self.treasureAvailableIcons.clear()
-        self.petsAvailableIcons.clear()
-
         del self.labels
         del self.clouds
         self.safeZoneButton.destroy()

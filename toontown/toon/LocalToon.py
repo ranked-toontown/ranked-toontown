@@ -367,8 +367,6 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         self.fishPage.setAvatar(self)
         self.fishPage.load()
         self.book.addPage(self.fishPage, pageName=TTLocalizer.FishPageTitle)
-        if base.wantKarts:
-            self.addKartPage()
         if self.disguisePageFlag:
             self.loadDisguisePages()
         if self.sosPageFlag:
@@ -376,7 +374,6 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         if self.gardenStarted:
             self.loadGardenPages()
         self.addGolfPage()
-        self.addEventsPage()
         if WantNewsPage:
             self.addNewsPage()
         self.wordPage = WordPage.WordPage()
@@ -443,21 +440,6 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.leaveToPayDialog.show()
         else:
             self.notify.error('You should not get here without a PlayToken')
-
-    if base.wantKarts:
-
-        def addKartPage(self):
-            if self.hasKart():
-                if hasattr(self, 'kartPage') and self.kartPage != None:
-                    return
-                if not launcher.getPhaseComplete(6):
-                    self.acceptOnce('phaseComplete-6', self.addKartPage)
-                    return
-                self.kartPage = KartPage.KartPage()
-                self.kartPage.setAvatar(self)
-                self.kartPage.load()
-                self.book.addPage(self.kartPage, pageName=TTLocalizer.KartPageTitle)
-            return
 
     def setWantBattles(self, wantBattles):
         self.wantBattles = wantBattles
@@ -1898,17 +1880,6 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.golfPage.setAvatar(self)
             self.golfPage.load()
             self.book.addPage(self.golfPage, pageName=TTLocalizer.GolfPageTitle)
-        return
-
-    def addEventsPage(self):
-        if hasattr(self, 'eventsPage') and self.eventsPage != None:
-            return
-        if not launcher.getPhaseComplete(4):
-            self.acceptOnce('phaseComplete-4', self.addEventsPage)
-            return
-        self.eventsPage = EventsPage.EventsPage()
-        self.eventsPage.load()
-        self.book.addPage(self.eventsPage, pageName=TTLocalizer.EventsPageName)
         return
 
     def addNewsPage(self):
