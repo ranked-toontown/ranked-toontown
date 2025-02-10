@@ -11,13 +11,11 @@ from toontown.coghq import DistributedCashbotBossSideCraneAI
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from .DistributedBossCogStrippedAI import DistributedBossCogStrippedAI
+from ..coghq.CraneLeagueGlobals import CraneGameRuleset
 
 
 class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedCashbotBossAI')
-
-    # How long should we wait before being able to safe helmet the CFO twice?
-    SAFE_HELMET_COOLDOWN: int = 60
 
     def __init__(self, air, game):
         DistributedBossCogStrippedAI.__init__(self, air, game, 'm')
@@ -56,7 +54,7 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return False
 
     def addSafeHelmetCooldown(self, toonId: int):
-        self.safeHelmetCooldownsDict[toonId] = time.time() + self.SAFE_HELMET_COOLDOWN
+        self.safeHelmetCooldownsDict[toonId] = time.time() + self.ruleset.SAFE_HELMET_COOLDOWN
 
     def clearSafeHelmetCooldowns(self):
         self.safeHelmetCooldownsDict.clear()
