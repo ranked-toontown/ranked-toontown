@@ -173,11 +173,11 @@ class OptionsTabPage(DirectFrame, FSM):
 
     def load(self) -> None:
         # Load the Fish Page to borrow its tabs
-        base.loader.loadModel("phase_3.5/models/gui/fishingBook", callback=self.loadTabs)
+        self.loadTabs(base.loader.loadModel("phase_3.5/models/gui/fishingBook"))
         # Load the "Exit Toontown" button
-        base.loader.loadModel("phase_3/models/gui/quit_button", callback=self.createExitButton)
+        self.createExitButton(base.loader.loadModel("phase_3/models/gui/quit_button"))
         # Load (& hide) the options frames
-        base.loader.loadModel("phase_3/models/gui/quit_button", callback=self.createTabs)
+        self.createTabs(base.loader.loadModel("phase_3/models/gui/quit_button"))
 
     def loadTabs(self, gui):
         # The blue and yellow colors are trying to match the
