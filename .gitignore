@@ -2,6 +2,8 @@
 *.pyo
 *.fzn
 *.dll
+*.mf
+deploy/
 pandac/
 *.dis
 *.log
@@ -17,6 +19,9 @@ backups/
 settings.json
 errorCode
 PPYTHON_PATH
+nuitka-crash-report.xml
+*.dist/
+*.build/
 
 toontown/archipelago/output/
 
