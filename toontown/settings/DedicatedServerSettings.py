@@ -51,6 +51,6 @@ class DedicatedServerSettings:
         self.loadFromSettings()
 
     def loadFromSettings(self):
-        mongoDB = self.settings.getBool('game', 'local-multiplayer', False)
-        loadPrcFileData('DedicatedServer Settings Local', 'local-multiplayer %s' % mongoDB)
-        self.settings.updateSetting('game', 'local-multiplayer', mongoDB)
+        localMultiplayer = self.settings.getBool('server', 'local-multiplayer', False)
+        loadPrcFileData('DedicatedServer Settings Local', 'local-multiplayer %s' % localMultiplayer)
+        self.settings.updateSetting('server', 'local-multiplayer', localMultiplayer)

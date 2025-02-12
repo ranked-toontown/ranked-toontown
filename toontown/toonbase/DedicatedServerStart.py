@@ -1,6 +1,9 @@
 from panda3d.core import loadPrcFile, VirtualFileSystem, Filename, ConfigVariableList, loadPrcFileData
 from direct.showbase.ShowBase import ShowBase
 from toontown.toonbase.DedicatedServer import DedicatedServer
+from toontown.settings.DedicatedServerSettings import DedicatedServerSettings
+
+settings = DedicatedServerSettings()
 
 if "__compiled__" not in globals():
     loadPrcFile('config/common.prc')
