@@ -65,8 +65,7 @@ class Settings:
         'discord-rich-presence': False,
         "archipelago-textsize": 0.5,
         "color-blind-mode": False,
-        'laff-display': True,
-        "local-multiplayer": False
+        'laff-display': True
     }
     settingsFile = Path.home() / "Documents" / "Toontown-Ranked" / "settings.json"
 
