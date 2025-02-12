@@ -136,7 +136,7 @@ if not config.ConfigVariableBool('local-multiplayer', False).getValue():
 
     base.accept('cleanup', cleanup)
     dialogClass = OTPGlobals.getGlobalDialogClass()
-    askServerSpecification = dialogClass(message = CRSpecifyServerSelection, style = OTPDialog.TwoChoiceCustom, okButtonText = CRSingleplayer, cancelButtonText = CRPublicServer, command = decision, doneEvent = 'cleanup')
+    askServerSpecification = dialogClass(message = CRSpecifyServerSelection, style = OTPDialog.TwoChoiceCustom, okButtonText = CRSingleplayer, cancelButtonText = CRPublicServer, command = decision, doneEvent = 'cleanup', text_wordwrap = 16, buttonPadSF = 5)
     askServerSpecification.show()
 else:
     if not launcher.isDummy():
