@@ -600,10 +600,32 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 
         return True
 
-    def makeGoon(self, side=None, forceNormalSpawn=False):
-        # Check if we can make a new goon
+    def makeGoon(self, side=None, forceNormalSpawn=False, fallingChance=0.5):
+        # Picks a side for a goon to generate on if not specified
+        if side is None:
+            side = self.__chooseGoonEmergeSide()
+
+        # Should this goon fall if we are in overtime?
+        falling = random.random() < fallingChance
+
+        # Long logic process to determine whether a goon should be made and what type.
+        # If we are at max goon size, do not make a new goon
         if len(self.goons) >= self.getMaxGoons():
             return
+
+        #Only 2 current cases where goons should spawn when the CFO is stunned
+        if self.boss.isStunned():
+            #If we are in OT and we roll a falling goon and it's not a forced normal spawn
+            if self.currentlyInOvertime and falling and not forceNormalSpawn:
+                pass
+            #Or if we are in live goon practice mode
+            elif self.practiceCheatHandler.wantGoonPractice:
+                pass
+            else:
+                return
+
+        #From here on out, a goon is guaranteed to be created on a specific side of the room
+        self.__updateGoonCache(side)
 
         # Create and generate the goon
         goon = DistributedCashbotBossGoonAI(self.air, self)
@@ -635,59 +657,42 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         goon.b_setupGoon(velocity=goon_velocity, hFov=goon_hfov, attackRadius=goon_attack_radius,
                          strength=goon_strength, scale=goon_scale)
 
-        # If this is an initial spawn or we're forced to use normal spawn, use door emergence
-        if forceNormalSpawn:
-            if side is None:
-                side = self.__chooseGoonEmergeSide()
-            goon.request(side)
-            return
-
-        # Only allow falling goons during overtime mode, with 50% chance
-        if self.currentlyInOvertime and random.random() < 0.5:
-            bossPos = self.boss.getPos()
-            
-            # Keep trying positions until we find a clear one
-            maxAttempts = 20  # Prevent infinite loops
-            attempts = 0
-            while attempts < maxAttempts:
-                # Random position 15-20 units away from CFO
-                radius = random.uniform(20, 30)
-                theta = random.uniform(-math.pi, math.pi)
-                xPos = bossPos[0] + radius * math.cos(theta)
-                yPos = bossPos[1] + radius * math.sin(theta)
-                
-                # Check if position is clear
-                if self.__isPositionClear(xPos, yPos):
-                    randomH = random.uniform(0, 360)  # Random heading between 0-360 degrees
-                    goon.b_setPosHpr(xPos, yPos, 40, randomH, 0, 0)
-                    goon.request('Falling')
-                    break
-                attempts += 1
-                
-            # If we couldn't find a clear position after max attempts, use door emergence
-            if attempts >= maxAttempts:
-                if side is None:
-                    side = self.__chooseGoonEmergeSide()
-                goon.request(side)
+        # Properly set up the goon in "Falling" state if necessary
+        if self.currentlyInOvertime and falling:
+            self.__makeFallingGoon(goon, side)
         else:
-            # Normal door emergence
-            if side is None:
-                side = self.__chooseGoonEmergeSide()
-
-            if side == self.goonCache[0]:
-                self.goonCache = (side, self.goonCache[1] + 1)
-            else:
-                self.goonCache = (side, 1)
             goon.request(side)
 
-    def __chooseOldGoon(self):
-        # Walks through the list of goons managed by the boss to see
-        # if any of them have recently been deleted and can be
-        # recycled.
+    def __updateGoonCache(self, side):
+        if side == self.goonCache[0]:
+            self.goonCache = (side, self.goonCache[1] + 1)
+        else:
+            self.goonCache = (side, 1)
 
-        for goon in self.goons:
-            if goon.state == 'Off':
-                return goon
+    def __makeFallingGoon(self, goon, side):
+        bossPos = self.boss.getPos()
+
+        # Keep trying positions until we find a clear one
+        # Took out prevent infinite loops code because 8 safes give a maximum of 200pi area covered
+        # Half of our allotted area for falling goons is 250 pi. Chance of 21+ iterations is 1.15%. 41+ is 0.013%.
+        while True:
+            # Random position 15-20 units away from CFO on correct side
+            radius = random.uniform(20, 30)
+            theta = random.uniform(-math.pi, math.pi)
+            xPos = bossPos[0] + radius * math.cos(theta)
+
+            #Bad luck protection position calculation
+            if side == "EmergeA":
+                yPos = bossPos[1] + abs(radius * math.sin(theta))
+            else:
+                yPos = bossPos[1] - abs(radius * math.sin(theta))
+
+            # Check if position is clear
+            if self.__isPositionClear(xPos, yPos):
+                randomH = random.uniform(0, 360)  # Random heading between 0-360 degrees
+                goon.b_setPosHpr(xPos, yPos, 40, randomH, 0, 0)
+                goon.request('Falling')
+                return
 
     def waitForNextGoon(self, delayTime):
         taskName = self.uniqueName('NextGoon')
@@ -699,10 +704,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         taskMgr.remove(taskName)
 
     def doNextGoon(self, task):
-        # Allow goons to spawn if we're in goon practice mode, even if CFO is stunned
-        if not self.boss.isStunned() or self.practiceCheatHandler.wantGoonPractice:
-            self.makeGoon()
-
+        self.makeGoon()
         # How long to wait for the next goon?
         delayTime = self.progressValue(10, 2)
         if self.practiceCheatHandler.wantFasterGoonSpawns:
