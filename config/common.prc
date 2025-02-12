@@ -76,3 +76,4 @@ text-use-harfbuzz #f
 # Dedicated Server Settings
 astron-config-path astron/config/astrond.yml
 local-multiplayer #f
+public-server-ip ttp.devvydont.xyz
