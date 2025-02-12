@@ -3,4 +3,4 @@ echo "Toontown Ranked: Astron Launcher"
 echo
 cd ../../astron
 
-./astrond --loglevel info config/astrond.yml
+./astrondmac --loglevel info config/astrond.yml
