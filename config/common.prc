@@ -72,3 +72,6 @@ texture-anisotropic-degree 16
 # Harfbuzz is good for handling non-latin text.
 # However, this causes odd spacing on Cog nametags, so let's disable it.
 text-use-harfbuzz #f
+
+# Dedicated Server Settings
+astron-config-path astron/config/astrond.yml
