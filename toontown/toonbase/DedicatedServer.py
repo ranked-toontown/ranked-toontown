@@ -49,8 +49,8 @@ class DedicatedServer:
         else:
             self.notify.info('Starting dedicated server...')
 
-        if ConfigVariableBool('local-multiplayer', True).getValue() and not self.localServer:
-            self.notify.error("You are trying to start the server manually, but local-multiplayer is enabled!\n"
+        if not ConfigVariableBool('local-multiplayer', True).getValue() and not self.localServer:
+            self.notify.error("You are trying to start the server manually, but local-multiplayer is disabled!\n"
                               "You do not need to run this file in singleplayer mode, the server will automatically start on bootup.")
 
         taskMgr.add(self.startAstron, 'startAstron')
@@ -67,6 +67,9 @@ class DedicatedServer:
                                                   stdin=self.astronLog, stdout=self.astronLog, stderr=self.astronLog)
         else:
             self.notify.error(f"The following platform is not supported: {sys.platform}")
+
+        if not ConfigVariableBool('local-multiplayer', True).getValue():
+            gameServicesDialog['text'] = OTPLocalizer.CRLoadingGameServices + '\n\n' + OTPLocalizer.CRLoadingGameServicesAstron
 
     def startAstron(self, task):
         self.notify.info('Starting Astron...')
@@ -118,7 +121,7 @@ class DedicatedServer:
             else:
                 uberDogArguments = 'RankedEngine --uberdog'
 
-        if ConfigVariableBool('local-multiplayer', True).getValue():
+        if not ConfigVariableBool('local-multiplayer', True).getValue():
             gameServicesDialog['text'] = OTPLocalizer.CRLoadingGameServices + '\n\n' + OTPLocalizer.CRLoadingGameServicesUberdog
 
         # Start UberDOG process.
@@ -165,7 +168,7 @@ class DedicatedServer:
             else:
                 aiArguments = 'RankedEngine --ai'
 
-        if ConfigVariableBool('local-multiplayer', True).getValue():
+        if not ConfigVariableBool('local-multiplayer', True).getValue():
             gameServicesDialog['text'] = OTPLocalizer.CRLoadingGameServices + '\n\n' + OTPLocalizer.CRLoadingGameServicesAI
 
         # Start AI process.
