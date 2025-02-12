@@ -1,6 +1,6 @@
 #!/bin/sh
 echo "Toontown Ranked: Astron Launcher"
 echo
-cd ../../astron
+cd ../../../astron
 
 ./astrondlinux --loglevel info config/astrond.yml

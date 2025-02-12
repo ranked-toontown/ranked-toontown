@@ -1,10 +1,10 @@
 @echo off
-title Toontown Ranked: Client 2 Launcher
-set /P PPYTHON_PATH=<PPYTHON_PATH
+title Toontown Ranked: Client 3 Launcher
+set /P PPYTHON_PATH=<../PPYTHON_PATH
 set SERVICE_TO_RUN=CLIENT
-cd ..\..
+cd ../../../
 
-set /P TTOFF_LOGIN_TOKEN="Enter your name (default: player2): " || set TTOFF_LOGIN_TOKEN=player2
+set /P TTOFF_LOGIN_TOKEN="Enter your name (default: player3): " || set TTOFF_LOGIN_TOKEN=player3
 set /P TTOFF_GAME_SERVER="Server IP (default: 127.0.0.1): " || set TTOFF_GAME_SERVER=127.0.0.1
 
 :main

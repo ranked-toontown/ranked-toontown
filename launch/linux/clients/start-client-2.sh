@@ -1,9 +1,9 @@
 #!/bin/sh
 echo "Toontown Ranked: Client 2 Launcher"
 echo
-export PPYTHON_PATH=$(cat PPYTHON_PATH)
+export PPYTHON_PATH=$(cat ../PPYTHON_PATH)
 export SERVICE_TO_RUN=CLIENT
-cd ../..
+cd ../../../
 
 echo "Enter your name (default: player2): "
 read -r loginToken
@@ -13,6 +13,9 @@ echo "Server IP (default: 127.0.0.1): "
 read -r gameServer
 export TTOFF_GAME_SERVER=${gameServer:="127.0.0.1"}
 
-$PPYTHON_PATH -m pip install -r requirements.txt
-$PPYTHON_PATH -m launch.launcher.launch
-sleep 1
+while true
+do
+	$PPYTHON_PATH -m pip install -r requirements.txt
+	$PPYTHON_PATH -m launch.launcher.launch
+	sleep 5
+done

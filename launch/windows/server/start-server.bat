@@ -1,6 +1,7 @@
+@echo off
 title Toontown Ranked: Dedicated Server
-set /P PPYTHON_PATH=<PPYTHON_PATH
-cd ..\..
+set /P PPYTHON_PATH=<../PPYTHON_PATH
+cd ../../../
 
 set WANT_ERROR_REPORTING=true
 

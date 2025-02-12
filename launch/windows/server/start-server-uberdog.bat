@@ -1,8 +1,8 @@
 @echo off
 title Toontown Ranked: UD Launcher
-set /P PPYTHON_PATH=<PPYTHON_PATH
+set /P PPYTHON_PATH=<../PPYTHON_PATH
 set SERVICE_TO_RUN=UD
-cd ..\..
+cd ../../../
 
 set BASE_CHANNEL=1000000
 set MAX_CHANNELS=999999

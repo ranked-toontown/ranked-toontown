@@ -1,9 +1,9 @@
 #!/bin/sh
 echo "Toontown Ranked: Client 4 Launcher"
 echo
-export PPYTHON_PATH=$(cat PPYTHON_PATH)
+export PPYTHON_PATH=$(cat ../PPYTHON_PATH)
 export SERVICE_TO_RUN=CLIENT
-cd ../..
+cd ../../../
 
 echo "Enter your name (default: player4): "
 read -r loginToken

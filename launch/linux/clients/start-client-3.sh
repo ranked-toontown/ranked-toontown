@@ -1,13 +1,13 @@
 #!/bin/sh
-echo "Toontown Ranked: Client 2 Launcher"
+echo "Toontown Ranked: Client 3 Launcher"
 echo
-export PPYTHON_PATH=$(cat PPYTHON_PATH)
+export PPYTHON_PATH=$(cat ../PPYTHON_PATH)
 export SERVICE_TO_RUN=CLIENT
-cd ../..
+cd ../../../
 
-echo "Enter your name (default: player2): "
+echo "Enter your name (default: player3): "
 read -r loginToken
-export TTOFF_LOGIN_TOKEN=${loginToken:="player2"}
+export TTOFF_LOGIN_TOKEN=${loginToken:="player3"}
 
 echo "Server IP (default: 127.0.0.1): "
 read -r gameServer

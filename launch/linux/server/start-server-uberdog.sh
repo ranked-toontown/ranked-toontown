@@ -1,9 +1,9 @@
 #!/bin/sh
 echo "Toontown Ranked: UD Launcher"
 echo
-export PPYTHON_PATH=$(cat PPYTHON_PATH)
+export PPYTHON_PATH=$(cat ../PPYTHON_PATH)
 export SERVICE_TO_RUN=UD
-cd ../..
+cd ../../../
 
 export BASE_CHANNEL=1000000
 export MAX_CHANNELS=999999

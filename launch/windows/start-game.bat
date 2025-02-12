@@ -1,11 +1,10 @@
 @echo off
-title Toontown Ranked: Client 1 Launcher
+title Toontown Ranked: Main Game Launcher
 set /P PPYTHON_PATH=<PPYTHON_PATH
 set SERVICE_TO_RUN=CLIENT
 cd ..\..
 
 set /P TTOFF_LOGIN_TOKEN="Enter your name (default: player1): " || set TTOFF_LOGIN_TOKEN=player1
-set /P TTOFF_GAME_SERVER="Server IP (default: 127.0.0.1): " || set TTOFF_GAME_SERVER=127.0.0.1
 
 :main
     %PPYTHON_PATH% -m pip install -r requirements.txt
