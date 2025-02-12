@@ -3,8 +3,6 @@ from direct.showbase.ShowBase import ShowBase
 from toontown.toonbase.DedicatedServer import DedicatedServer
 from toontown.settings.DedicatedServerSettings import DedicatedServerSettings
 
-settings = DedicatedServerSettings()
-
 if "__compiled__" not in globals():
     loadPrcFile('config/common.prc')
     loadPrcFile('config/development.prc')
@@ -18,6 +16,8 @@ if "__compiled__" not in globals():
         vfs.mount(Filename(mountFile), Filename(mountPoint), 0)
 
 loadPrcFileData('window config', 'window-type none')
+
+settings = DedicatedServerSettings()
 
 ShowBase()
 dedicatedServer = DedicatedServer(localServer=False)
