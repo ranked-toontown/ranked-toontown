@@ -72,8 +72,8 @@ from toontown.uberdog.ToontownUberRepository import ToontownUberRepository
 version = simbase.config.GetString('version', 'v???')
 simbase.errorReportingService = BasicErrorTrackingService(ServiceType.UBERDOG, version)
 
-simbase.air = ToontownUberRepository(config.ConfigVariableInt('air-base-channel', 400000000).getValue(),
-                                     config.ConfigVariableInt('air-stateserver', 10000).getValue())
+simbase.air = ToontownUberRepository(config.ConfigVariableInt('air-base-channel', 1000000).getValue(),
+                                     config.ConfigVariableInt('air-stateserver', 4002).getValue())
 host = config.ConfigVariableString('air-connect', '127.0.0.1').getValue()
 port = 7199
 if ':' in host:
