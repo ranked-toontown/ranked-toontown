@@ -29,6 +29,7 @@ import time
 import toontown.archipelago.util.global_text_properties as global_text_properties
 from .ErrorTrackingService import ErrorTrackingService, ServiceType, BasicErrorTrackingService
 from ..settings.Settings import Settings, ControlSettings
+from ..settings.DedicatedServerSettings import DedicatedServerSettings
 
 if typing.TYPE_CHECKING:
     from toontown.toonbase.ToonBaseGlobals import *
@@ -45,6 +46,7 @@ class ToonBase(OTPBase.OTPBase):
         self.global_text_properties = global_text_properties
 
         self.settings = Settings()
+        self.serverSettings = DedicatedServerSettings()
         self.setMultiThreading()
 
         os.environ['WANT_ERROR_REPORTING'] = 'true' if self.settings.get('report-errors') else 'false'
