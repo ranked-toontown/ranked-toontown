@@ -188,6 +188,7 @@ CRLoadingGameServices = 'Loading Game Servers. Please wait...'
 CRLoadingGameServicesAstron = 'Loading Astron...'
 CRLoadingGameServicesUberdog = 'Loading UberDog...'
 CRLoadingGameServicesAI = 'Loading AI...'
+CRAstronAddressAlreadyUsed = "There is an instance of Astron already open on this system. Please close it to play singleplayer, it will be automatically started on bootup."
 CRConnecting = 'Connecting...'
 CRNoConnectTryAgain = 'Could not connect to %s:%s. Try again?'
 CRNoConnectProxyNoPort = 'Could not connect to %s:%s.\n\nYou are communicating to the internet via a proxy, but your proxy does not permit connections on port %s.\n\nYou must open up this port, or disable your proxy, in order to play.  If your proxy has been provided by your ISP, you must contact your ISP to request them to open up this port.'

@@ -3,7 +3,11 @@ import sys
 import time
 import atexit
 import subprocess
+from direct.showbase.DirectObject import DirectObject
 from panda3d.core import ConfigVariableString, ConfigVariableBool
+from otp.otpgui import OTPDialog
+from otp.otpbase import OTPGlobals
+from otp.otpbase.OTPLocalizer import CRAstronAddressAlreadyUsed
 
 from direct.directnotify import DirectNotifyGlobal
 from otp.otpbase import OTPLocalizer
@@ -12,6 +16,7 @@ AI_NOITFY_CATEGORY_NAME = 'ToontownAIRepository'
 UD_NOITFY_CATEGORY_NAME = 'ToontownUberRepository'
 
 ASTRON_EXCEPTION_MSG = ':%s(warning): INTERNAL-EXCEPTION: '
+ASTRON_ALREADY_OPEN_MSG = 'Message Director: Failed to bind to address: address already in use'
 PYTHON_TRACEBACK_MSG = 'Traceback (most recent call last):'
 
 ASTRON_DONE_MSG = 'Event Logger: Opened new log.'
@@ -19,7 +24,7 @@ UD_DONE_MSG = f':{UD_NOITFY_CATEGORY_NAME}: Done.'
 AI_DONE_MSG = f':{AI_NOITFY_CATEGORY_NAME}: District is now ready. Have fun in Toontown Ranked!'
 
 
-class DedicatedServer:
+class DedicatedServer(DirectObject):
     notify = DirectNotifyGlobal.directNotify.newCategory('DedicatedServer')
 
     def __init__(self, localServer=False):
@@ -93,7 +98,18 @@ class DedicatedServer:
         astronLog = open(astronLogFile)
         astronLogData = astronLog.read()
         astronLog.close()
-        if ASTRON_DONE_MSG not in astronLogData:
+        if ASTRON_ALREADY_OPEN_MSG in astronLogData:
+            self.killProcesses()
+            if not ConfigVariableBool('local-multiplayer', True).getValue():
+                dialogClass = OTPGlobals.getGlobalDialogClass()
+                astronErrorMsg = dialogClass(message = CRAstronAddressAlreadyUsed, text_wordwrap = 16, style = OTPDialog.Acknowledge, doneEvent = 'astronErrorExit')
+                astronErrorMsg.show()
+                return task.done
+            else:
+                self.notify.error("The Astron server has crashed, you will need to restart your server."
+                                    "\n\nThere is an instance of Astron already open on this system."
+                                    "\nPlease close it to start the dedicated server, it will be automatically started on bootup.")
+        elif ASTRON_DONE_MSG not in astronLogData:
             # Astron has not started yet. Rerun the task.
             return task.again
 
