@@ -10,6 +10,7 @@ class TTOffQuickLauncher(TTOffLauncherBase):
 
     def __init__(self):
         print('Running: TTOffQuickLauncher')
+        self.playToken = None
         TTOffLauncherBase.__init__(self)
         self.useTTOffSpecificLogin = config.GetBool('ttoff-specific-login', 0)
         if self.useTTOffSpecificLogin:
@@ -48,14 +49,10 @@ class TTOffQuickLauncher(TTOffLauncherBase):
         return None
 
     def getPlayToken(self):
-        playToken = self.getValue(self.ttoffPlayTokenKey)
-        self.setValue(self.ttoffPlayTokenKey, '')
-        if playToken == 'NO PLAYTOKEN':
-            playToken = None
-        return playToken
+        return self.playToken
 
     def setPlayToken(self, playToken):
-        self.setValue(self.ttoffPlayTokenKey, playToken)
+        self.playToken = playToken
 
     def setRegistry(self, name, value):
         pass

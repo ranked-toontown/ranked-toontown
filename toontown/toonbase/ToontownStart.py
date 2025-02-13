@@ -125,7 +125,7 @@ def determineAuthenticity(textEntered):
     elif username in ['dev', 'NO PLAYTOKEN']:
         askForUsername['text'] = CRInvalidUsername
     else:
-        launcher.setPlayToken(username)
+        base.cr.playToken = username
         askServerPreference()
 
 dialogClass = OTPGlobals.getGlobalDialogClass()
