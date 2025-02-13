@@ -54,6 +54,9 @@ class TTOffQuickLauncher(TTOffLauncherBase):
             playToken = None
         return playToken
 
+    def setPlayToken(self, playToken):
+        self.setValue(self.ttoffPlayTokenKey, playToken)
+
     def setRegistry(self, name, value):
         pass
 
