@@ -108,6 +108,37 @@ from otp.friends import FriendManager
 from otp.distributed.OtpDoGlobals import *
 cr.generateGlobalObject(OTP_DO_ID_FRIEND_MANAGER, 'FriendManager')
 
+from otp.otpgui import OTPDialog
+from otp.otpbase.OTPLocalizer import CREnterUsername, CRInvalidUsername, CREmptyUsername, CRLoadingGameServices, CRSpecifyServerSelection, CRSingleplayer, CRPublicServer
+
+def cleanup(dialogClass):
+    dialogClass.cleanup()
+    del dialogClass
+
+def clearText():
+    entry.enterText('')
+
+def determineAuthenticity(textEntered):
+    username = textEntered
+    if not username:
+        askForUsername['text'] = CREmptyUsername
+    elif username in ['dev', 'NO PLAYTOKEN']:
+        askForUsername['text'] = CRInvalidUsername
+    else:
+        launcher.setPlayToken(username)
+        askServerPreference()
+
+dialogClass = OTPGlobals.getGlobalDialogClass()
+askForUsername = dialogClass(message=CREnterUsername, style=OTPDialog.NoButtons,
+                             doneEvent='cleanup', text_wordwrap=16, midPad=0.2, extraArgs=['askForUsername'])
+base.accept('cleanup', cleanup, extraArgs=[askForUsername])
+
+entry = DirectEntry(parent=askForUsername , text="", scale=0.0625, pos=(-0.3, 0, -0.19), command=determineAuthenticity,
+                    cursorKeys=1, obscured=1, initialText="Username", numLines=1, focus=1, focusInCommand=clearText)
+
+askForUsername.show()
+base.accept('determineAuthenticity', determineAuthenticity)
+
 def decision(buttonValue = None):
     if buttonValue == -1: # buttonValue returning -1 will connect us to the public seever.
         base.startShow(cr, config.ConfigVariableString('public-server-ip', '').getValue())
@@ -124,25 +155,21 @@ def decision(buttonValue = None):
             builtins.gameServicesDialog.cleanup()
             del builtins.gameServicesDialog
             base.startShow(cr)
-        base.accept('localServerReady', localServerReady)
 
-def cleanup():
-    askServerSpecification.cleanup()
-    del askServerSpecification
+def askServerPreference():
+    if not config.ConfigVariableBool('local-multiplayer', False).getValue():
+        from otp.otpgui import OTPDialog
 
-if not config.ConfigVariableBool('local-multiplayer', False).getValue():
-    from otp.otpgui import OTPDialog
-    from otp.otpbase.OTPLocalizer import CRLoadingGameServices, CRSpecifyServerSelection, CRSingleplayer, CRPublicServer
-
-    base.accept('cleanup', cleanup)
-    dialogClass = OTPGlobals.getGlobalDialogClass()
-    askServerSpecification = dialogClass(message = CRSpecifyServerSelection, style = OTPDialog.TwoChoiceCustom, okButtonText = CRSingleplayer, cancelButtonText = CRPublicServer, command = decision, doneEvent = 'cleanup', text_wordwrap = 16, buttonPadSF = 5)
-    askServerSpecification.show()
-else:
-    if not launcher.isDummy():
-        base.startShow(cr, launcher.getGameServer())
+        askServerSpecification = dialogClass(message=CRSpecifyServerSelection, style=OTPDialog.TwoChoiceCustom,
+                                             okButtonText=CRSingleplayer, cancelButtonText=CRPublicServer, command=decision,
+                                             doneEvent='cleanup', text_wordwrap=16, buttonPadSF=5)
+        askServerSpecification.show()
+        base.accept('cleanup', cleanup, extraArgs=[askServerSpecification])
     else:
-        base.startShow(cr)
+        if not launcher.isDummy():
+            base.startShow(cr, launcher.getGameServer())
+        else:
+            base.startShow(cr)
 
 
 backgroundNodePath.reparentTo(hidden)
