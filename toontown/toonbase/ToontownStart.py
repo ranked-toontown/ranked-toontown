@@ -107,10 +107,44 @@ loader.endBulkLoad('init')
 from otp.friends import FriendManager
 from otp.distributed.OtpDoGlobals import *
 cr.generateGlobalObject(OTP_DO_ID_FRIEND_MANAGER, 'FriendManager')
-if not launcher.isDummy():
-    base.startShow(cr, launcher.getGameServer())
+
+def decision(buttonValue = None):
+    if buttonValue == -1: # buttonValue returning -1 will connect us to the public seever.
+        base.startShow(cr, config.ConfigVariableString('public-server-ip', '').getValue())
+    else: # buttonValue returning any other value will startup the Singleplayer server.
+        # Start DedicatedServer
+        builtins.gameServicesDialog = dialogClass(message = CRLoadingGameServices)
+        builtins.gameServicesDialog.show()
+
+        from toontown.toonbase.DedicatedServer import DedicatedServer
+        builtins.clientServer = DedicatedServer(localServer=True)
+        builtins.clientServer.start()
+
+        def localServerReady():
+            builtins.gameServicesDialog.cleanup()
+            del builtins.gameServicesDialog
+            base.startShow(cr)
+        base.accept('localServerReady', localServerReady)
+
+def cleanup():
+    askServerSpecification.cleanup()
+    del askServerSpecification
+
+if not config.ConfigVariableBool('local-multiplayer', False).getValue():
+    from otp.otpgui import OTPDialog
+    from otp.otpbase.OTPLocalizer import CRLoadingGameServices, CRSpecifyServerSelection, CRSingleplayer, CRPublicServer
+
+    base.accept('cleanup', cleanup)
+    dialogClass = OTPGlobals.getGlobalDialogClass()
+    askServerSpecification = dialogClass(message = CRSpecifyServerSelection, style = OTPDialog.TwoChoiceCustom, okButtonText = CRSingleplayer, cancelButtonText = CRPublicServer, command = decision, doneEvent = 'cleanup', text_wordwrap = 16, buttonPadSF = 5)
+    askServerSpecification.show()
 else:
-    base.startShow(cr)
+    if not launcher.isDummy():
+        base.startShow(cr, launcher.getGameServer())
+    else:
+        base.startShow(cr)
+
+
 backgroundNodePath.reparentTo(hidden)
 backgroundNodePath.removeNode()
 del backgroundNodePath

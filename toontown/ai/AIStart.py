@@ -82,8 +82,8 @@ simbase.errorReportingService = BasicErrorTrackingService(ServiceType.AI, versio
 
 simbase.air = ToontownAIRepository(
     config.ConfigVariableInt('air-base-channel', 401000000).getValue(),
-    config.ConfigVariableInt('air-stateserver', 10000).getValue(),
-    config.ConfigVariableString('district-name', 'Toon Valley').getValue()
+    config.ConfigVariableInt('air-stateserver', 4002).getValue(),
+    config.ConfigVariableString('district-name', 'Ranked Realms').getValue()
 )
 
 host = config.ConfigVariableString('air-connect', '127.0.0.1').getValue()
