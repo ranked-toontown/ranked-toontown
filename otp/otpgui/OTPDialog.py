@@ -12,6 +12,8 @@ CancelOnly = 2
 TwoChoice = 3
 YesNo = 4
 TwoChoiceCustom = 5
+YesNoCancel = 6
+ThreeChoiceCustom = 7
 
 class OTPDialog(DirectDialog):
 
@@ -54,6 +56,21 @@ class OTPDialog(DirectDialog):
             buttonImage = [cancelImageList]
             buttonText = [OTPLocalizer.DialogCancel]
             buttonValue = [DGG.DIALOG_CANCEL]
+        elif self.style == YesNoCancel:
+            okImageList = (buttons.find('**/ChtBx_OKBtn_UP'), buttons.find('**/ChtBx_OKBtn_DN'), buttons.find('**/ChtBx_OKBtn_Rllvr'))
+            cancelImageList = (buttons.find('**/CloseBtn_UP'), buttons.find('**/CloseBtn_DN'), buttons.find('**/CloseBtn_Rllvr'))
+            buttonImage = [okImageList, cancelImageList, cancelImageList]
+            buttonText = [OTPLocalizer.DialogYes, OTPLocalizer.DialogNo, OTPLocalizer.DialogCancel]
+            buttonValue = [DGG.DIALOG_YES, DGG.DIALOG_NO, DGG.DIALOG_CANCEL]
+        elif self.style == ThreeChoiceCustom:
+            okImageList = (buttons.find('**/ChtBx_OKBtn_UP'), buttons.find('**/ChtBx_OKBtn_DN'), buttons.find('**/ChtBx_OKBtn_Rllvr'))
+            buttonImage = [okImageList, okImageList, okImageList]
+            buttonValue = [DGG.DIALOG_YES, DGG.DIALOG_NO, DGG.DIALOG_CANCEL]
+            if 'buttonText' in kw:
+                buttonText = kw['buttonText']
+                del kw['buttonText']
+            else:
+                buttonText = [OTPLocalizer.DialogOK, OTPLocalizer.DialogCancel]
         elif self.style == NoButtons:
             buttonImage = []
             buttonText = []
@@ -95,7 +112,7 @@ class OTPDialog(DirectDialog):
 class GlobalDialog(OTPDialog):
     notify = DirectNotifyGlobal.directNotify.newCategory('GlobalDialog')
 
-    def __init__(self, message = '', doneEvent = None, style = NoButtons, okButtonText = OTPLocalizer.DialogOK, cancelButtonText = OTPLocalizer.DialogCancel, **kw):
+    def __init__(self, message = '', doneEvent = None, style = NoButtons, okButtonText = OTPLocalizer.DialogOK, yesButtonText = OTPLocalizer.DialogYes, noButtonText = OTPLocalizer.DialogNo, cancelButtonText = OTPLocalizer.DialogCancel, **kw):
         if not hasattr(self, 'path'):
             self.path = 'phase_3/models/gui/dialog_box_buttons_gui'
         if doneEvent == None and style != NoButtons:
@@ -107,6 +124,8 @@ class GlobalDialog(OTPDialog):
             buttonText = [okButtonText]
         elif style == CancelOnly:
             buttonText = [cancelButtonText]
+        elif style in [YesNoCancel, ThreeChoiceCustom]:
+            buttonText = [yesButtonText, noButtonText, cancelButtonText]
         else:
             buttonText = [okButtonText, cancelButtonText]
         optiondefs = (('dialogName', 'globalDialog', DGG.INITOPT),
