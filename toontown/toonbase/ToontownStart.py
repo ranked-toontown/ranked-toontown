@@ -155,6 +155,7 @@ def decision(buttonValue = None):
             builtins.gameServicesDialog.cleanup()
             del builtins.gameServicesDialog
             base.startShow(cr)
+        base.accept('localServerReady', localServerReady)
 
 def askServerPreference():
     if not config.ConfigVariableBool('local-multiplayer', False).getValue():
