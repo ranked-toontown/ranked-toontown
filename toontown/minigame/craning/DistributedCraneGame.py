@@ -510,6 +510,8 @@ class DistributedCraneGame(DistributedMinigame):
         return CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
 
     def __cleanupRulesPanel(self):
+        self.ignore(self.rulesDoneEvent)
+        self.ignore('spotStatusChanged')
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -560,6 +562,7 @@ class DistributedCraneGame(DistributedMinigame):
     def enterOff(self):
         self.notify.debug("enterOff")
         self.__checkSpectatorState(spectate=False)
+        self.__cleanupRulesPanel()
 
     def exitOff(self):
         pass
@@ -788,8 +791,6 @@ class DistributedCraneGame(DistributedMinigame):
         self.accept('spotStatusChanged', self.handleSpotStatusChanged)
 
     def exitFrameworkRules(self):
-        self.ignore(self.rulesDoneEvent)
-        self.ignore('spotStatusChanged')
         self.__cleanupRulesPanel()
 
     def handleRulesDone(self):
