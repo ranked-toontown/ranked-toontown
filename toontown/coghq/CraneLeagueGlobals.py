@@ -204,7 +204,7 @@ class CraneGameRuleset:
         self.HEAL_TOONS_ON_START = True  # Should we set all toons to full laff when starting the round?
         self.RANDOM_SPAWN_POSITIONS = False  # Should spawn positions be completely random?
 
-        self.WANT_LOW_LAFF_BONUS = True  # Should we award toons with low laff bonus points?
+        self.WANT_LOW_LAFF_BONUS = False  # Should we award toons with low laff bonus points?
         self.LOW_LAFF_BONUS = .1  # How much will the bonus be worth? i.e. .1 = 10% bonus for ALL points
         self.LOW_LAFF_BONUS_THRESHOLD = 25  # How much laff or less should a toon have to be considered for a low laff bonus?
         self.LOW_LAFF_BONUS_INCLUDE_PENALTIES = False  # Should penalties also be increased when low on laff?
