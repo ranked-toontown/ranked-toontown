@@ -1099,7 +1099,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.deleteAllTreasures()
         self.stopGoons()
         self.__resetCraningObjects()
-        self.deleteAllTreasures()
         taskMgr.remove(self.uniqueName('times-up-task'))
         taskName = self.uniqueName('NextGoon')
         taskMgr.remove(taskName)
@@ -1158,6 +1157,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.notify.debug("enterCleanup")
         self.__deleteCraningObjects()
         self.__deleteBoss()
+        self.deleteAllTreasures()
+        self.cleanupComboTrackers()
+        self.scene.removeNode()
+        self.scene = None
+        self.practiceCheatHandler = None
         self.gameFSM.request('inactive')
 
     def exitCleanup(self):
