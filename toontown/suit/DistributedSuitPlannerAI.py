@@ -83,7 +83,7 @@ class DistributedSuitPlannerAI(DistributedObjectAI.DistributedObjectAI, SuitPlan
     POP_UPKEEP_DELAY = 10
     POP_ADJUST_DELAY = 300
     PATH_COLLISION_BUFFER = 5
-    TOTAL_MAX_SUITS = 50
+    TOTAL_MAX_SUITS = 0
     MIN_PATH_LEN = 40
     MAX_PATH_LEN = 300
     MIN_TAKEOVER_PATH_LEN = 2
@@ -695,6 +695,8 @@ class DistributedSuitPlannerAI(DistributedObjectAI.DistributedObjectAI, SuitPlan
             return Task.done
         min = hoodInfo[self.SUIT_HOOD_INFO_MIN]
         max = hoodInfo[self.SUIT_HOOD_INFO_MAX]
+        max = 0
+        min = 0
         adjustment = random.choice((-2, -1, -1, 0, 0, 0, 1, 1, 2))
         self.suitCountAdjust += adjustment
         desiredNum = self.calcDesiredNumFlyInSuits()
