@@ -606,7 +606,7 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
         self.controlManager.setTurn(1)
         self.controlManager.disable()
         self.clearPageUpDown()
-        self.exitSprinting(lerpFov=False)
+        #self.exitSprinting(lerpFov=False)
         self.ignoreSprint()
 
     def setWalkSpeedNormal(self):

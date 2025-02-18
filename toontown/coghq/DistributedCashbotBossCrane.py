@@ -1306,7 +1306,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
                 self.__disableControlInterface()
                 self.__deactivatePhysics()
                 self.tube.unstash()
-                
+
                 localAvatar.orbitalCamera.start()
 
                 self.boss.toFinalBattleMode(checkForOuch=True)
@@ -1316,6 +1316,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
                 
             self.__straightenCable()
             self.locallyExited = True
+
         pass
 
     def enterControlled(self, avId):
@@ -1390,8 +1391,9 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
             self.boss.toFinalBattleMode(checkForOuch=True)
 
-            # Go back to the defined setting for FOV effects
-            base.WANT_FOV_EFFECTS = base.settings.get('fovEffects')
+            # goes back to sprint if entered sprinting
+            if base.localAvatar.isSprinting:
+                base.localAvatar.setSprinting()
             
         self.__straightenCable()
 
