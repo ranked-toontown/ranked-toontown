@@ -1255,9 +1255,9 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
             # The local toon is beginning to control the crane.
 
             # No fov effects on cranes
-            base.WANT_FOV_EFFECTS = False
-            base.localAvatar.setCameraFov(base.localAvatar.fallbackFov)
-            
+            if base.WANT_FOV_EFFECTS:
+                base.localAvatar.lerpFov(base.localAvatar.fov, base.localAvatar.fallbackFov)
+
             self.boss.toCraneMode()
             
             localAvatar.orbitalCamera.stop()
