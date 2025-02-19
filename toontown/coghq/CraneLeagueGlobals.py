@@ -1414,7 +1414,7 @@ class ModifierNoRevives(CFORulesetModifierBase):
         return 'Total Bankruptcy!'
 
     def getDescription(self):
-        return f'Toons will %(color_start)sno longer revives%(color_end)s when going sad!'
+        return f'Toons will %(color_start)sno longer revive%(color_end)s when going sad!'
 
     def getHeat(self):
         return 3
