@@ -1,5 +1,6 @@
 import functools
 import random
+import math
 
 from direct.distributed import DistributedSmoothNode
 from direct.fsm import ClassicFSM
@@ -12,7 +13,7 @@ from direct.showbase.MessengerGlobal import messenger
 from direct.showbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
-    VBase3, VBase4
+    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat
 from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator, PhysicsManager
 
 from libotp import CFSpeech
@@ -46,6 +47,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.overlayText = OnscreenText('', shadow=(0, 0, 0, 1), font=ToontownGlobals.getCompetitionFont(), pos=(0, 0), scale=0.35, mayChange=1)
         self.overlayText.hide()
         self.rulesPanel = None
+        self.rulesPanelToggleButton = None
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -55,6 +57,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.heatDisplay = CraneLeagueHeatDisplay()
         self.heatDisplay.hide()
         self.endVault = None
+        self.statusIndicators = {}  # Dictionary to store status indicators for each toon
 
         self.warningSfx = None
 
@@ -134,24 +137,29 @@ class DistributedCraneGame(DistributedMinigame):
         self.__checkSpectatorState(spectate=False)
 
     def __checkSpectatorState(self, spectate=True):
+        # If we're in the rules state, don't apply any visibility changes
+        if hasattr(self, 'rulesPanel') and self.rulesPanel is not None:
+            return
 
-        # Loop through every spectator and make sure they are hidden.
+        # Loop through every spectator and make them semi-transparent
         for toon in self.getSpectatingToons():
-
-            # If this is us, let's apply some special logic.
+            # If this is us, let's apply some special logic
             if toon.isLocal():
                 toon.setGhostMode(True)
                 continue
 
-            toon.setGhostMode(True)
-            toon.hide()
+            # Make other spectators semi-transparent instead of invisible
+            toon.setTransparency(1)
+            toon.setColorScale(1, 1, 1, 0)
 
-        # Loop through every non-spectator and make sure we can see them.
+        # Loop through every non-spectator and make sure we can see them
         for toon in self.getParticipantsNotSpectating():
             toon.setGhostMode(False)
+            toon.clearColorScale()
+            toon.clearTransparency()
             toon.show()
 
-        # If we are spectating, make sure the boss cannot touch us.
+        # If we are spectating, make sure the boss cannot touch us
         if self.boss is not None:
             if self.localToonSpectating():
                 self.boss.makeLocalToonSafe()
@@ -440,11 +448,11 @@ class DistributedCraneGame(DistributedMinigame):
         base.transitions.irisIn(0.4)
         NametagGlobals.setMasterArrowsOn(1)
         camera.reparentTo(render)
-        camera.setPosHpr(119.541, -275.886, 35, 180, -30, 0)
+        camera.setPosHpr(119.541, -265.886, 4, 180, 9, 0)
 
-        self.setToonsToBattleThreePos()
+        #self.setToonsToBattleThreePos()
 
-        # All trolley games call this function, but I am commenting it out because I have a suspicion that
+        # All trolley games call this function, but I am commenting it oukkl12t because I have a suspicion that
         # global smooth node predictions are fighting with physics calculations with CFO objects.
         # I could be wrong, but this seems to be unnecessary since CFO objects appear just fine without this set.
         # DistributedSmoothNode.activateSmoothing(1, 1)
@@ -477,7 +485,8 @@ class DistributedCraneGame(DistributedMinigame):
             return
         # all of the remote toons have joined the game;
         # it's safe to show them now.
-        self.setToonsToBattleThreePos()
+
+        self.setToonsToRulesPositions()
 
         for toon in self.getParticipants():
             toon.startSmooth()
@@ -503,11 +512,40 @@ class DistributedCraneGame(DistributedMinigame):
                     self.rulesPanel.updateSpotStatus(i, False)
 
     def __generateRulesPanel(self):
-        return CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
+        panel = CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
+        # Create toggle button
+        from direct.gui.DirectButton import DirectButton
+        from toontown.toonbase import TTLocalizer
+        btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
+        self.rulesPanelToggleButton = DirectButton(
+            relief=None,
+            text='Rules',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(-1.15, 0, 0.85),
+            command=self.__toggleRulesPanel
+        )
+        btnGeom.removeNode()
+        self.rulesPanelToggleButton.hide()
+        return panel
+
+    def __toggleRulesPanel(self):
+        if self.rulesPanel:
+            if self.rulesPanel.isHidden():
+                self.rulesPanel.show()
+            else:
+                self.rulesPanel.hide()
 
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
         self.ignore('spotStatusChanged')
+        if self.rulesPanelToggleButton is not None:
+            self.rulesPanelToggleButton.destroy()
+            self.rulesPanelToggleButton = None
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -781,17 +819,141 @@ class DistributedCraneGame(DistributedMinigame):
         if self.walkStateData.fsm.getCurrentState().getName() == "walking":
             base.localAvatar.enableAvatarControls()
 
+    def setToonsToRulesPositions(self):
+        """
+        Places toons in front of the vault during the rules state.
+        Uses a single row for 8 or fewer toons, and two rows for more than 8 toons.
+        """
+        centerPoint = self.endVault.getPos()
+        spacing = 4  # Space between toons
+        
+        # Get all participants, both playing and spectating
+        allToons = self.getParticipants()
+        numToons = len(allToons)
+        
+        # For 8 or fewer toons, use a single row
+        if numToons <= 8:
+            # Center all toons in one row
+            rowWidth = (numToons - 1) * spacing
+            startX = centerPoint.getX() + 36 - (rowWidth / 2)
+            
+            for i, toon in enumerate(allToons):
+                if not toon:
+                    continue
+                
+                # Calculate position
+                x = startX + (i * spacing)
+                y = centerPoint.getY() - 98  # All toons in front row
+                z = 0
+                h = 0
+                
+                # Position the toon
+                if toon.doId == base.localAvatar.doId:
+                    toon.setPos(x, y, z)
+                    toon.setH(h)
+                    toon.d_setXY(x, y)
+                    toon.d_setH(h)
+                    toon.d_clearSmoothing()
+                    toon.sendCurrentPosition()
+                else:
+                    toon.setPos(x, y, z)
+                    toon.setH(h)
+                    toon.clearSmoothing()
+                    toon.startSmooth()
+                
+                # Create or update status indicator
+                isPlayer = toon.doId not in self.getSpectators()
+                if toon.doId in self.statusIndicators:
+                    self.updateStatusIndicator(toon, isPlayer)
+                else:
+                    self.createStatusIndicator(toon, isPlayer)
+        else:
+            # For more than 8 toons, use two rows
+            firstRowCount = min(8, (numToons + 1) // 2)
+            secondRowCount = min(8, numToons - firstRowCount)
+            
+            for i, toon in enumerate(allToons):
+                if not toon:
+                    continue
+                
+                # Determine if toon is in first or second row
+                inFirstRow = i < firstRowCount
+                posInRow = i if inFirstRow else (i - firstRowCount)
+                
+                # Calculate row-specific values
+                toonsInThisRow = firstRowCount if inFirstRow else secondRowCount
+                rowOffset = 0 if inFirstRow else 6  # Second row is slightly behind first row
+                
+                # Center the toons in their row
+                rowWidth = (toonsInThisRow - 1) * spacing
+                startX = centerPoint.getX() + 36 - (rowWidth / 2)
+                x = startX + (posInRow * spacing)
+                y = centerPoint.getY() - 98 - rowOffset
+                z = 0
+                h = 0
+                
+                # Position the toon
+                if toon.doId == base.localAvatar.doId:
+                    toon.setPos(x, y, z)
+                    toon.setH(h)
+                    toon.d_setXY(x, y)
+                    toon.d_setH(h)
+                    toon.d_clearSmoothing()
+                    toon.sendCurrentPosition()
+                else:
+                    toon.setPos(x, y, z)
+                    toon.setH(h)
+                    toon.clearSmoothing()
+                    toon.startSmooth()
+                
+                # Create or update status indicator
+                isPlayer = toon.doId not in self.getSpectators()
+                if toon.doId in self.statusIndicators:
+                    self.updateStatusIndicator(toon, isPlayer)
+                else:
+                    self.createStatusIndicator(toon, isPlayer)
+
     def enterFrameworkRules(self):
-        self.notify.debug('BASE: enterFrameworkRules')
+        self.notify.debug('enterFrameworkRules')
         self.accept(self.rulesDoneEvent, self.handleRulesDone)
+        
+        # Create and show the rules panel
         self.rulesPanel = self.__generateRulesPanel()
         self.rulesPanel.load()
-        self.rulesPanel.show()  # Instead of enter(), just show() since it's a DirectFrame
+        # Hide the panel by default, but show the toggle button
+        self.rulesPanel.hide()
+        self.rulesPanelToggleButton.show()
+        
+        # Position toons in the rules formation
+        self.setToonsToRulesPositions()
+        
+        # Hide all toon shadows
+        for toon in self.getParticipants():
+            if toon and hasattr(toon, 'dropShadow') and toon.dropShadow:
+                toon.dropShadow.hide()
+        
+        # Accept the rules done event
+        self.accept(self.rulesDoneEvent, self.handleRulesDone)
         # Accept spot status change messages
         self.accept('spotStatusChanged', self.handleSpotStatusChanged)
 
     def exitFrameworkRules(self):
+        # Restore all toon shadows
+        for toon in self.getParticipants():
+            if toon and hasattr(toon, 'dropShadow') and toon.dropShadow:
+                toon.dropShadow.show()
+                
+        self.removeStatusIndicators()
         self.__cleanupRulesPanel()
+
+    def enterFrameworkWaitServerStart(self):
+        self.notify.debug('BASE: enterFrameworkWaitServerStart')
+        if self.numPlayers > 1:
+            msg = "Waiting for Group Leader to start..."
+        else:
+            msg = TTLocalizer.MinigamePleaseWait
+        self.waitingStartLabel['text'] = msg
+        self.waitingStartLabel.show()
 
     def handleRulesDone(self):
         self.notify.debug('BASE: handleRulesDone')
@@ -808,7 +970,160 @@ class DistributedCraneGame(DistributedMinigame):
     def updateSpotStatus(self, spotIndex, isPlayer):
         """
         Received from the server when any client changes a spot's status
-        Update the local panel to reflect the change
+        Update the local panel and indicators to reflect the change
         """
         if self.rulesPanel is not None:
             self.rulesPanel.updateSpotStatus(spotIndex, isPlayer)
+            
+        # Get the toon whose status changed
+        if spotIndex < len(self.avIdList):
+            changedAvId = self.avIdList[spotIndex]
+            changedToon = self.cr.getDo(changedAvId)
+            if changedToon:
+                # Update or create the indicator for this toon
+                if changedAvId in self.statusIndicators:
+                    self.updateStatusIndicator(changedToon, isPlayer)
+                else:
+                    self.createStatusIndicator(changedToon, isPlayer)
+
+    def createStatusIndicator(self, toon, isPlayer):
+        """Creates a spotlight indicator for a toon's status (player or spectator)"""
+        # Create the camera model and spotlight effect
+        indicator = NodePath('statusIndicator')
+        indicator.reparentTo(render)
+        
+        # Position the camera above
+        cameraHeight = 8
+        projector = Point3(0, 0, cameraHeight)
+        
+        # Create the beam and floor nodes
+        beamNode = indicator.attachNewNode('beamNode')
+        floorNode = indicator.attachNewNode('floorNode')
+        
+        # Setup rendering attributes for both
+        for node in (beamNode, floorNode):
+            node.setTransparency(1)
+            node.setAttrib(ColorBlendAttrib.make(ColorBlendAttrib.MAdd, ColorBlendAttrib.OIncomingAlpha, ColorBlendAttrib.OOne))
+            node.setTwoSided(False)
+            node.setDepthWrite(False)
+        
+        # Create geometry for beam and floor
+        beamVertexData = GeomVertexData('beam', GeomVertexFormat.getV3cp(), Geom.UHDynamic)
+        floorVertexData = GeomVertexData('floor', GeomVertexFormat.getV3cp(), Geom.UHDynamic)
+        
+        beamVertexWriter = GeomVertexWriter(beamVertexData, 'vertex')
+        beamColorWriter = GeomVertexWriter(beamVertexData, 'color')
+        floorVertexWriter = GeomVertexWriter(floorVertexData, 'vertex')
+        floorColorWriter = GeomVertexWriter(floorVertexData, 'color')
+        
+        # Default colors (will be updated in updateStatusIndicator)
+        normalColor = VBase4(0.2, 0.2, 0.2, 0.3)
+        
+        # Create beam geometry (from projector to ground)
+        radius = 1.8
+        beamVertexWriter.addData3f(projector[0], projector[1], projector[2])
+        beamColorWriter.addData4f(normalColor)
+        
+        # Create circle points for beam
+        for angle in range(0, 360, 45):
+            x = radius * math.cos(math.radians(angle))
+            y = radius * math.sin(math.radians(angle))
+            beamVertexWriter.addData3f(x, y, 0.025)
+            beamColorWriter.addData4f(VBase4(0, 0, 0, 0))
+            
+        # Create floor geometry (circle on ground)
+        floorVertexWriter.addData3f(0, 0, 0.025)
+        floorColorWriter.addData4f(normalColor)
+        
+        # Create circle points for floor
+        for angle in range(0, 360, 10):
+            x = radius * math.cos(math.radians(angle))
+            y = radius * math.sin(math.radians(angle))
+            floorVertexWriter.addData3f(x, y, 0.025)
+            floorColorWriter.addData4f(VBase4(0, 0, 0, 0))
+            
+        # Create beam triangles
+        beamTris = GeomTrifans(Geom.UHStatic)
+        beamTris.addVertex(0)
+        for i in range(1, 9):
+            beamTris.addVertex(i)
+        beamTris.addVertex(1)
+        beamTris.closePrimitive()
+        
+        # Create floor triangles
+        floorTris = GeomTrifans(Geom.UHStatic)
+        floorTris.addVertex(0)
+        for i in range(1, 37):
+            floorTris.addVertex(i)
+        floorTris.addVertex(1)
+        floorTris.closePrimitive()
+        
+        # Create and attach geometry nodes
+        beamGeom = Geom(beamVertexData)
+        beamGeom.addPrimitive(beamTris)
+        beamGeomNode = GeomNode('beam')
+        beamGeomNode.addGeom(beamGeom)
+        beamNode.attachNewNode(beamGeomNode)
+        
+        floorGeom = Geom(floorVertexData)
+        floorGeom.addPrimitive(floorTris)
+        floorGeomNode = GeomNode('floor')
+        floorGeomNode.addGeom(floorGeom)
+        floorNode.attachNewNode(floorGeomNode)
+        
+        # Store the indicator
+        self.statusIndicators[toon.doId] = indicator
+        
+        # Update position and appearance
+        self.updateStatusIndicator(toon, isPlayer)
+
+    def updateStatusIndicator(self, toon, isPlayer):
+        """Updates an existing status indicator's position and appearance"""
+        indicator = self.statusIndicators.get(toon.doId)
+        if indicator:
+            # Update position to follow toon
+            pos = toon.getPos(render)
+            indicator.setPos(pos[0], pos[1], 0)
+            
+            # Remaining vertices (bottom of beam) fade to transparent
+            transparent = VBase4(0, 0, 0, 0)
+            # Set color based on player status with reduced intensity
+            if isPlayer:
+                color = VBase4(0.1, 0.8, 0.1, 1)  # Softer green for players
+                transparent = VBase4(0, 0.1, 0, 0.1)
+            else:
+                color = VBase4(0.8, 0.1, 0.1, 1)  # Softer red for spectators
+                transparent = VBase4(0.1, 0, 0, 0.1)
+            # Update the color for both beam and floor nodes
+            beamNode = indicator.find('beamNode')
+            floorNode = indicator.find('floorNode')
+            
+            # Get the GeomNode for each
+            beamGeom = beamNode.find('beam').node()
+            floorGeom = floorNode.find('floor').node()
+            
+            # Update vertex colors for beam
+            beamVertexData = beamGeom.modifyGeom(0).modifyVertexData()
+            beamColorWriter = GeomVertexWriter(beamVertexData, 'color')
+            
+            # First vertex (top of beam) gets full color
+            beamColorWriter.setData4f(color)
+            for _ in range(8):
+                beamColorWriter.setData4f(transparent)
+                
+            # Update vertex colors for floor
+            floorVertexData = floorGeom.modifyGeom(0).modifyVertexData()
+            floorColorWriter = GeomVertexWriter(floorVertexData, 'color')
+            
+            # Center point gets full color
+            floorColorWriter.setData4f(color)
+            # Outer points fade to transparent
+            for _ in range(36):
+                floorColorWriter.setData4f(transparent)
+
+    def removeStatusIndicators(self):
+        """Removes all status indicators"""
+        for avId, indicator in list(self.statusIndicators.items()):
+            if not indicator.isEmpty():
+                indicator.removeNode()
+        self.statusIndicators.clear()
