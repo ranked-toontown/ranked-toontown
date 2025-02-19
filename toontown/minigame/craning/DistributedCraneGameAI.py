@@ -268,8 +268,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.gameFSM.request('cleanup')
 
         DistributedMinigameAI.setGameAbort(self)
-        self.scene.removeNode()
-        self.scene = None
+        if self.scene is not None:
+            self.scene.removeNode()
+            self.scene = None
 
     def gameOver(self):
         self.notify.debug("gameOver")
@@ -278,8 +279,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.gameFSM.request('cleanup')
         # tell the base class to wrap things up
         DistributedMinigameAI.gameOver(self)
-        self.scene.removeNode()
-        self.scene = None
+        if self.scene is not None:
+            self.scene.removeNode()
+            self.scene = None
 
     def clearObjectSpeedCaching(self):
         for safe in self.safes:
