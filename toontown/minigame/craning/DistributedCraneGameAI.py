@@ -52,6 +52,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.rollModsOnStart = False
         self.numModsWanted = 5
+        self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
 
         self.customSpawnPositions = {}
         self.goonMinScale = 0.8
@@ -159,38 +160,56 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def setupRuleset(self):
 
+        self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
+        self.modifiers.clear()
+        modifiers = []
+        for modifier in self.desiredModifiers:
+            modifiers.append(modifier)
+        # Should we randomize some modifiers?
+        if self.rollModsOnStart:
+            modifiers += self.rollRandomModifiers()
+
         # Temporary until the ruleset/modifiers tabs are implemented into the rules panel interface.
         # If a toon is performing a solo crane round, use clash rules.
         # If there is more than one toon present, use competitive crane league rules.
-        if len(self.getParticipants()) >= 2:
-            self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
-        else:
-            self.ruleset = CraneLeagueGlobals.ClashCraneGameRuleset()
+        if len(self.getParticipantsNotSpectating()) >= 2:
+            modifiers.append(CraneLeagueGlobals.ModifierInvincibleBoss())
+            modifiers.append(CraneLeagueGlobals.ModifierTimerEnabler(3))
+
+        self.applyModifiers(modifiers, updateClient=True)
 
         if self.getBoss() is not None:
             self.getBoss().setRuleset(self.ruleset)
 
-        # Should we randomize some modifiers?
-        if self.rollModsOnStart:
-            self.rollRandomModifiers()
-
-        self.applyModifiers()
-        # Make sure they didn't do anything bad
-        self.ruleset.validate()
-
-        # Update the client
-        self.d_setRawRuleset()
-        self.d_setModifiers()
-
     # Call to update the ruleset with the modifiers active, note calling more than once can cause unexpected behavior
     # if the ruleset doesn't fallback to an initial value, for example if a cfo hp increasing modifier is active and we
     # call this multiply times, his hp will be 1500 * 1.5 * 1.5 * 1.5 etc etc
-    def applyModifiers(self, updateClient=False):
-        for modifier in self.modifiers:
-            modifier.apply(self.ruleset)
-
+    def applyModifiers(self, modifiers: list[CraneLeagueGlobals.CFORulesetModifierBase], updateClient=False):
+        for modifier in modifiers:
+            self.applyModifier(modifier, updateClient=False)
         if updateClient:
             self.d_setRawRuleset()
+            self.d_setModifiers()
+
+    def applyModifier(self, modifier: CraneLeagueGlobals.CFORulesetModifierBase, updateClient=False):
+        self.modifiers.append(modifier)
+        modifier.apply(self.ruleset)
+        self.ruleset.validate()
+        if updateClient:
+            self.d_setRawRuleset()
+            self.d_setModifiers()
+
+    def removeModifier(self, modifierClass):
+        modifiers = list(self.modifiers)
+        for mod in self.modifiers:
+            if mod.__class__ == modifierClass:
+                modifiers.remove(mod)
+        for mod in list(self.desiredModifiers):
+            if mod.__class__ == modifierClass:
+                self.desiredModifiers.remove(mod)
+        self.modifiers = modifiers
+        self.d_setRawRuleset()
+        self.d_setModifiers()
 
     # Any time you change the ruleset, you should call this to sync the clients
     def d_setRawRuleset(self):
@@ -208,11 +227,20 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def rollRandomModifiers(self):
         tierLeftBound = self.ruleset.MODIFIER_TIER_RANGE[0]
         tierRightBound = self.ruleset.MODIFIER_TIER_RANGE[1]
-        pool = [c(random.randint(tierLeftBound, tierRightBound)) for c in
+        pool: list[CraneLeagueGlobals.CFORulesetModifierBase] = [c(random.randint(tierLeftBound, tierRightBound)) for c in
                 CraneLeagueGlobals.NON_SPECIAL_MODIFIER_CLASSES]
+
+        alreadyApplied = [mod.MODIFIER_ENUM for mod in self.desiredModifiers]
+        for choice in list(pool):
+            if choice.MODIFIER_ENUM in alreadyApplied:
+                pool.remove(choice)
+
+        if len(pool) <= 0:
+            return
+
         random.shuffle(pool)
 
-        self.modifiers = [pool.pop() for _ in range(self.numModsWanted)]
+        modifiers = [pool.pop() for _ in range(self.numModsWanted)]
 
         # If we roll a % roll, go ahead and make this a special cfo
         # Doing this last also ensures any rules that the special mod needs to set override
@@ -220,7 +248,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             cls = random.choice(CraneLeagueGlobals.SPECIAL_MODIFIER_CLASSES)
             tier = random.randint(tierLeftBound, tierRightBound)
             mod_instance = cls(tier)
-            self.modifiers.append(mod_instance)
+            modifiers.append(mod_instance)
+
+        return modifiers
 
     def setGameStart(self, timestamp):
         self.notify.debug("setGameStart")
@@ -238,6 +268,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.gameFSM.request('cleanup')
 
         DistributedMinigameAI.setGameAbort(self)
+        self.scene.removeNode()
+        self.scene = None
 
     def gameOver(self):
         self.notify.debug("gameOver")
@@ -246,6 +278,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.gameFSM.request('cleanup')
         # tell the base class to wrap things up
         DistributedMinigameAI.gameOver(self)
+        self.scene.removeNode()
+        self.scene = None
 
     def clearObjectSpeedCaching(self):
         for safe in self.safes:
@@ -987,8 +1021,17 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
 
+        # Laff drain?
+        if self.ruleset.WANT_LAFF_DRAIN:
+            self.startDrainingLaff(self.ruleset.LAFF_DRAIN_FREQUENCY)
+
+        # Check for special logic if we are restarting the round with cheats enabled previously.
+        self.practiceCheatHandler.checkCheatModifier()
         if self.practiceCheatHandler.wantAimPractice:
             self.practiceCheatHandler.setupAimMode()
+        if self.practiceCheatHandler.cheatIsEnabled():
+            taskMgr.remove(self.uniqueName('times-up-task'))
+            self.d_updateTimer()
 
     # Called when we actually run out of time, simply tell the clients we ran out of time then handle it later
     def __timesUp(self, task=None):
@@ -1016,21 +1059,21 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.currentlyInOvertime = True
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_START)
 
-        self.startDrainingLaff(.5)
+        modifiers = [
+            CraneLeagueGlobals.ModifierGoonCapIncreaser(tier=1),
+            CraneLeagueGlobals.ModifierNoSafeHelmet(tier=1),
+            CraneLeagueGlobals.ModifierTreasureHealDecreaser(tier=2),
+            CraneLeagueGlobals.ModifierLaffDrain(tier=3),
+            CraneLeagueGlobals.ModifierNoRevives(tier=1),
+        ]
 
-        self.ruleset.MAX_GOON_AMOUNT_END += 3  # Add 3 goons
+        self.applyModifiers(modifiers, updateClient=True)
 
-        self.ruleset.DISABLE_SAFE_HELMETS = True  # Turn off helmets
+        # Some modifiers don't exactly support us adding them mid-round based on state. Perform that logic here.
         self.getBoss().stopHelmets()
-
-        # Cut treasures in half
-        self.ruleset.STRONG_TREASURE_HEAL_AMOUNT = int(math.ceil(self.ruleset.STRONG_TREASURE_HEAL_AMOUNT * .5))
-        self.ruleset.AVERAGE_TREASURE_HEAL_AMOUNT = int(math.ceil(self.ruleset.AVERAGE_TREASURE_HEAL_AMOUNT * .5))
-        self.ruleset.WEAK_TREASURE_HEAL_AMOUNT = int(math.ceil(self.ruleset.WEAK_TREASURE_HEAL_AMOUNT * .5))
-        self.ruleset.REALLY_WEAK_TREASURE_HEAL_AMOUNT = int(math.ceil(self.ruleset.REALLY_WEAK_TREASURE_HEAL_AMOUNT * .5))
-        self.ruleset.update_lists()
-
+        self.startDrainingLaff(self.ruleset.LAFF_DRAIN_FREQUENCY)
         self.__cancelReviveTasks()
+        self.d_setModifiers()
 
     def __checkOvertimeState(self):
         """
@@ -1064,6 +1107,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         taskMgr.remove(self.__getLaffDrainTaskName())
 
     def startDrainingLaff(self, interval):
+        self.stopDrainingLaff()
         taskMgr.add(self.__laffDrainTask, self.__getLaffDrainTaskName(), delay=interval)
 
     def __laffDrainTask(self, task):

@@ -2153,10 +2153,16 @@ class SetCFOModifiers(MagicWord):
                 if m.MODIFIER_ENUM == m_instance.MODIFIER_ENUM:
                     boss.modifiers.remove(m)
 
-            boss.modifiers.append(m_instance)
-            s = "Added modifier %s, ~rcr to take effect" % m_instance.getName()
+            for m in list(boss.desiredModifiers):
+                if m.MODIFIER_ENUM == m_instance.MODIFIER_ENUM:
+                    boss.desiredModifiers.remove(m)
+
+            boss.applyModifier(m_instance)
+            boss.desiredModifiers.append(m_instance)
+            boss.d_setModifiers()
+            s = "Added modifier %s\n\nSome modifiers may require ~rcr to take effect." % m_instance.getName()
             if boss.rollModsOnStart:
-                s += ' warning: roll modifiers on rcr active, use ~modifiers random off'
+                s += '\n\nwarning: roll modifiers on rcr active, use `~modifiers random off` to prevent unpredictable behavior.'
 
             return s
 
@@ -2172,13 +2178,13 @@ class SetCFOModifiers(MagicWord):
             if not mod:
                 return "Invalid modifier ID provided"
 
-            for m in list(boss.modifiers):
+            for m in list(boss.desiredModifiers):
                 if m.MODIFIER_ENUM == mod_id:
-                    boss.modifiers.remove(m)
+                    boss.desiredModifiers.remove(m)
 
-            s = "Removed modifier %s, ~rcr to take effect" % mod_id
+            s = "Removed modifier %s\n\nSome modifiers may require ~rcr to take effect" % mod_id
             if boss.rollModsOnStart:
-                s += ' warning: roll modifiers on rcr active, use ~modifiers random off'
+                s += '\n\nwarning: roll modifiers on rcr active, use `~modifiers random off` to prevent unpredictable behavior.'
 
             return s
 

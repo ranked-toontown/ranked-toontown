@@ -123,10 +123,10 @@ class CraneGameRuleset:
 
     def __init__(self):
 
-        self.TIMER_MODE = True  # When true, the cfo is timed and ends when time is up, when false, acts as a stopwatch
-        self.TIMER_MODE_TIME_LIMIT = 3 * 60  # How many seconds do we give the CFO crane round if TIMER_MODE is active?
+        self.TIMER_MODE = False  # When true, the cfo is timed and ends when time is up, when false, acts as a stopwatch
+        self.TIMER_MODE_TIME_LIMIT = 60 * 30  # How many seconds do we give the CFO crane round if TIMER_MODE is active?
 
-        self.CFO_MAX_HP = 10000  # How much HP should the CFO have?
+        self.CFO_MAX_HP = 1_500  # How much HP should the CFO have?
         self.CFO_STUN_THRESHOLD = 24  # How much damage should a goon do to stun?
         self.SIDECRANE_IMPACT_STUN_THRESHOLD = 0.8  # How much impact should a side crane hit need to register a stun
         self.SAFE_HELMET_COOLDOWN = 90 # How long should we wait before being able to safe helmet the CFO twice?
@@ -203,6 +203,9 @@ class CraneGameRuleset:
         self.FORCE_MAX_LAFF_AMOUNT = 100  # The laff that we are going to force all toons participating to have
         self.HEAL_TOONS_ON_START = True  # Should we set all toons to full laff when starting the round?
         self.RANDOM_SPAWN_POSITIONS = False  # Should spawn positions be completely random?
+
+        self.WANT_LAFF_DRAIN = False  # Should we drain toon laff over time?
+        self.LAFF_DRAIN_FREQUENCY = 1  # How often should we drain toon laff? Value is in seconds.
 
         self.WANT_LOW_LAFF_BONUS = False  # Should we award toons with low laff bonus points?
         self.LOW_LAFF_BONUS = .1  # How much will the bonus be worth? i.e. .1 = 10% bonus for ALL points
@@ -338,20 +341,6 @@ class CraneGameRuleset:
         return repr(self.__dict__)
 
 
-
-
-class ClashCraneGameRuleset(CraneGameRuleset):
-    """
-    Tweaks the crane game ruleset to match the gameplay that is present on clash.
-    Since crane league was inspired by clash's CFO gameplay, the only things we have to tweak really is
-    timer behavior and the CFO's HP.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.TIMER_MODE = False
-        self.CFO_MAX_HP = 1500
-
 # This is where we define modifiers, all modifiers alter a ruleset instance in some way to tweak cfo behavior
 # dynamically, first the base class that any modifiers should extend from
 class CFORulesetModifierBase(object):
@@ -481,31 +470,6 @@ class CFORulesetModifierBase(object):
 #         cfoRuleset.CFO_MAX_HP = 69  # Give the cfo 69 hp
 
 
-# Now here is where we can actually define our modifiers
-class ModifierTimerEnabler(CFORulesetModifierBase):
-    MODIFIER_ENUM = 26
-    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
-    TITLE_COLOR = CFORulesetModifierBase.DARK_PURPLE
-    DESCRIPTION_COLOR = CFORulesetModifierBase.PURPLE
-
-    def getName(self):
-        return "Timed!"
-    
-    def _getTime(self):
-        return self.tier * 60
-    
-    def getDescription(self):
-        return f'The CFO will automatically end in %(color_start)s{self._getTime()}%(color_end)s!'
-    
-    def getHeat(self):
-        return 0
-    
-    def apply(self, cfoRuleset):
-        cfoRuleset.TIMER_MODE = True
-        cfoRuleset.TIMER_MODE_TIME_LIMIT = self._getTime()
-        cfoRuleset.CFO_MAX_HP = 3000
-
-
 class ModifierComboExtender(CFORulesetModifierBase):
     MODIFIER_ENUM = 0
     MODIFIER_TYPE = CFORulesetModifierBase.HELPFUL
@@ -531,7 +495,7 @@ class ModifierComboExtender(CFORulesetModifierBase):
         return 'Increases combo length by %(color_start)s+' + str(perc) + '%%%(color_end)s'
 
     def getHeat(self):
-        return -10 * self.tier
+        return -1
 
     def apply(self, cfoRuleset):
         cfoRuleset.COMBO_DURATION *= self.additivePercent(self._duration())
@@ -564,7 +528,7 @@ class ModifierComboShortener(CFORulesetModifierBase):
         return 'Decreases combo length by %(color_start)s-' + str(perc) + '%%%(color_end)s'
 
     def getHeat(self):
-        return 10 * self.tier
+        return 1
 
     def apply(self, cfoRuleset):
         cfoRuleset.COMBO_DURATION *= self.subtractivePercent(self._duration())
@@ -596,7 +560,7 @@ class ModifierCFOHPIncreaser(CFORulesetModifierBase):
         return 'The CFO has %(color_start)s+' + str(perc) + '%%%(color_end)s more HP'
 
     def getHeat(self):
-        return 125 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.CFO_MAX_HP *= self.additivePercent(self._perc_increase())
@@ -628,7 +592,7 @@ class ModifierCFOHPDecreaser(CFORulesetModifierBase):
         return 'The CFO has %(color_start)s-' + str(perc) + '%%%(color_end)s less HP'
 
     def getHeat(self):
-        return -30 * self.tier
+        return self.tier * -1
 
     def apply(self, cfoRuleset):
         cfoRuleset.CFO_MAX_HP *= self.subtractivePercent(self._perc_decrease())
@@ -668,7 +632,7 @@ class ModifierDesafeImpactIncreaser(CFORulesetModifierBase):
             perc) + "%%%(color_end)s"
 
     def getHeat(self):
-        return 50 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.MIN_DEHELMET_IMPACT *= self.additivePercent(self._perc_increase())
@@ -695,7 +659,7 @@ class ModifierGeneralImpactDecreaser(CFORulesetModifierBase):
             self.PERC_REDUCTION) + "%%%(color_end)s for goons and safes"
 
     def getHeat(self):
-        return -30
+        return self.tier * -1
 
     def apply(self, cfoRuleset):
         cfoRuleset.MIN_DEHELMET_IMPACT *= self.subtractivePercent(
@@ -727,7 +691,7 @@ class ModifierGeneralImpactIncreaser(CFORulesetModifierBase):
             self.PERC_REDUCTION) + "%%%(color_end)s for goons and safes"
 
     def getHeat(self):
-        return 50
+        return self.tier * -1
 
     def apply(self, cfoRuleset):
         cfoRuleset.MIN_DEHELMET_IMPACT *= self.additivePercent(self.PERC_REDUCTION)  # reduce min safe impact for helms
@@ -751,7 +715,7 @@ class ModifierDevolution(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.RED
 
     TIER_NAMES = ['', 'Omega', 'Beta', 'Alpha']
-    TIER_HEATS = [0, 25, 200, 225]
+    TIER_HEATS = [0, 0, 1, 2]
 
     # Returns the part of the string that's colored, basically what is disabled
     def _getDynamicString(self):
@@ -809,7 +773,7 @@ class ModifierCFONoFlinch(CFORulesetModifierBase):
         return 'The CFO %(color_start)sno longer flinches%(color_end)s upon being damaged'
 
     def getHeat(self):
-        return 150
+        return 2
 
     def apply(self, cfoRuleset):
         cfoRuleset.CFO_FLINCHES_ON_HIT = False
@@ -848,7 +812,7 @@ class ModifierGoonDamageInflictIncreaser(CFORulesetModifierBase):
             self._perc_increase()) + '%%%(color_end)s'
 
     def getHeat(self):
-        return -20 * self.tier
+        return -1 * self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.GOON_CFO_DAMAGE_MULTIPLIER *= self.additivePercent(self._perc_increase())
@@ -884,7 +848,7 @@ class ModifierSafeDamageInflictIncreaser(CFORulesetModifierBase):
             self._perc_increase()) + '%%%(color_end)s'
 
     def getHeat(self):
-        return -20 * self.tier
+        return -1 * self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.SAFE_CFO_DAMAGE_MULTIPLIER *= self.additivePercent(self._perc_increase())
@@ -919,7 +883,7 @@ class ModifierGoonSpeedIncreaser(CFORulesetModifierBase):
         return 'Goons move %(color_start)s+' + str(self._perc_increase()) + '%%%(color_end)s faster'
 
     def getHeat(self):
-        return 50 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.GOON_SPEED_MULTIPLIER *= self.additivePercent(self._perc_increase())
@@ -935,16 +899,16 @@ class ModifierGoonCapIncreaser(CFORulesetModifierBase):
 
     TITLE_COLOR = CFORulesetModifierBase.DARK_RED
     DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
-    TIER_PERCENT_AMOUNTS = [0, 25, 50, 75]
+    TIER_PERCENT_AMOUNTS = [0, 10, 25, 50]
 
     def _perc_increase(self):
         if self.tier <= len(self.TIER_PERCENT_AMOUNTS):
             return self.TIER_PERCENT_AMOUNTS[self.tier]
 
-        return self.tier * 25
+        return (self.tier-1) * 25
 
     def getName(self):
-        n = "Overwhelming Security"
+        n = "Overwhelming Security!"
         if self.tier > 1:
             n += ' ' + self.numToRoman(self.tier)
         return n
@@ -953,7 +917,7 @@ class ModifierGoonCapIncreaser(CFORulesetModifierBase):
         return 'The CFO spawns %(color_start)s+' + str(self._perc_increase()) + '%%%(color_end)s more goons'
 
     def getHeat(self):
-        return 40 * self.tier
+        return self.tier + 1
 
     def apply(self, cfoRuleset):
         cfoRuleset.MAX_GOON_AMOUNT_START *= self.additivePercent(self._perc_increase())
@@ -972,13 +936,13 @@ class ModifierSafesStunGoons(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.RED
 
     def getName(self):
-        return 'Undying Security'
+        return 'Undying Security!'
 
     def getDescription(self):
         return 'Safes now %(color_start)sstun goons instead of destroy%(color_end)s them on impact'
 
     def getHeat(self):
-        return 50
+        return 1
 
     def apply(self, cfoRuleset):
         cfoRuleset.SAFES_STUN_GOONS = True
@@ -996,13 +960,13 @@ class ModifierGoonsGrabbedWakeup(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.RED
 
     def getName(self):
-        return 'Slippery Security'
+        return 'Slippery Security!'
 
     def getDescription(self):
         return 'Goons %(color_start)salways wakeup%(color_end)s when grabbed by all cranes'
 
     def getHeat(self):
-        return 90
+        return 2
 
     def apply(self, cfoRuleset):
         cfoRuleset.GOONS_ALWAYS_WAKE_WHEN_GRABBED = True
@@ -1027,7 +991,7 @@ class ModifierTreasureHealIncreaser(CFORulesetModifierBase):
         return 'Treasures heal %(color_start)s+' + str(self.INCREASE_PERC) + '%%%(color_end)s when grabbed'
 
     def getHeat(self):
-        return -50
+        return -2
 
     def apply(self, cfoRuleset):
         cfoRuleset.WEAK_TREASURE_HEAL_AMOUNT *= self.additivePercent(self.INCREASE_PERC)
@@ -1064,7 +1028,7 @@ class ModifierTreasureHealDecreaser(CFORulesetModifierBase):
         return 'Treasures heal %(color_start)s-' + str(self._perc_decrease()) + '%%%(color_end)s when grabbed'
 
     def getHeat(self):
-        return 40 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.WEAK_TREASURE_HEAL_AMOUNT *= self.subtractivePercent(self._perc_decrease())
@@ -1103,7 +1067,7 @@ class ModifierTreasureRNG(CFORulesetModifierBase):
             self._get_decrease()) + '%%%(color_end)s chance to drop from stunned goons'
 
     def getHeat(self):
-        return 30 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.GOON_TREASURE_DROP_CHANCE *= self.subtractivePercent(self._get_decrease())
@@ -1137,7 +1101,7 @@ class ModifierTreasureCapDecreaser(CFORulesetModifierBase):
         return 'Amount of treasures decreased by %(color_start)s-' + str(self._get_decrease()) + '%%%(color_end)s'
 
     def getHeat(self):
-        return 40 * self.tier
+        return self.tier
 
     def apply(self, cfoRuleset):
         cfoRuleset.MAX_TREASURE_AMOUNT *= self.subtractivePercent(self._get_decrease())
@@ -1173,7 +1137,7 @@ class ModifierUberBonusIncreaser(CFORulesetModifierBase):
             self._perc_increase()) + '%%%(color_end)s'
 
     def getHeat(self):
-        return -10 * self.tier
+        return 0
 
     def apply(self, cfoRuleset):
         cfoRuleset.LOW_LAFF_BONUS *= self.additivePercent(self._perc_increase())
@@ -1191,13 +1155,13 @@ class ModifierCFOJumpAttackEnabler(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.RED
 
     def getName(self):
-        return 'Jumping for Joy'
+        return 'Market Crash!'
 
     def getDescription(self):
         return 'The CFO can now perform an %(color_start)sAoE jump attack%(color_end)s!'
 
     def getHeat(self):
-        return 250
+        return 3
 
     def apply(self, cfoRuleset):
         cfoRuleset.WANT_CFO_JUMP_ATTACK = True
@@ -1215,13 +1179,13 @@ class ModifierMillionMomentum(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
 
     def getName(self):
-        return 'Maximum Momentum'
+        return 'Compound Interest!'
 
     def getDescription(self):
         return 'The CFO has a %(color_start)smillion HP%(color_end)s, but toons gain %(color_start)spermanent damage buffs %(color_end)swhen inflicting damage!'
 
     def getHeat(self):
-        return 1000
+        return 10
 
     def apply(self, cfoRuleset):
         cfoRuleset.CFO_MAX_HP = 1000000
@@ -1240,13 +1204,13 @@ class ModifierNoSafeHelmet(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
 
     def getName(self):
-        return 'Hats Off'
+        return 'Security Breach!'
 
     def getDescription(self):
         return 'The CFO can %(color_start)sno longer equip safe helmets%(color_end)s!'
 
     def getHeat(self):
-        return -50
+        return -3
 
     def apply(self, cfoRuleset):
         cfoRuleset.DISABLE_SAFE_HELMETS = True
@@ -1267,13 +1231,13 @@ class ModifierReducedSafes(CFORulesetModifierBase):
         return min(max(0, self.tier * 2), len(SAFE_POSHPR))
 
     def getName(self):
-        return 'Safe Shortage ' + self.numToRoman(self.tier)
+        return 'Budget Cuts ' + self.numToRoman(self.tier)
 
     def getDescription(self):
         return 'Amount of safes %(color_start)sdecreased by ' + str(self._getSafesDecrement()) + '%(color_end)s!'
 
     def getHeat(self):
-        return 20 * self.tier
+        return self.tier // 2
 
     def apply(self, cfoRuleset):
         cfoRuleset.SAFES_TO_SPAWN -= self._getSafesDecrement()
@@ -1289,19 +1253,19 @@ class ModifierReducedSafes(CFORulesetModifierBase):
 class ModifierRandomSpawns(CFORulesetModifierBase):
     # The enum used by astron to know the type
     MODIFIER_ENUM = 24
-    MODIFIER_TYPE = CFORulesetModifierBase.HURTFUL
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
 
-    TITLE_COLOR = CFORulesetModifierBase.DARK_RED
-    DESCRIPTION_COLOR = CFORulesetModifierBase.RED
+    TITLE_COLOR = CFORulesetModifierBase.PURPLE
+    DESCRIPTION_COLOR = CFORulesetModifierBase.DARK_PURPLE
 
     def getName(self):
-        return 'Monkey Mode'
+        return 'Musical Chairs!'
 
     def getDescription(self):
-        return 'Spawn positions are %(color_start)srandomized%(color_end)s!'
+        return 'Toon spawn positions are %(color_start)srandomized%(color_end)s!'
 
     def getHeat(self):
-        return 10
+        return 0
 
     def apply(self, cfoRuleset):
         cfoRuleset.RANDOM_SPAWN_POSITIONS = True
@@ -1319,19 +1283,19 @@ class ModifierInstakillGoons(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.RED
 
     def getName(self):
-        return 'Goodbye Goons!'
+        return 'Volatile Assets!'
 
     def getDescription(self):
         return 'Goons are %(color_start)sdestroyed%(color_end)s when stomped!'
 
     def getHeat(self):
-        return 50
+        return 2
 
     def apply(self, cfoRuleset):
         cfoRuleset.GOONS_DIE_ON_STOMP = True
 
 
-# (-) Slow and Steady!
+# (-) Open Market!
 # --------------------------------
 # - Timer is disabled
 class ModifierNoTimeLimit(CFORulesetModifierBase):
@@ -1343,16 +1307,144 @@ class ModifierNoTimeLimit(CFORulesetModifierBase):
     DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
 
     def getName(self):
-        return 'Slow And Steady!'
+        return 'Open Market!'
 
     def getDescription(self):
         return 'The time limit is %(color_start)sdisabled%(color_end)s for this crane round!'
 
     def getHeat(self):
-        return -100
+        return -2
 
     def apply(self, cfoRuleset):
         cfoRuleset.TIMER_MODE = False
+
+
+# Now here is where we can actually define our modifiers
+class ModifierTimerEnabler(CFORulesetModifierBase):
+    MODIFIER_ENUM = 27
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
+    TITLE_COLOR = CFORulesetModifierBase.DARK_RED
+    DESCRIPTION_COLOR = CFORulesetModifierBase.RED
+
+    def getName(self):
+        return "Margin Call!"
+
+    def _getTime(self):
+        return self.tier * 60
+
+    def getDescription(self):
+        return f'The CFO will automatically end in %(color_start)s{self._getTime()//60} minutes%(color_end)s!'
+
+    def getHeat(self):
+        return max(0, min(4 - self.tier, 3))
+
+    def apply(self, cfoRuleset):
+        cfoRuleset.TIMER_MODE = True
+        cfoRuleset.TIMER_MODE_TIME_LIMIT = self._getTime()
+
+
+# (-) Liquidity Lockdown!
+# --------------------------------
+# - CFO is invincible
+class ModifierInvincibleBoss(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 28
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
+
+    TITLE_COLOR = CFORulesetModifierBase.DARK_RED
+    DESCRIPTION_COLOR = CFORulesetModifierBase.RED
+
+    def getName(self):
+        return 'Liquidity Lockdown!'
+
+    def getDescription(self):
+        return 'The CFO is %(color_start)sinvincible%(color_end)s!'
+
+    def getHeat(self):
+        return 4
+
+    def apply(self, cfoRuleset):
+        cfoRuleset.CFO_MAX_HP = 1_000_000
+
+
+# (-) Leaky Laff!
+# --------------------------------
+# - Laff drains every so often
+class ModifierLaffDrain(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 29
+    MODIFIER_TYPE = CFORulesetModifierBase.HURTFUL
+
+    TITLE_COLOR = CFORulesetModifierBase.DARK_RED
+    DESCRIPTION_COLOR = CFORulesetModifierBase.RED
+
+    DRAIN_RATES = [1, 1, .75, .5, .25, .1]
+
+    def __getDrainFrequency(self):
+        if self.tier >= len(self.DRAIN_RATES):
+            return .1
+        return self.DRAIN_RATES[self.tier]
+
+    def getName(self):
+        return 'Leaky Laff!'
+
+    def getDescription(self):
+        return f'Toons drain laff every %(color_start)s{self.__getDrainFrequency()}s%(color_end)s second(s)!'
+
+    def getHeat(self):
+        return 2 * self.tier
+
+    def apply(self, cfoRuleset):
+        cfoRuleset.WANT_LAFF_DRAIN = True
+        cfoRuleset.LAFF_DRAIN_FREQUENCY = self.__getDrainFrequency()
+
+
+# (-) Leaky Laff!
+# --------------------------------
+# - Laff drains every so often
+class ModifierNoRevives(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 30
+    MODIFIER_TYPE = CFORulesetModifierBase.HURTFUL
+
+    TITLE_COLOR = CFORulesetModifierBase.DARK_RED
+    DESCRIPTION_COLOR = CFORulesetModifierBase.RED
+
+    def getName(self):
+        return 'Total Bankruptcy!'
+
+    def getDescription(self):
+        return f'Toons will %(color_start)sno longer revives%(color_end)s when going sad!'
+
+    def getHeat(self):
+        return 3
+
+    def apply(self, cfoRuleset):
+        cfoRuleset.REVIVE_TOONS_UPON_DEATH = False
+
+
+# (-) Insider Trading!
+# --------------------------------
+# - Doesn't exactly do anything, just a signal that this CFO has some sort of cheats enabled.
+class ModifierCFOCheatsEnabled(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 31
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
+
+    TITLE_COLOR = CFORulesetModifierBase.CYAN
+    DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
+
+    def getName(self):
+        return 'Insider Trading!'
+
+    def getDescription(self):
+        return f'There are %(color_start)scheats enabled%(color_end)s for practicing purposes!'
+
+    def getHeat(self):
+        return -20
+
+    def apply(self, cfoRuleset):
+        pass
 
 
 # Any implemented subclasses of CFORulesetModifierBase cannot go past this point

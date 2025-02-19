@@ -1,5 +1,5 @@
 # Server settings
-version v0.1.1 Alpha
+version v0.1.2 Alpha
 
 server-version tt-ranked-edition
 

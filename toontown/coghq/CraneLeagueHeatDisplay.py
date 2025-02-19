@@ -14,13 +14,16 @@ HIGHEST_HEAT_S_VALUE = .70
 
 V_HEAT_VALUE = .83
 
-LOWEST_HEAT = 150
-HIGHEST_HEAT = 1000
+LOWEST_HEAT = -20
+HIGHEST_HEAT = 30
 
 TITLE_FONT_SIZE = 1.05
 DESCRIPTION_TITLE_FONT_SIZE = 0.85
 DESCRIPTION_BODY_FONT_SIZE = 0.65
 DESCRIPTION_WORD_WRAP = 20
+
+HEAT_AMOUNT_COLOR = (.8, .4, .05, 1)
+HEAT_HELPFUL_AMOUNT_COLOR = (.05, .65, .4, 1)
 
 
 class CraneLeagueHeatDisplay:
@@ -36,13 +39,22 @@ class CraneLeagueHeatDisplay:
     text_properties_default_color.setTextScale(TITLE_FONT_SIZE)
     text_properties_manager.setProperties("default_mod_color", text_properties_default_color)
 
+    title_text_heat_properties = TextProperties()
+    title_text_heat_properties.setTextColor(*HEAT_AMOUNT_COLOR)
+    title_text_heat_properties.setTextScale(.9)
+    text_properties_manager.setProperties("mod-heat-amount", title_text_heat_properties)
+    title_text_heat_helpful_properties = TextProperties()
+    title_text_heat_helpful_properties.setTextColor(*HEAT_HELPFUL_AMOUNT_COLOR)
+    title_text_heat_helpful_properties.setTextScale(.9)
+    text_properties_manager.setProperties("mod-heat-helpful-amount", title_text_heat_helpful_properties)
+
     def __init__(self):
-        self.heat = 500
+        self.heat = 0
         self.frame = DirectFrame(parent=base.a2dRightCenter)
         self.flame_image = OnscreenImage(parent=self.frame, image='phase_10/maps/heat.png', pos=self.FLAME_POS, scale=.05)
         self.flame_image.setTransparency(TransparencyAttrib.MAlpha)
 
-        self.heat_number = OnscreenText(parent=self.frame, text='500', style=3, fg=self.calculate_color(), align=TextNode.ALeft, scale=.1, pos=self.HEAT_NUM_POS, font=ToontownGlobals.getSuitFont())
+        self.heat_number = OnscreenText(parent=self.frame, text='0', style=3, fg=self.calculate_color(), align=TextNode.ALeft, scale=.1, pos=self.HEAT_NUM_POS, font=ToontownGlobals.getCompetitionFont())
 
         self.hover_button = DirectButton(parent=self.frame, pos=(-.43, 0, .74), scale=(1.5, 1, .5))
         self.hover_button.setTransparency(TransparencyAttrib.MAlpha)
@@ -106,7 +118,8 @@ class CraneLeagueHeatDisplay:
             self.text_properties_manager.setProperties(desc_key, desc_text_properties)
 
             # Now add the text with the special chars in it
-            s += '\1' + title_key + '\1' + title + '\2\n'
+            heat_tag = "mod-heat-amount" if mod.getHeat() >= 0 else 'mod-heat-helpful-amount'
+            s += '\1' + title_key + '\1' + title + '\2' + '\1' + heat_tag +  '\1' + f' ({mod.getHeat()})' '\2' + '\n'
             # Now add the desc, replacing color_start and color_end with color codes
             s += desc % {'color_start': '\1' + desc_key + '\1', 'color_end': '\2'}
 
@@ -133,17 +146,30 @@ class CraneLeagueHeatDisplay:
         self.heat_number.hide()
         self.flame_image.hide()
         self.modifiers_desc_path.hide()
+        self.hover_button['state'] = DGG.DISABLED
 
     def show(self):
         self.heat_number.show()
         self.flame_image.show()
-        # self.modifiers_desc_path.show()
+        self.hover_button['state'] = DGG.NORMAL
+
+    def calculateHeat(self, modifiers):
+        bonusHeat = 0
+        # Loop through all modifiers present and calculate the bonus heat
+        for modifier in modifiers:
+            bonusHeat += modifier.getHeat()
+
+        return bonusHeat
 
     # Updates all elements on the gui
-    def update(self, heat, modifiers):
-        self.set_heat(heat)
+    def update(self, modifiers):
+        self.set_heat(self.calculateHeat(modifiers))
         self.modifiers_desc.setText(self.generateText(modifiers))
         self.modifiers_desc.setFrameColor(self.calculate_color())
+        if len(modifiers) > 0:
+            self.show()
+        else:
+            self.hide()
 
     def cleanup(self):
         self.hover_button.destroy()

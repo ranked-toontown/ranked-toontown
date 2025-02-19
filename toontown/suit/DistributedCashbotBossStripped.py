@@ -128,6 +128,8 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
 
         # Display Health Bar
         self.bossHealthBar.initialize(self.ruleset.CFO_MAX_HP - self.bossDamage, self.ruleset.CFO_MAX_HP)
+        if self.ruleset.CFO_MAX_HP > 999_999 and self.ruleset.TIMER_MODE:
+            self.bossHealthBar.hide()
 
     def cleanupBossBattle(self):
         self.cleanupIntervals()

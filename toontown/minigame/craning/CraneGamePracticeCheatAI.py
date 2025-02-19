@@ -4,6 +4,7 @@ import typing
 
 from direct.directnotify import DirectNotifyGlobal
 
+from toontown.coghq import CraneLeagueGlobals
 from toontown.toonbase import ToontownGlobals
 
 if typing.TYPE_CHECKING:
@@ -44,6 +45,9 @@ class CraneGamePracticeCheatAI:
         self.wantNoStunning = False
         self.wantFasterGoonSpawns = False
         self.wantAlwaysStunned = False
+
+    def cheatIsEnabled(self):
+        return True in (self.wantRNGMode, self.wantSafeRushPractice, self.wantLiveGoonPractice, self.wantAimPractice, self.wantGoonPractice)
 
     def setPracticeParams(self, practiceMode):
 
@@ -109,6 +113,16 @@ class CraneGamePracticeCheatAI:
             self.wantOpeningModifications = True
             self.wantAlwaysStunned = True
             self.setupGoonPracticeMode()
+
+        # We probably want some sort of indicator so we know if someone has cheats enabled.
+        # We can use a modifier with a really low heat value to display this, so we know we are in
+        # some sort of "easy mode"
+        self.checkCheatModifier()
+
+    def checkCheatModifier(self):
+        self.game.removeModifier(CraneLeagueGlobals.ModifierCFOCheatsEnabled)
+        if self.cheatIsEnabled():
+            self.game.applyModifier(CraneLeagueGlobals.ModifierCFOCheatsEnabled(tier=1), updateClient=True)
 
     def setupAimMode(self):
         # Initial setup for aim mode - stun CFO and remove goons

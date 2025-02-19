@@ -88,9 +88,12 @@ class BossSpeedrunTimedTimer(BossSpeedrunTimer):
     MODE = BossSpeedrunTimer.TIMER
 
     def __init__(self, time_limit):
-        BossSpeedrunTimer.__init__(self)
         self.time_limit = time_limit
+        BossSpeedrunTimer.__init__(self)
         self.want_overtime = False
+        self.beepSfx = base.loader.loadSfx('phase_14/audio/sfx/tick.ogg')
+        self.beepSfx.setPlayRate(0.8)
+        self.beepSfx.setVolume(.1)
 
     def reset(self):
         BossSpeedrunTimer.reset(self)
@@ -108,21 +111,29 @@ class BossSpeedrunTimedTimer(BossSpeedrunTimer):
         # Color is determined by how much time is left under normal circumstances.
         if seconds <= 10:
             frac_secs = int((seconds - int(seconds))*100)
-            return (.7, 0, 0, .85) if frac_secs < 50 else (.9, .9, .9, .85)
+            return (.7, 0, 0, .85) if frac_secs >= 50 else (.9, .9, .9, .85)
         elif seconds <= 31:
-            return (.7, 0, 0, 1) if int(seconds) % 2 == 0 else (.9, .9, .9, .85)
+            return (.7, 0, 0, 1) if int(seconds) % 2 != 0 else (.9, .9, .9, .85)
         else:
             return .9, .9, .9, .85
 
-    def update_time(self):
-
-        # Run some math that we need
+    def calculate_time_left(self):
         now = datetime.now()
         end = self.started + timedelta(seconds=self.time_limit)
         time_left = end - now
         total_secs = time_left.total_seconds()
         if total_secs < 0:
             total_secs = 0
+        return total_secs
+    
+    def start_updating(self):
+        super().start_updating()
+        self.schedule_beep()
+
+    def update_time(self):
+
+        # Run some math that we need
+        total_secs = self.calculate_time_left()
 
         # Figure out the color we want to set the timer to
         self.time_text['fg'] = self._determine_color(total_secs)
@@ -148,6 +159,35 @@ class BossSpeedrunTimedTimer(BossSpeedrunTimer):
         else:
             self.time_text.show()
             super().hide_overtime()
+
+    def schedule_beep(self):
+        taskMgr.remove('boss-timer-warning')
+        time_left = self.calculate_time_left()
+        if time_left > 11:
+            taskMgr.doMethodLater(time_left-11, self.__beep, 'boss-timer-warning')
+        else:
+            self.__beep()
+
+    def __beep(self, task=None):
+        base.playSfx(self.beepSfx, volume=.2)
+
+        if self.calculate_time_left() <= 1:
+            return task.done
+
+        task.delayTime = 2
+
+        if self.calculate_time_left() <= 6:
+            task.delayTime = 1
+
+        return task.again
+
+    def override_time(self, secs):
+        super().override_time(secs)
+        taskMgr.remove('boss-timer-warning')
+
+    def stop_updating(self):
+        super().stop_updating()
+        taskMgr.remove('boss-timer-warning')
 
     def show_overtime(self):
         self.want_overtime = True

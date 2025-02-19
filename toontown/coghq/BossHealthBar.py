@@ -55,6 +55,11 @@ class BossHealthBar:
 
         self.drainIval = None
 
+    def hide(self):
+        self.bossBarFrame.hide()
+
+    def show(self):
+        self.bossBarFrame.show()
 
     def initialize(self, hp, maxhp):
         self.maxHp = maxhp

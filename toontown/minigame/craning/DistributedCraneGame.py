@@ -71,6 +71,7 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.bossSpeedrunTimer = BossSpeedrunTimer()
         self.bossSpeedrunTimer.hide()
+        self.bossSpeedrunTimer.stop_updating()
 
         # The crane round scoreboard
         self.scoreboard = CashbotBossScoreboard(ruleset=self.ruleset)
@@ -172,8 +173,11 @@ class DistributedCraneGame(DistributedMinigame):
         self.winSting = base.loader.loadSfx("phase_4/audio/sfx/MG_win.ogg")
         self.loseSting = base.loader.loadSfx("phase_4/audio/sfx/MG_lose.ogg")
 
-        self.timerTickSfx = base.loader.loadSfx("phase_3.5/audio/sfx/tick_counter.ogg")
-        self.goSfx = base.loader.loadSfx('phase_4/audio/sfx/AA_sound_whistle.ogg')
+        self.timerTickSfx = base.loader.loadSfx("phase_14/audio/sfx/tick.ogg")
+        self.timerTickSfx.setPlayRate(.8)
+        self.timerTickSfx.setVolume(.1)
+        self.goSfx = base.loader.loadSfx('phase_14/audio/sfx/tick.ogg')
+        self.goSfx.setVolume(.1)
 
         base.cr.forbidCheesyEffects(1)
 
@@ -498,14 +502,6 @@ class DistributedCraneGame(DistributedMinigame):
                 if avId in self.getSpectators():
                     self.rulesPanel.updateSpotStatus(i, False)
 
-    def calculateHeat(self):
-        bonusHeat = 0
-        # Loop through all modifiers present and calculate the bonus heat
-        for modifier in self.modifiers:
-            bonusHeat += modifier.getHeat()
-
-        return self.BASE_HEAT + bonusHeat
-
     def __generateRulesPanel(self):
         return CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
 
@@ -521,17 +517,21 @@ class DistributedCraneGame(DistributedMinigame):
         self.bossSpeedrunTimer = BossSpeedrunTimedTimer(
             time_limit=self.ruleset.TIMER_MODE_TIME_LIMIT) if self.ruleset.TIMER_MODE else BossSpeedrunTimer()
         self.bossSpeedrunTimer.hide()
+        self.updateRulesetDependencies()
+
+    def updateRulesetDependencies(self):
         # If the scoreboard was made then update the ruleset
         if self.scoreboard:
             self.scoreboard.set_ruleset(self.ruleset)
 
-        self.heatDisplay.update(self.calculateHeat(), self.modifiers)
+        self.heatDisplay.update(self.modifiers)
+
         if self.boss is not None:
             self.boss.setRuleset(self.ruleset)
 
     def setRawRuleset(self, attrs):
         self.ruleset = CraneLeagueGlobals.CraneGameRuleset.fromStruct(attrs)
-        self.updateRequiredElements()
+        self.updateRulesetDependencies()
 
     def getRawRuleset(self):
         return self.ruleset.asStruct()
@@ -580,8 +580,7 @@ class DistributedCraneGame(DistributedMinigame):
         base.localAvatar.b_setParent(ToontownGlobals.SPRender)
 
         # Display Modifiers Heat
-        self.heatDisplay.update(self.calculateHeat(), self.modifiers)
-        self.heatDisplay.show()
+        self.updateRequiredElements()
 
         # Setup the scoreboard
         self.scoreboard.clearToons()
@@ -726,6 +725,7 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.modifiers = modsToSet
         self.modifiers.sort(key=lambda m: m.MODIFIER_TYPE)
+        self.heatDisplay.update(self.modifiers)
 
     def restart(self):
         """
