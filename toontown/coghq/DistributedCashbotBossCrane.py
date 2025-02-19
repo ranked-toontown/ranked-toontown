@@ -1391,10 +1391,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
             self.boss.toFinalBattleMode(checkForOuch=True)
 
-            # goes back to sprint if entered sprinting
-            if base.localAvatar.isSprinting:
-                base.localAvatar.setSprinting()
-            
         self.__straightenCable()
 
     def enterLocalFree(self):
