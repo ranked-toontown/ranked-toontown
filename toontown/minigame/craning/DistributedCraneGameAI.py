@@ -1115,8 +1115,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         Drain all present toons' laff by one.
         """
         for toon in self.getParticipantsNotSpectating():
+            if not self.ruleset.LAFF_DRAIN_KILLS_TOONS and toon.getHp() <= 1:
+                continue
             self.damageToon(toon, 1)
-        self.__checkOvertimeState()  # Check if we are allowed to end the game. This will cancel the task for us if we choose to.
         return task.again
 
     def __doInitialGoons(self, task):
