@@ -1,4 +1,5 @@
 import builtins
+import os
 import re
 from direct.showbase.DirectObject import DirectObject
 from direct.gui.DirectGui import *
@@ -50,6 +51,7 @@ class OpeningUserInput(DirectObject):
             base.startShow(self.cr, gameserver)
 
     def askForPlaytoken(self):
+
         self.askForUsername = self.dialogClass(message=CREnterUsername, style=OTPDialog.NoButtons,
                                      doneEvent='cleanup', text_wordwrap=16, midPad=0.2, extraArgs=['askForUsername'])
         self.accept('cleanup', self.cleanup, extraArgs=[self.askForUsername])
@@ -58,6 +60,13 @@ class OpeningUserInput(DirectObject):
                                  cursorKeys=1, obscured=1, initialText="Username", numLines=1, focus=1, focusInCommand=self.clearText)
 
         self.askForUsername.show()
+
+        # Is an environment variable already set? Skip the process if so.
+        token = os.getenv('PLAYTOKEN')
+        os.unsetenv('PLAYTOKEN')  # Get rid of it after one attempt at this.
+        if token is not None:
+            self.entry.setText(token)
+            self.determineUsernameAuthenticity(token)
 
     def localMultiplayerScreen(self):
         self.askForGameserver = self.dialogClass(message=CREnterGameserver, style=OTPDialog.NoButtons,
@@ -97,14 +106,23 @@ class OpeningUserInput(DirectObject):
             self.singlePlayerScreen()
 
     def askServerPreference(self):
+
+        # Is an env var set?
+        gameserver = os.getenv('GAMESERVER')
+        if gameserver is not None:
+            base.startShow(self.cr, gameserver)
+            return
+
         if not config.ConfigVariableBool('local-multiplayer', False).getValue():
             self.askServerSpecification = self.dialogClass(message=CRSpecifyServerSelection, style=OTPDialog.ThreeChoiceCustom,
                                                            yesButtonText=CRSingleplayer, noButtonText=CRPublicServer, cancelButtonText=CRLocalMultiplayer,
                                                            command=self.decision, doneEvent='cleanup', text_wordwrap=20, buttonPadSF=5)
             self.askServerSpecification.show()
             self.accept('cleanup', self.cleanup, extraArgs=[self.askServerSpecification])
+            return
+
+        # Default behavior
+        if not self.launcher.isDummy():
+            base.startShow(self.cr, self.launcher.getGameServer())
         else:
-            if not self.launcher.isDummy():
-                base.startShow(self.cr, self.launcher.getGameServer())
-            else:
-                base.startShow(self.cr)
+            base.startShow(self.cr)
