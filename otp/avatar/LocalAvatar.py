@@ -92,6 +92,9 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
         self.orbitalCamera = OrbitalCamera(self)
 
         # Some enums to make switching control modes easier
+        self.currentSpeed = OTPGlobals.ToonForwardSpeed
+        self.currentReverseSpeed = OTPGlobals.ToonReverseSpeed
+        self.currentRotateSpeed = OTPGlobals.ToonRotateSpeed
         self.NORMAL_SPEED_ENUM = 0
         self.SPRINT_SPEED_ENUM = 1
         self.REVERSE_NORMAL_SPEED_ENUM = 2
@@ -229,8 +232,9 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
     def setSprinting(self):
         self.currentSpeed = self.currentMovementMode[self.SPRINT_SPEED_ENUM]
         self.currentReverseSpeed = self.currentMovementMode[self.REVERSE_SPRINT_SPEED_ENUM]
-        self.controlManager.setSpeeds(self.currentMovementMode[self.SPRINT_SPEED_ENUM], OTPGlobals.ToonJumpForce,
-                                      self.currentMovementMode[self.REVERSE_SPRINT_SPEED_ENUM], self.currentMovementMode[self.ROTATE_SPRINT_SPEED_ENUM])
+        self.currentRotateSpeed = self.currentMovementMode[self.ROTATE_SPRINT_SPEED_ENUM]
+        self.controlManager.setSpeeds(self.currentSpeed, OTPGlobals.ToonJumpForce,
+                                      self.currentReverseSpeed, self.currentRotateSpeed)
         self.isSprinting = 1
 
         if base.WANT_FOV_EFFECTS:
@@ -243,8 +247,9 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
 
         self.currentSpeed = self.currentMovementMode[self.NORMAL_SPEED_ENUM]
         self.currentReverseSpeed = self.currentMovementMode[self.REVERSE_NORMAL_SPEED_ENUM]
-        self.controlManager.setSpeeds(self.currentMovementMode[self.NORMAL_SPEED_ENUM], OTPGlobals.ToonJumpForce,
-                                      self.currentMovementMode[self.REVERSE_NORMAL_SPEED_ENUM], self.currentMovementMode[self.ROTATE_NORMAL_SPEED_ENUM])
+        self.currentRotateSpeed = self.currentMovementMode[self.ROTATE_NORMAL_SPEED_ENUM]
+        self.controlManager.setSpeeds(self.currentSpeed, OTPGlobals.ToonJumpForce,
+                                      self.currentReverseSpeed, self.currentRotateSpeed)
 
         if base.WANT_FOV_EFFECTS and lerpFov:
             self.lerpFov(self.fov, self.fallbackFov)
@@ -606,11 +611,14 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
         self.controlManager.setTurn(1)
         self.controlManager.disable()
         self.clearPageUpDown()
-        self.exitSprinting(lerpFov=False)
+        if base.settings.get('sprint_mode') == "Hold":
+            self.exitSprinting(lerpFov=False)
         self.ignoreSprint()
 
     def setWalkSpeedNormal(self):
-        self.controlManager.setSpeeds(OTPGlobals.ToonForwardSpeed, OTPGlobals.ToonJumpForce, OTPGlobals.ToonReverseSpeed, OTPGlobals.ToonRotateSpeed)
+        self.controlManager.setSpeeds(self.currentSpeed, OTPGlobals.ToonJumpForce, self.currentReverseSpeed, self.currentRotateSpeed)
+        if base.WANT_FOV_EFFECTS and self.isSprinting:
+            self.lerpFov(self.fov, self.fallbackFov + self.currentMovementMode[self.FOV_INCREASE_ENUM])
 
     def setWalkSpeedSlow(self):
         self.controlManager.setSpeeds(OTPGlobals.ToonForwardSlowSpeed, OTPGlobals.ToonJumpSlowForce, OTPGlobals.ToonReverseSlowSpeed, OTPGlobals.ToonRotateSlowSpeed)

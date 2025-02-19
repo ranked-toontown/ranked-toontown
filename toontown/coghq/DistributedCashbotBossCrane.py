@@ -1255,9 +1255,9 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
             # The local toon is beginning to control the crane.
 
             # No fov effects on cranes
-            base.WANT_FOV_EFFECTS = False
-            base.localAvatar.setCameraFov(base.localAvatar.fallbackFov)
-            
+            if base.WANT_FOV_EFFECTS:
+                base.localAvatar.lerpFov(base.localAvatar.fov, base.localAvatar.fallbackFov)
+
             self.boss.toCraneMode()
             
             localAvatar.orbitalCamera.stop()
@@ -1306,7 +1306,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
                 self.__disableControlInterface()
                 self.__deactivatePhysics()
                 self.tube.unstash()
-                
+
                 localAvatar.orbitalCamera.start()
 
                 self.boss.toFinalBattleMode(checkForOuch=True)
@@ -1316,6 +1316,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
                 
             self.__straightenCable()
             self.locallyExited = True
+
         pass
 
     def enterControlled(self, avId):
@@ -1390,9 +1391,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
             self.boss.toFinalBattleMode(checkForOuch=True)
 
-            # Go back to the defined setting for FOV effects
-            base.WANT_FOV_EFFECTS = base.settings.get('fovEffects')
-            
         self.__straightenCable()
 
     def enterLocalFree(self):

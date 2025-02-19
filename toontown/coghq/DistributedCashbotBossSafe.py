@@ -29,7 +29,7 @@ class DistributedCashbotBossSafe(DistributedCashbotBossObject.DistributedCashbot
     # A safe remains under physical control of whichever client
     # last dropped it, even after it stops moving.  This allows
     # goons to push safes out of the way.
-    wantsWatchDrift = 0
+    wantsWatchDrift = 1
 
     def __init__(self, cr):
         DistributedCashbotBossObject.DistributedCashbotBossObject.__init__(self, cr)
@@ -43,7 +43,6 @@ class DistributedCashbotBossSafe(DistributedCashbotBossObject.DistributedCashbot
         self.hitFloorSfx = loader.loadSfx('phase_5/audio/sfx/AA_drop_bigweight_miss.ogg')
         self.hitFloorSoundInterval = SoundInterval(self.hitFloorSfx, node=self)
         self.name = 'safe'
-        self.wantsWatchDrift = 0
         return
 
     def announceGenerate(self):
