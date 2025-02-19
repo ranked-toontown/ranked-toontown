@@ -63,6 +63,7 @@ class CraneWalk(Walk):
         base.localAvatar.controlManager.placeOnFloor()
         base.localAvatar.stopTrackAnimToSpeed()
         base.localAvatar.endAllowPies()
+        base.localAvatar.finishLerpFov()
 
     def enterSlowWalking(self):
         self.accept(base.localAvatar.uniqueName('positiveHP'), self.__handlePositiveHP)
