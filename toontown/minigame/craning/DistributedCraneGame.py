@@ -13,7 +13,7 @@ from direct.showbase.MessengerGlobal import messenger
 from direct.showbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
-    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat
+    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube
 from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator, PhysicsManager
 
 from libotp import CFSpeech
@@ -43,6 +43,18 @@ class DistributedCraneGame(DistributedMinigame):
         self.cranes = {}
         self.safes = {}
         self.goons = []
+
+        # Setup collision detection for clicking
+        self.clickRay = CollisionRay()
+        self.clickRayNode = CollisionNode('mouseRay')
+        self.clickRayNode.addSolid(self.clickRay)
+        self.clickRayNodePath = camera.attachNewNode(self.clickRayNode)
+        # Create a special bitmask for our spotlight clicks
+        self.spotlightBitMask = BitMask32.bit(3)  # Using bit 3 for our spotlight clicks
+        self.clickRayNode.setFromCollideMask(self.spotlightBitMask)
+        self.clickRayNode.setIntoCollideMask(BitMask32.allOff())
+        self.clickRayQueue = CollisionHandlerQueue()
+        base.cTrav.addCollider(self.clickRayNodePath, self.clickRayQueue)
 
         self.overlayText = OnscreenText('', shadow=(0, 0, 0, 1), font=ToontownGlobals.getCompetitionFont(), pos=(0, 0), scale=0.35, mayChange=1)
         self.overlayText.hide()
@@ -926,14 +938,18 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
+
+        # Only setup click detection for the leader
+        if self.avIdList[0] == base.localAvatar.doId:
+            # Make sure the click ray is using our spotlight bitmask
+            self.clickRayNode.setFromCollideMask(self.spotlightBitMask)
+            self.accept('mouse1', self.handleMouseClick)
         
         # Hide all toon shadows
         for toon in self.getParticipants():
             if toon and hasattr(toon, 'dropShadow') and toon.dropShadow:
                 toon.dropShadow.hide()
         
-        # Accept the rules done event
-        self.accept(self.rulesDoneEvent, self.handleRulesDone)
         # Accept spot status change messages
         self.accept('spotStatusChanged', self.handleSpotStatusChanged)
 
@@ -942,30 +958,50 @@ class DistributedCraneGame(DistributedMinigame):
         for toon in self.getParticipants():
             if toon and hasattr(toon, 'dropShadow') and toon.dropShadow:
                 toon.dropShadow.show()
-                
+        
+        # Clean up click detection
+        self.ignore('mouse1')
         self.removeStatusIndicators()
         self.__cleanupRulesPanel()
 
-    def enterFrameworkWaitServerStart(self):
-        self.notify.debug('BASE: enterFrameworkWaitServerStart')
-        if self.numPlayers > 1:
-            msg = "Waiting for Group Leader to start..."
-        else:
-            msg = TTLocalizer.MinigamePleaseWait
-        self.waitingStartLabel['text'] = msg
-        self.waitingStartLabel.show()
+    def handleMouseClick(self):
+        """Handle mouse clicks during the rules state to detect clicks on spotlights."""
+        # Only the leader can click
+        if self.avIdList[0] != base.localAvatar.doId:
+            return
+        
+        # Get the mouse position
+        if not base.mouseWatcherNode.hasMouse():
+            return
+        
+        mpos = base.mouseWatcherNode.getMouse()
+        
+        # Set up the collision ray
+        self.clickRay.setFromLens(base.camNode, mpos.getX(), mpos.getY())
+        
+        # Traverse and check for collisions
+        base.cTrav.traverse(render)
+        
+        # Check the collision queue
+        if self.clickRayQueue.getNumEntries() > 0:
+            self.clickRayQueue.sortEntries()
+            entry = self.clickRayQueue.getEntry(0)
+            clickedNode = entry.getIntoNodePath()
+            pickedObject = clickedNode.findNetTag('toonId')
+            
+            if not pickedObject.isEmpty():
+                avId = int(pickedObject.getTag('toonId'))
+                for i, toonId in enumerate(self.avIdList):
+                    if toonId == avId:
+                        # Toggle the status - if they're in spectators, make them a player and vice versa
+                        currentlySpectating = avId in self.getSpectators()
+                        self.sendUpdate('handleSpotStatusChanged', [i, currentlySpectating])
+                        break
 
     def handleRulesDone(self):
         self.notify.debug('BASE: handleRulesDone')
         self.sendUpdate('setAvatarReady', [])
         self.frameworkFSM.request('frameworkWaitServerStart')
-
-    def handleSpotStatusChanged(self, spotIndex, isPlayer):
-        """
-        Called when a spot's status is changed between Player and Spectator
-        Send the change to the server
-        """
-        self.sendUpdate('handleSpotStatusChanged', [spotIndex, isPlayer])
 
     def updateSpotStatus(self, spotIndex, isPlayer):
         """
@@ -1070,6 +1106,16 @@ class DistributedCraneGame(DistributedMinigame):
         floorGeomNode = GeomNode('floor')
         floorGeomNode.addGeom(floorGeom)
         floorNode.attachNewNode(floorGeomNode)
+
+        # Add collision cylinder for clicking
+        if self.avIdList[0] == base.localAvatar.doId:  # Only leader gets collision
+            radius = 1.2  # Same radius as the spotlight
+            collTube = CollisionTube(0, 0, 4, 0, 0, 1.2, radius)  # point1_x, point1_y, point1_z, point2_x, point2_y, point2_z, radius
+            collNode = CollisionNode(f'spotlightSphere-{toon.doId}')  # Keep the same node name for consistency
+            collNode.addSolid(collTube)
+            collNode.setIntoCollideMask(self.spotlightBitMask)
+            collPath = indicator.attachNewNode(collNode)
+            collPath.setTag('toonId', str(toon.doId))
         
         # Store the indicator
         self.statusIndicators[toon.doId] = indicator
@@ -1127,3 +1173,19 @@ class DistributedCraneGame(DistributedMinigame):
             if not indicator.isEmpty():
                 indicator.removeNode()
         self.statusIndicators.clear()
+
+    def handleSpotStatusChanged(self, spotIndex, isPlayer):
+        """
+        Called when a spot's status is changed between Player and Spectator
+        Send the change to the server
+        """
+        self.sendUpdate('handleSpotStatusChanged', [spotIndex, isPlayer])
+
+    def enterFrameworkWaitServerStart(self):
+        self.notify.debug('BASE: enterFrameworkWaitServerStart')
+        if self.numPlayers > 1:
+            msg = "Waiting for Group Leader to start..."
+        else:
+            msg = TTLocalizer.MinigamePleaseWait
+        self.waitingStartLabel['text'] = msg
+        self.waitingStartLabel.show()
