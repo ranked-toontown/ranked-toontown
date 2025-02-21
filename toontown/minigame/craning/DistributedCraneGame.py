@@ -627,6 +627,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.accept("LocalSetOuchMode", self.toOuchMode)
         self.accept("ChatMgr-enterMainMenu", self.chatClosed)
 
+        if base.WANT_FOV_EFFECTS and base.localAvatar.isSprinting:
+            base.localAvatar.lerpFov(base.localAvatar.fov, base.localAvatar.fallbackFov + base.localAvatar.currentMovementMode[base.localAvatar.FOV_INCREASE_ENUM])
+
         self.__checkSpectatorState()
 
     def exitPlay(self):
