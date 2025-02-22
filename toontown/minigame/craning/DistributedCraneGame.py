@@ -145,9 +145,35 @@ class DistributedCraneGame(DistributedMinigame):
         # this is for debugging only
         return 0
 
-    def setSpectators(self, avIds):
-        super().setSpectators(avIds)
-        self.__checkSpectatorState(spectate=False)
+    def setSpectators(self, spectatorIds):
+        """
+        Called by the server to update the list of spectators.
+        This is the distributed method that gets called on all clients.
+        """
+        super().setSpectators(spectatorIds)
+        
+        # Update all toon indicators based on their spectator status
+        for i, avId in enumerate(self.avIdList):
+            toon = self.cr.getDo(avId)
+            if toon:
+                isPlayer = avId not in spectatorIds
+                if avId in self.statusIndicators:
+                    self.updateStatusIndicator(toon, isPlayer)
+                else:
+                    self.createStatusIndicator(toon, isPlayer)
+
+                # Only apply ghost/transparency effects if we're not in the rules state
+                if not hasattr(self, 'rulesPanel') or self.rulesPanel is None:
+                    if toon.doId == base.localAvatar.doId:
+                        toon.setGhostMode(not isPlayer)
+                    else:
+                        if not isPlayer:
+                            toon.setTransparency(1)
+                            toon.setColorScale(1, 1, 1, 0)
+                        else:
+                            toon.clearColorScale()
+                            toon.clearTransparency()
+                            toon.show()
 
     def __checkSpectatorState(self, spectate=True):
         # If we're in the rules state, don't apply any visibility changes
@@ -508,21 +534,6 @@ class DistributedCraneGame(DistributedMinigame):
         base.localAvatar.sendCurrentPosition()
         base.localAvatar.b_setAnimState('neutral', 1)
         base.localAvatar.b_setParent(ToontownGlobals.SPRender)
-
-        # Update the settings panel with the current toons
-        if self.rulesPanel is not None:
-            for i, avId in enumerate(self.avIdList):
-                toon = self.cr.getDo(avId)
-                if toon is None:
-                    continue
-
-                self.rulesPanel.occupySpot(i, toon)
-                # Set leader status based on being first in avIdList
-                if i == 0:
-                    self.rulesPanel.isLeader = (avId == base.localAvatar.doId)
-
-                if avId in self.getSpectators():
-                    self.rulesPanel.updateSpotStatus(i, False)
 
     def __generateRulesPanel(self):
         panel = CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
@@ -981,36 +992,48 @@ class DistributedCraneGame(DistributedMinigame):
             
             if not pickedObject.isEmpty():
                 avId = int(pickedObject.getTag('toonId'))
-                for i, toonId in enumerate(self.avIdList):
-                    if toonId == avId:
-                        # Toggle the status - if they're in spectators, make them a player and vice versa
-                        currentlySpectating = avId in self.getSpectators()
-                        self.sendUpdate('handleSpotStatusChanged', [i, currentlySpectating])
-                        break
+                # Find the index of this toon in avIdList
+                if avId in self.avIdList:
+                    spotIndex = self.avIdList.index(avId)
+                    # Toggle the status - if they're in spectators, make them a player and vice versa
+                    currentlySpectating = avId in self.getSpectators()
+                    # Send update to server to handle the status change
+                    self.sendUpdate('handleSpotStatusChanged', [spotIndex, currentlySpectating])
 
     def handleRulesDone(self):
         self.notify.debug('BASE: handleRulesDone')
         self.sendUpdate('setAvatarReady', [])
         self.frameworkFSM.request('frameworkWaitServerStart')
 
-    def updateSpotStatus(self, spotIndex, isPlayer):
+    def handleSpotStatusChanged(self, spotIndex, isPlayer):
         """
-        Received from the server when any client changes a spot's status
-        Update the local panel and indicators to reflect the change
+        Called when a spot's status is changed between Player and Spectator.
+        This is called on all clients when any client changes a spot's status.
         """
-        if self.rulesPanel is not None:
-            self.rulesPanel.updateSpotStatus(spotIndex, isPlayer)
+        if spotIndex >= len(self.avIdList):
+            return
             
-        # Get the toon whose status changed
-        if spotIndex < len(self.avIdList):
-            changedAvId = self.avIdList[spotIndex]
-            changedToon = self.cr.getDo(changedAvId)
-            if changedToon:
-                # Update or create the indicator for this toon
-                if changedAvId in self.statusIndicators:
-                    self.updateStatusIndicator(changedToon, isPlayer)
+        changedAvId = self.avIdList[spotIndex]
+        changedToon = self.cr.getDo(changedAvId)
+        if changedToon:
+            # Update or create the indicator for this toon
+            if changedAvId in self.statusIndicators:
+                self.updateStatusIndicator(changedToon, isPlayer)
+            else:
+                self.createStatusIndicator(changedToon, isPlayer)
+
+            # Only apply ghost/transparency effects if we're not in the rules state
+            if not hasattr(self, 'rulesPanel') or self.rulesPanel is None:
+                if changedToon.doId == base.localAvatar.doId:
+                    changedToon.setGhostMode(not isPlayer)
                 else:
-                    self.createStatusIndicator(changedToon, isPlayer)
+                    if not isPlayer:
+                        changedToon.setTransparency(1)
+                        changedToon.setColorScale(1, 1, 1, 0)
+                    else:
+                        changedToon.clearColorScale()
+                        changedToon.clearTransparency()
+                        changedToon.show()
 
     def createStatusIndicator(self, toon, isPlayer):
         """Creates a spotlight indicator for a toon's status (player or spectator)"""
@@ -1163,13 +1186,6 @@ class DistributedCraneGame(DistributedMinigame):
             if not indicator.isEmpty():
                 indicator.removeNode()
         self.statusIndicators.clear()
-
-    def handleSpotStatusChanged(self, spotIndex, isPlayer):
-        """
-        Called when a spot's status is changed between Player and Spectator
-        Send the change to the server
-        """
-        self.sendUpdate('handleSpotStatusChanged', [spotIndex, isPlayer])
 
     def enterFrameworkWaitServerStart(self):
         self.notify.debug('BASE: enterFrameworkWaitServerStart')
