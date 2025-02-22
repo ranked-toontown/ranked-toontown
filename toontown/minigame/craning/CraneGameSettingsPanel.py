@@ -28,7 +28,7 @@ class CraneGameSettingsPanel(DirectFrame):
             text=self.gameTitle,
             text_scale=0.1,
             text_fg=(0.2, 0.2, 0.2, 1),
-            pos=(0, 0, 0.6)
+            pos=(0, 0, 0.5)
         )
 
     def cleanup(self):
