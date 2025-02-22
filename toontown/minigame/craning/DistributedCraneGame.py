@@ -2,6 +2,7 @@ import functools
 import random
 import math
 
+from direct.actor.Actor import Actor
 from direct.distributed import DistributedSmoothNode
 from direct.fsm import ClassicFSM
 from direct.fsm import State
@@ -460,7 +461,7 @@ class DistributedCraneGame(DistributedMinigame):
         base.transitions.irisIn(0.4)
         NametagGlobals.setMasterArrowsOn(1)
         camera.reparentTo(render)
-        camera.setPosHpr(119.541, -265.886, 4, 180, 9, 0)
+        camera.setPosHpr(119.541, -260.886, 20, 180, -20, 0)
 
         #self.setToonsToBattleThreePos()
 
@@ -834,28 +835,55 @@ class DistributedCraneGame(DistributedMinigame):
     def setToonsToRulesPositions(self):
         """
         Places toons in front of the vault during the rules state.
-        Uses a single row for 8 or fewer toons, and two rows for more than 8 toons.
+        Creates a symmetric linear layout with multiple rows that expand from the center.
         """
         centerPoint = self.endVault.getPos()
-        spacing = 4  # Space between toons
+        spacing = 5.5  # Horizontal space between toons
+        rowSpacing = 5.5  # Space between rows
         
         # Get all participants, both playing and spectating
         allToons = self.getParticipants()
         numToons = len(allToons)
         
-        # For 8 or fewer toons, use a single row
-        if numToons <= 8:
-            # Center all toons in one row
-            rowWidth = (numToons - 1) * spacing
-            startX = centerPoint.getX() + 36 - (rowWidth / 2)
+        # Calculate optimal row configuration
+        if numToons <= 6:
+            # Single row for 6 or fewer toons
+            numRows = 1
+            toonsPerRow = numToons
+            baseY = centerPoint.getY() - 92  # Center position for single row
+        elif numToons <= 12:
+            # Two rows for 7-12 toons
+            numRows = 2
+            toonsPerRow = (numToons + 1) // 2
+            baseY = centerPoint.getY() - 90  # Move first row forward from center
+        else:
+            # Three rows for 13-16 toons
+            numRows = 3
+            toonsPerRow = (numToons + 2) // 3
+            baseY = centerPoint.getY() - 88  # Move first row even more forward
+        
+        # Position each toon
+        toonIndex = 0
+        for row in range(numRows):
+            # Calculate how many toons go in this row
+            toonsThisRow = min(toonsPerRow, numToons - (row * toonsPerRow))
+            if toonsThisRow <= 0:
+                break
+                
+            # Calculate row-specific adjustments
+            rowWidth = (toonsThisRow - 1) * spacing
+            rowStartX = centerPoint.getX() + 36 - (rowWidth / 2)
+            rowY = baseY - (row * rowSpacing)  # Each back row moves back by rowSpacing
             
-            for i, toon in enumerate(allToons):
+            # Position toons in this row
+            for i in range(toonsThisRow):
+                toon = allToons[toonIndex]
                 if not toon:
                     continue
                 
                 # Calculate position
-                x = startX + (i * spacing)
-                y = centerPoint.getY() - 98  # All toons in front row
+                x = rowStartX + (i * spacing)
+                y = rowY
                 z = 0
                 h = 0
                 
@@ -865,13 +893,17 @@ class DistributedCraneGame(DistributedMinigame):
                     toon.setH(h)
                     toon.d_setXY(x, y)
                     toon.d_setH(h)
-                    toon.d_clearSmoothing()
-                    toon.sendCurrentPosition()
+                    if hasattr(toon, 'd_clearSmoothing'):
+                        toon.d_clearSmoothing()
+                    if hasattr(toon, 'sendCurrentPosition'):
+                        toon.sendCurrentPosition()
                 else:
                     toon.setPos(x, y, z)
                     toon.setH(h)
-                    toon.clearSmoothing()
-                    toon.startSmooth()
+                    if hasattr(toon, 'clearSmoothing'):
+                        toon.clearSmoothing()
+                    if hasattr(toon, 'startSmooth'):
+                        toon.startSmooth()
                 
                 # Create or update status indicator
                 isPlayer = toon.doId not in self.getSpectators()
@@ -879,51 +911,8 @@ class DistributedCraneGame(DistributedMinigame):
                     self.updateStatusIndicator(toon, isPlayer)
                 else:
                     self.createStatusIndicator(toon, isPlayer)
-        else:
-            # For more than 8 toons, use two rows
-            firstRowCount = min(8, (numToons + 1) // 2)
-            secondRowCount = min(8, numToons - firstRowCount)
-            
-            for i, toon in enumerate(allToons):
-                if not toon:
-                    continue
                 
-                # Determine if toon is in first or second row
-                inFirstRow = i < firstRowCount
-                posInRow = i if inFirstRow else (i - firstRowCount)
-                
-                # Calculate row-specific values
-                toonsInThisRow = firstRowCount if inFirstRow else secondRowCount
-                rowOffset = 0 if inFirstRow else 6  # Second row is slightly behind first row
-                
-                # Center the toons in their row
-                rowWidth = (toonsInThisRow - 1) * spacing
-                startX = centerPoint.getX() + 36 - (rowWidth / 2)
-                x = startX + (posInRow * spacing)
-                y = centerPoint.getY() - 98 - rowOffset
-                z = 0
-                h = 0
-                
-                # Position the toon
-                if toon.doId == base.localAvatar.doId:
-                    toon.setPos(x, y, z)
-                    toon.setH(h)
-                    toon.d_setXY(x, y)
-                    toon.d_setH(h)
-                    toon.d_clearSmoothing()
-                    toon.sendCurrentPosition()
-                else:
-                    toon.setPos(x, y, z)
-                    toon.setH(h)
-                    toon.clearSmoothing()
-                    toon.startSmooth()
-                
-                # Create or update status indicator
-                isPlayer = toon.doId not in self.getSpectators()
-                if toon.doId in self.statusIndicators:
-                    self.updateStatusIndicator(toon, isPlayer)
-                else:
-                    self.createStatusIndicator(toon, isPlayer)
+                toonIndex += 1
 
     def enterFrameworkRules(self):
         self.notify.debug('enterFrameworkRules')
@@ -961,6 +950,7 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Clean up click detection
         self.ignore('mouse1')
+            
         self.removeStatusIndicators()
         self.__cleanupRulesPanel()
 
@@ -1109,7 +1099,7 @@ class DistributedCraneGame(DistributedMinigame):
 
         # Add collision cylinder for clicking
         if self.avIdList[0] == base.localAvatar.doId:  # Only leader gets collision
-            radius = 1.2  # Same radius as the spotlight
+            radius = 1  # Same radius as the spotlight
             collTube = CollisionTube(0, 0, 4, 0, 0, 1.2, radius)  # point1_x, point1_y, point1_z, point2_x, point2_y, point2_z, radius
             collNode = CollisionNode(f'spotlightSphere-{toon.doId}')  # Keep the same node name for consistency
             collNode.addSolid(collTube)
