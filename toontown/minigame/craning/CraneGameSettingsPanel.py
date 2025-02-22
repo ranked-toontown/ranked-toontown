@@ -5,12 +5,13 @@ from toontown.toonbase import TTLocalizer
 
 class CraneGameSettingsPanel(DirectFrame):
     def __init__(self, gameTitle, doneEvent):
-        DirectFrame.__init__(self, relief=None,
-                           geom=DGG.getDefaultDialogGeom(),
-                           geom_color=ToontownGlobals.GlobalDialogColor[:3] + (0.8,),
-                           geom_scale=(1.75, 1, 1.25),
-                           pos=(0, 0, 0))
-
+        DirectFrame.__init__(
+            self, relief=None,
+            geom=DGG.getDefaultDialogGeom(),
+            geom_color=ToontownGlobals.GlobalDialogColor,
+            geom_scale=(1.75, 1, 1.25),
+            pos=(0, 0, 0)
+        )
         self.initialiseoptions(self)
         self.doneEvent = doneEvent
         self.gameTitle = gameTitle
@@ -19,18 +20,18 @@ class CraneGameSettingsPanel(DirectFrame):
 
     def load(self):
         # Create title text
-        self.titleText = DirectLabel(parent=self,
-                                   relief=None,
-                                   text=self.gameTitle,
-                                   text_scale=0.1,
-                                   text_fg=(0.2, 0.2, 0.2, 1),
-                                   pos=(0, 0, 0.6))
+        self.titleText = DirectLabel(
+            parent=self,
+            relief=None,
+            text=self.gameTitle,
+            text_scale=0.1,
+            text_fg=(0.2, 0.2, 0.2, 1),
+            pos=(0, 0, 0.6)
+        )
 
     def cleanup(self):
-        if self is not None:
-            self.titleText.destroy()
-            self.titleText.removeNode()
-            self.destroy()
-            self.removeNode()
-            self.titleText = None
-
+        self.titleText.destroy()
+        self.titleText.removeNode()
+        self.destroy()
+        self.removeNode()
+        self.titleText = None
