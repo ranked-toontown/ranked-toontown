@@ -11,7 +11,7 @@ class CraneGameSettingsPanel(DirectFrame):
                            geom_scale=(1.75, 1, 1.25),
                            pos=(0, 0, 0))
 
-        self.initialiseoptions(CraneGameSettingsPanel)
+        self.initialiseoptions(self)
         self.doneEvent = doneEvent
         self.gameTitle = gameTitle
 
