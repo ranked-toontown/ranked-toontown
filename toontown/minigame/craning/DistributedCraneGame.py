@@ -141,10 +141,13 @@ class DistributedCraneGame(DistributedMinigame):
             # If this is us, let's apply some special logic.
             if toon.isLocal():
                 toon.setGhostMode(True)
+                toon.disableAvatarControls()
+                toon.setPos(0, 0, 1000)  # Elevate spectators high above the arena
                 continue
 
             toon.setGhostMode(True)
             toon.hide()
+            toon.setPos(0, 0, 1000)  # Elevate spectators high above the arena
 
         # Loop through every non-spectator and make sure we can see them.
         for toon in self.getParticipantsNotSpectating():
@@ -670,6 +673,9 @@ class DistributedCraneGame(DistributedMinigame):
         for toon in self.getParticipants():
             toon.setGhostMode(False)
             toon.show()
+            if toon.isLocal():
+                toon.enableAvatarControls()
+            toon.setZ(0) # Reset Z position
         self.overlayText.removeNode()
         self.bossSpeedrunTimer.cleanup()
         del self.bossSpeedrunTimer
