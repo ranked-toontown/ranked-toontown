@@ -543,7 +543,7 @@ class DistributedCraneGame(DistributedMinigame):
         btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
         self.rulesPanelToggleButton = DirectButton(
             relief=None,
-            text='Rules',
+            text='Settings',
             text_scale=0.055,
             text_pos=(0, -0.02),
             geom=(btnGeom.find('**/QuitBtn_UP'),
