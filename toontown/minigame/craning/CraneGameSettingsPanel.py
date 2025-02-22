@@ -18,14 +18,8 @@ class CraneGameSettingsPanel(DirectFrame):
         self.load()
 
     def load(self):
-        # Create the main panel frame
-        self.frame = DirectFrame(parent=self,
-                               relief=None,
-                               pos=(0, 0, 0),
-                               scale=1.0)
-
         # Create title text
-        self.titleText = DirectLabel(parent=self.frame,
+        self.titleText = DirectLabel(parent=self,
                                    relief=None,
                                    text=self.gameTitle,
                                    text_scale=0.1,
@@ -33,13 +27,10 @@ class CraneGameSettingsPanel(DirectFrame):
                                    pos=(0, 0, 0.6))
 
     def cleanup(self):
-        if hasattr(self, 'frame') and self.frame is not None:
+        if self is not None:
             self.titleText.destroy()
             self.titleText.removeNode()
-            self.frame.destroy()
-            self.frame.removeNode()
+            self.destroy()
+            self.removeNode()
             self.titleText = None
-            self.frame = None
 
-        # Call parent's destroy
-        DirectFrame.destroy(self)
