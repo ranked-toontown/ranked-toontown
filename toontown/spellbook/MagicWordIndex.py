@@ -1890,6 +1890,22 @@ class HitCFO(MagicWord):
         craneGame.recordHit(dmg, impact=1)
 
 
+class EndCFO(MagicWord):
+    aliases = ['end', 'finish']
+    desc = "Ends the C.F.O."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'USER'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from ..minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        craneGame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if craneGame is None:
+            return "You aren't in a crane round!"
+
+        craneGame.gameFSM.request('victory')
+        return "Ending Crane Round"
+
+
 class RestartCraneRound(MagicWord):
     aliases = ['rcr', 'restartcrane']
     desc = "Restarts the crane round"
