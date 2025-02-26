@@ -126,8 +126,8 @@ class CraneGameRuleset:
         self.TIMER_MODE = False  # When true, the cfo is timed and ends when time is up, when false, acts as a stopwatch
         self.TIMER_MODE_TIME_LIMIT = 60 * 30  # How many seconds do we give the CFO crane round if TIMER_MODE is active?
 
-        self.CFO_MAX_HP = 1_500  # How much HP should the CFO have?
-        self.CFO_STUN_THRESHOLD = 24  # How much damage should a goon do to stun?
+        self.CFO_MAX_HP = 500  # How much HP should the CFO have?
+        self.CFO_STUN_THRESHOLD = 15  # How much damage should a goon do to stun?
         self.SIDECRANE_IMPACT_STUN_THRESHOLD = 0.8  # How much impact should a side crane hit need to register a stun
         self.SAFE_HELMET_COOLDOWN = 90 # How long should we wait before being able to safe helmet the CFO twice?
 
@@ -170,7 +170,7 @@ class CraneGameRuleset:
 
         # GOON/TREASURE SETTINGS
         self.MIN_GOON_DAMAGE = 5  # What is the lowest amount of damage a goon should do? (beginning of CFO)
-        self.MAX_GOON_DAMAGE = 35  # What is the highest amount of damage a goon should do? (end of CFO)
+        self.MAX_GOON_DAMAGE = 25  # What is the highest amount of damage a goon should do? (end of CFO)
         self.GOON_SPEED_MULTIPLIER = 1.0  # How fast should goons move?
 
         # How many goons should we allow to spawn? This will scale up towards the end of the fight to the 2nd var

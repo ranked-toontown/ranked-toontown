@@ -55,8 +55,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
 
         self.customSpawnPositions = {}
-        self.goonMinScale = 0.8
-        self.goonMaxScale = 2.4
+        self.goonMinScale = 0.5
+        self.goonMaxScale = 1.5
 
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
 

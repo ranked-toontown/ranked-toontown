@@ -420,7 +420,9 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         cn = CollisionNode('sniffer')
         self.sniffer = magnetModel.attachNewNode(cn)
         self.sniffer.stash()
-        cs = CollisionCapsule(0, 0, -10, 0, 0, -13, 6)
+        #Old sniffer
+        cs = CollisionSphere(0, 0, -10, 6)
+        #cs = CollisionCapsule(0, 0, -10, 0, 0, -13, 6)
         cs.setTangible(0)
         cn.addSolid(cs)
         cn.setIntoCollideMask(BitMask32(0))
@@ -433,7 +435,8 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         cn2 = CollisionNode('smallSniffer')
         self.smallSniffer = magnetModel.attachNewNode(cn2)
         self.smallSniffer.stash()
-        cs2 = CollisionSphere(0, 0, -8, 4)  # Much smaller sniffer
+        cs2 = CollisionSphere(0, 0, -10, 6)
+        #cs2 = CollisionCapsule(0, 0, -10, 0, 0, -13, 6)  # Much smaller sniffer
         cs2.setTangible(0)
         cn2.addSolid(cs2)
         cn2.setIntoCollideMask(BitMask32(0))
