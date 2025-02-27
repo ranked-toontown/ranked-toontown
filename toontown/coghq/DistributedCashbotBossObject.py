@@ -119,6 +119,8 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         self.handler = PhysicsCollisionHandler()
         self.handler.addCollider(self.collisionNodePath, self)
 
+        base.cTrav.setRespectPrevTransform(False)
+
         # Set up a collision event so we know when the object hits the
         # floor, or the boss's target.
         self.collideName = self.uniqueName('collide')
