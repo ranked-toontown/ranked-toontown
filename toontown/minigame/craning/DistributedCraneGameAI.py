@@ -1029,7 +1029,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Check for special logic if we are restarting the round with cheats enabled previously.
         self.practiceCheatHandler.checkCheatModifier()
-        if self.practiceCheatHandler.wantAimPractice:
+        if self.practiceCheatHandler.wantAimPractice or self.practiceCheatHandler.wantAimRightPractice or self.practiceCheatHandler.wantAimLeftPractice or self.practiceCheatHandler.wantAimAlternatePractice or self.practiceCheatHandler.wantGoonPractice:
             self.practiceCheatHandler.setupAimMode()
         if self.practiceCheatHandler.cheatIsEnabled():
             taskMgr.remove(self.uniqueName('times-up-task'))

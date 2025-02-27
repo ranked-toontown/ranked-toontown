@@ -21,6 +21,9 @@ class CraneGamePracticeCheatAI:
     LIVE_GOON_PRACTICE = 3
     AIM_PRACTICE = 4
     GOON_PRACTICE = 5  # New practice mode
+    A_R_PRACTICE = 6
+    A_L_PRACTICE = 7
+    A_ALT_PRACTICE = 8
 
     """
     Activated via magic words when cheats are enabled for a crane game minigame.
@@ -29,13 +32,19 @@ class CraneGamePracticeCheatAI:
     def __init__(self, game: "DistributedCraneGameAI"):
         self.game = game
         self.numSafesWanted = 0
+        self.forwardDistance = 10
+        self.alternateDirection = True  # True for right, False for left
+        self.isFirstAlternate = True   # Used to make random choice on first drop
 
         # Practice mode bools
         self.wantRNGMode = False
         self.wantSafeRushPractice = False
         self.wantLiveGoonPractice = False
         self.wantAimPractice = False
-        self.wantGoonPractice = False  # New practice mode bool
+        self.wantAimRightPractice = False
+        self.wantAimLeftPractice = False
+        self.wantAimAlternatePractice = False
+        self.wantGoonPractice = False
 
         # Practice mode parameters
         self.wantOpeningModifications = False
@@ -47,7 +56,7 @@ class CraneGamePracticeCheatAI:
         self.wantAlwaysStunned = False
 
     def cheatIsEnabled(self):
-        return True in (self.wantRNGMode, self.wantSafeRushPractice, self.wantLiveGoonPractice, self.wantAimPractice, self.wantGoonPractice)
+        return True in (self.wantRNGMode, self.wantSafeRushPractice, self.wantLiveGoonPractice, self.wantAimPractice, self.wantAimRightPractice, self.wantAimLeftPractice, self.wantAimAlternatePractice, self.wantGoonPractice)
 
     def setPracticeParams(self, practiceMode):
 
@@ -64,7 +73,13 @@ class CraneGamePracticeCheatAI:
             currentState = self.wantLiveGoonPractice
         elif practiceMode == self.AIM_PRACTICE:
             currentState = self.wantAimPractice
-        elif practiceMode == self.GOON_PRACTICE:  # New practice mode
+        elif practiceMode == self.A_R_PRACTICE:
+            currentState = self.wantAimRightPractice
+        elif practiceMode == self.A_L_PRACTICE:
+            currentState = self.wantAimLeftPractice
+        elif practiceMode == self.A_ALT_PRACTICE:
+            currentState = self.wantAimAlternatePractice
+        elif practiceMode == self.GOON_PRACTICE:
             currentState = self.wantGoonPractice
         else:
             currentState = False
@@ -74,7 +89,10 @@ class CraneGamePracticeCheatAI:
         self.wantSafeRushPractice = False
         self.wantLiveGoonPractice = False
         self.wantAimPractice = False
-        self.wantGoonPractice = False  # New practice mode
+        self.wantAimRightPractice = False
+        self.wantAimLeftPractice = False
+        self.wantAimAlternatePractice = False
+        self.wantGoonPractice = False
 
         # Disable all practice parameters
         self.wantOpeningModifications = False
@@ -93,6 +111,12 @@ class CraneGamePracticeCheatAI:
             self.wantLiveGoonPractice = not currentState
         elif practiceMode == self.AIM_PRACTICE:
             self.wantAimPractice = not currentState
+        elif practiceMode == self.A_R_PRACTICE:
+            self.wantAimRightPractice = not currentState
+        elif practiceMode == self.A_L_PRACTICE:
+            self.wantAimLeftPractice = not currentState
+        elif practiceMode == self.A_ALT_PRACTICE:
+            self.wantAimAlternatePractice = not currentState
         elif practiceMode == self.GOON_PRACTICE:  # New practice mode
             self.wantGoonPractice = not currentState
 
@@ -106,7 +130,7 @@ class CraneGamePracticeCheatAI:
             self.wantNoStunning = True
             self.openingModificationsToonIndex = 0
             self.wantFasterGoonSpawns = True
-        elif self.wantAimPractice:
+        elif self.wantAimPractice or self.wantAimRightPractice or self.wantAimLeftPractice or self.wantAimAlternatePractice:
             self.wantAlwaysStunned = True
             self.setupAimMode()
         elif self.wantGoonPractice:  # New practice mode setup
@@ -124,6 +148,12 @@ class CraneGamePracticeCheatAI:
         if self.cheatIsEnabled():
             self.game.applyModifier(CraneLeagueGlobals.ModifierCFOCheatsEnabled(tier=1), updateClient=True)
 
+    def clearSafes(self):
+        """Move all safes far away to clear the field"""
+        for safe in self.game.safes:
+            if safe.index != 0:  # Skip helmet safe
+                safe.move(1000, 1000, 1000, 0)
+
     def setupAimMode(self):
         # Initial setup for aim mode - stun CFO and remove goons
         self.game.getBoss().stopHelmets()
@@ -133,6 +163,9 @@ class CraneGamePracticeCheatAI:
             goon.request('Off')
             goon.requestDelete()
         self.__pauseTimer()
+        
+        # Clear all safes from the field
+        self.clearSafes()
 
     def __pauseTimer(self):
         self.notify.debug("Pausing timer")
@@ -140,7 +173,7 @@ class CraneGamePracticeCheatAI:
         self.game.d_updateTimer()
 
     def handleSafeDropped(self, safe):
-        if not self.wantAimPractice:
+        if not (self.wantAimPractice or self.wantAimRightPractice or self.wantAimLeftPractice or self.wantAimAlternatePractice):
             return
 
         # Get the first toon's position
@@ -149,11 +182,63 @@ class CraneGamePracticeCheatAI:
             return
         toon = players[0]
 
-        toonX = toon.getPos().x
-        toonY = toon.getPos().y
+        # Find which crane the toon is controlling
+        controlledCrane = None
+        for crane in self.game.cranes:
+            if crane.avId == toon.doId:
+                controlledCrane = crane
+                break
 
-        # Calculate progressive distance for repositioning
-        battleTime = globalClock.getFrameTime() - self.game.battleThreeStart
+        if not controlledCrane:
+            return  # Toon isn't controlling a crane
+
+        # Get crane's position and heading from the predefined positions
+        cranePos = CraneLeagueGlobals.ALL_CRANE_POSHPR[controlledCrane.index]
+        craneX = cranePos[0]
+        craneY = cranePos[1]
+        craneH = cranePos[3]  # Index 3 is the H value in POSHPR
+        
+        if self.wantAimRightPractice or self.wantAimLeftPractice or self.wantAimAlternatePractice:
+            # For alternate mode, randomly choose first direction then alternate
+            if self.wantAimAlternatePractice and self.isFirstAlternate:
+                self.alternateDirection = random.choice([True, False])
+                self.isFirstAlternate = False
+            elif self.wantAimAlternatePractice:
+                self.alternateDirection = not self.alternateDirection
+
+            # Convert heading to radians for math calculations
+            # Add 90 because in Panda3D, 0 degrees points down +Y axis, and we want to point forward
+            headingRadians = math.radians(craneH + 90)
+            
+            # Calculate unit vectors for forward and rightward directions
+            forwardUnitX = math.cos(headingRadians)
+            forwardUnitY = math.sin(headingRadians)
+            rightwardUnitX = forwardUnitY  # Rotate 90 degrees clockwise
+            rightwardUnitY = -forwardUnitX
+
+            # Calculate progressive shift (2 to 50 units)
+            # For AimLeft or alternating left, we negate the shift
+            shiftAmount = self.game.progressValue(2, 50)
+            if self.wantAimLeftPractice or (self.wantAimAlternatePractice and not self.alternateDirection):
+                shiftAmount = -shiftAmount
+            
+            # Calculate base position:
+            # 1. Start at crane position
+            # 2. Add forward/backward offset based on forwardDistance (can be negative)
+            # 3. Add rightward/leftward shift
+            baseX = craneX + (forwardUnitX * self.forwardDistance) + (rightwardUnitX * shiftAmount)
+            baseY = craneY + (forwardUnitY * self.forwardDistance) + (rightwardUnitY * shiftAmount)
+
+            # For Aim modes, we always want to reposition a safe
+            # Find any available safe that isn't the helmet
+            for potentialSafe in self.game.safes:
+                if potentialSafe.index != 0 and potentialSafe.state in ['Free', 'Initial']:
+                    # Pass 0 as repositionDistance to ensure exact positioning, and 180 for heading
+                    self.repositionSafe(potentialSafe, baseX, baseY, 0, 180)
+                    break
+            return
+
+        # Original AIM_PRACTICE logic below
         repositionDistance = self.game.progressValue(8, 28)  # Start at 8 units, progress to 28 units
 
         # First count how many safes are already nearby (always check within 35 units)
@@ -163,7 +248,7 @@ class CraneGamePracticeCheatAI:
             if potentialSafe.index != 0 and potentialSafe.state in ['Free', 'Initial']:  # Not the helmet safe
                 safeX = potentialSafe.getPos().x
                 safeY = potentialSafe.getPos().y
-                distance = math.sqrt((toonX - safeX) ** 2 + (toonY - safeY) ** 2)
+                distance = math.sqrt((craneX - safeX) ** 2 + (craneY - safeY) ** 2)
                 if distance <= checkDistance:
                     nearbySafes.add(potentialSafe)
 
@@ -178,9 +263,7 @@ class CraneGamePracticeCheatAI:
                     potentialSafe.state in ['Free', 'Initial'] and  # Only free or initial safes
                     potentialSafe != safe and  # Not the safe that was just dropped
                     potentialSafe not in nearbySafes):  # Not already nearby
-                safeX = potentialSafe.getPos().x
-                safeY = potentialSafe.getPos().y
-                distance = math.sqrt((toonX - safeX) ** 2 + (toonY - safeY) ** 2)
+                distance = math.sqrt((craneX - potentialSafe.getPos().x) ** 2 + (craneY - potentialSafe.getPos().y) ** 2)
                 availableSafes.append((distance, potentialSafe))
 
         # Sort safes by distance (furthest first)
@@ -192,7 +275,7 @@ class CraneGamePracticeCheatAI:
 
         # Reposition each safe
         for _, safeToMove in safesToMove:
-            self.repositionSafe(safeToMove, toonX, toonY, repositionDistance)
+            self.repositionSafe(safeToMove, craneX, craneY, repositionDistance)
 
     def checkSafePosition(self, x, y, safes):
         # Safe radius is approximately 4 units (collision sphere is about 8 units)
@@ -207,35 +290,27 @@ class CraneGamePracticeCheatAI:
                 return False
         return True
 
-    def repositionSafe(self, safe, toonX, toonY, nearbyDistance):
+    def repositionSafe(self, safe, toonX, toonY, nearbyDistance, heading=None):
         # Keep trying new angles until we find a position in bounds and not colliding
-        maxAttempts = 20
-        for _ in range(maxAttempts):
+        for i in range(100):
             angle = random.random() * 2.0 * math.pi
             x = toonX + nearbyDistance * math.cos(angle)
             y = toonY + nearbyDistance * math.sin(angle)
 
-            # Check if position is within the octagonal battle area and not colliding with other safes
-            if self.isLocationInBounds(x, y) and self.checkSafePosition(x, y, [s for s in self.game.safes if s != safe]):
-                z = 0  # Height will be adjusted by physics
-                if safe.state == 'Initial':
-                    safe.demand('Free')  # Transition from Initial to Free state
-                safe.move(x, y, z, 360 * random.random())  # Use move instead of setPos for proper synchronization
-                return
+            # First check if this position is within the octagonal bounds
+            if not self.isLocationInBounds(x, y):
+                continue
 
-        # If we failed to find a valid position after all attempts, try with a smaller radius
-        nearbyDistance *= 0.75  # Try with 75% of the distance
-        for _ in range(maxAttempts):
-            angle = random.random() * 2.0 * math.pi
-            x = toonX + nearbyDistance * math.cos(angle)
-            y = toonY + nearbyDistance * math.sin(angle)
+            # Now check if this position collides with any other safes
+            if not self.checkSafePosition(x, y, self.game.safes):
+                continue
 
-            if self.isLocationInBounds(x, y) and self.checkSafePosition(x, y, [s for s in self.game.safes if s != safe]):
-                z = 0
-                if safe.state == 'Initial':
-                    safe.demand('Free')
-                safe.move(x, y, z, 360 * random.random())
-                return
+            # Found a valid position!
+            z = 0
+            if safe.state == 'Initial':
+                safe.demand('Free')
+            safe.move(x, y, z, 180 if heading is not None else 360 * random.random())
+            return
 
         # If we still can't find a valid position, place it very close to the toon
         nearbyDistance = 5  # Very close radius as last resort
@@ -251,7 +326,7 @@ class CraneGamePracticeCheatAI:
         z = 0
         if safe.state == 'Initial':
             safe.demand('Free')
-        safe.move(x, y, z, 360 * random.random())
+        safe.move(x, y, z, 180 if heading is not None else 360 * random.random())
 
     # Probably a better way to do this but o well
     # Checking each line of the octogon to see if the location is outside

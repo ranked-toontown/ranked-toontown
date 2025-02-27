@@ -63,6 +63,9 @@ class DistributedCashbotBossAI(DistributedBossCogAI.DistributedBossCogAI, FSM.FS
         self.wantSafeRushPractice = False
         self.wantCustomCraneSpawns = False
         self.wantAimPractice = False
+        self.wantAimRightPractice = False
+        self.wantAimLeftPractice = False
+        self.wantAimAlternatePractice = False
         self.toonsWon = False
 
         # Controlled RNG parameters, True to enable, False to disable
