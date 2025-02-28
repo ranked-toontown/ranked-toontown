@@ -216,9 +216,9 @@ class CraneGamePracticeCheatAI:
             rightwardUnitX = forwardUnitY  # Rotate 90 degrees clockwise
             rightwardUnitY = -forwardUnitX
 
-            # Calculate progressive shift (2 to 50 units)
+            # Calculate progressive shift (2 to 25 units)
             # For AimLeft or alternating left, we negate the shift
-            shiftAmount = self.game.progressValue(2, 50)
+            shiftAmount = self.game.progressValue(2, 25)
             if self.wantAimLeftPractice or (self.wantAimAlternatePractice and not self.alternateDirection):
                 shiftAmount = -shiftAmount
             
