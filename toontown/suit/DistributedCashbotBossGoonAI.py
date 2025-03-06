@@ -260,12 +260,13 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def __updatePosition(self):
         #Updates goon position/orientation when states change while walking
         currentTime = globalClock.getFrameTime()
-        if taskMgr.getTasksNamed(self.uniqueName('turnedToTarget')):
-            delayTime = taskMgr.getTasksNamed(self.uniqueName('turnedToTarget'))[0].delayTime
-            wakeTime = taskMgr.getTasksNamed(self.uniqueName('turnedToTarget'))[0].wakeTime
+        turnTask = taskMgr.getTasksNamed(self.uniqueName('turnedToTarget'))
+        if turnTask:
+            delayTime = turnTask[0].delayTime
+            wakeTime = turnTask[0].wakeTime
 
             origH = self.getH()
-            targetH = taskMgr.getTasksNamed(self.uniqueName('turnedToTarget'))[0].getArgs()[0]
+            targetH = turnTask[0].getArgs()[0]
             taskMgr.remove(self.uniqueName('turnedToTarget'))
             taskMgr.remove(self.uniqueName('startingWalk'))
             correctedH = (1 - (wakeTime - currentTime) / delayTime) * PythonUtil.reduceAngle((targetH - origH)) + origH
@@ -444,6 +445,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # If a goon is grabbed while he's just waking up, it
         # interrupts the wake-up process.  Ditto for a goon in battle
         # mode.
+        self.__updatePosition()
         taskMgr.remove(self.taskName('recovery'))
         taskMgr.remove(self.taskName('resumeWalk'))
 
