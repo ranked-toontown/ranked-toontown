@@ -164,8 +164,9 @@ class CraneGamePracticeCheatAI:
             goon.requestDelete()
         self.__pauseTimer()
         
-        # Clear all safes from the field
-        self.clearSafes()
+        # Only clear safes if we want some safes (not when numSafesWanted is 0)
+        if not (self.wantAimPractice and self.numSafesWanted == 0):
+            self.clearSafes()
 
     def __pauseTimer(self):
         self.notify.debug("Pausing timer")
