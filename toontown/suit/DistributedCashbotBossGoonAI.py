@@ -433,6 +433,9 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def enterOff(self):
         self.tubeNodePath.stash()
         self.feelerNodePath.stash()
+        taskMgr.remove(self.uniqueName('reachedTarget'))
+        taskMgr.remove(self.uniqueName('turnedToTarget'))
+        taskMgr.remove(self.uniqueName('startingWalk'))
 
     def exitOff(self):
         self.tubeNodePath.unstash()
