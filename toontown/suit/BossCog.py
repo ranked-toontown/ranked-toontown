@@ -167,7 +167,7 @@ class BossCog(Avatar.Avatar):
         self.pelvisReversedHpr = VBase3(-180, 0, 0)
         self.neck = self.getPart('head')
         self.neckForwardHpr = VBase3(0, 0, 0)
-        self.neckReversedHpr = VBase3(0, -540, 0)
+        self.neckReversedHpr = VBase3(0, 180, 0)
         self.axle = self.find('**/joint_axle')
         self.doorA = self.__setupDoor('**/joint_doorFront', 'doorA', self.doorACallback, VBase3(0, 0, 0), VBase3(0, 0, -80), CollisionBox(Point3(0, -4, 0), Point3(5, 4, 0.32)))
         self.doorB = self.__setupDoor('**/joint_doorRear', 'doorB', self.doorBCallback, VBase3(0, 0, 0), VBase3(0, 0, 80), CollisionBox(Point3(-5, -4, 0), Point3(0, 4, 0.84)))
