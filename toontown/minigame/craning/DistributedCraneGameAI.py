@@ -29,7 +29,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     DESPERATION_MODE_ACTIVATE_THRESHOLD = 1800
 
     # If time limit is enabled, how many seconds should be remaining to activate when an overtake happens?
-    OVERTIME_OVERTAKE_ACTIVATION_THRESHOLD = 10
+    OVERTIME_OVERTAKE_ACTIVATION_THRESHOLD = 15
 
     def __init__(self, air, minigameId):
         DistributedMinigameAI.__init__(self, air, minigameId)
