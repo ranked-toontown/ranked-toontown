@@ -180,8 +180,8 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         
         # And how long will it take to walk to position?
         walkTime = dist / self.velocity
-        self.target = self.boss.scene.getRelativePoint(self, Point3(dist * math.cos(delta * (math.pi / 180) + math.pi / 2),
-                                                              dist * math.sin(delta * (math.pi / 180) + math.pi / 2),
+        self.target = self.boss.scene.getRelativePoint(self, Point3(dist * math.cos(deg2Rad(delta) + math.pi / 2),
+                                                              dist * math.sin(deg2Rad(delta) + math.pi / 2),
                                                               0))
 
         taskMgr.doMethodLater(turnTime, self.setH, self.uniqueName('turnedToTarget'), extraArgs=[targetH])
