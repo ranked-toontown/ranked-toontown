@@ -106,8 +106,9 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         safePos = safe.getPos()
 
         direction = safePos - goonPos
-        if direction.length() > 0:
-            direction.normalize()
+
+        direction[2] = 0
+        direction.normalize()
 
         pushDistance = self.velocity * globalClock.getDt()
         newSafePos = safePos + direction * pushDistance
