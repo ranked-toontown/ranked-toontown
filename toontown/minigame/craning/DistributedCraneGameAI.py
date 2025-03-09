@@ -6,8 +6,7 @@ from direct.fsm import ClassicFSM
 from direct.fsm import State
 from direct.showbase.PythonUtil import clamp
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, NodePath, Vec3, Point3
-
+from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, CollisionPolygon, CollisionBox, NodePath, Vec3, Point3
 from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.coghq.CraneLeagueGlobals import ScoreReason
@@ -126,8 +125,17 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # And some solids to keep the goons constrained to our room.
         cn = CollisionNode('walls')
-        cs = CollisionSphere(0, 0, 0, 13)
-        cn.addSolid(cs)
+        #cs = CollisionSphere(0, 0, 0, 13)
+        #cn.addSolid(cs)
+
+        collisionSolids = [CollisionTube(6.5, -7.5, 2, 6.5, 7.5, 2, 2.5), #tube1
+                           CollisionTube(-6.5, -7.5, 2, -6.5, 7.5, 2, 2.5), #tube2
+                           CollisionSphere(0, 0, 0, 8.35) #box (as sphere)
+        ]
+
+        for collisionSolid in collisionSolids:
+            cn.addSolid(collisionSolid)
+
         cs = CollisionInvSphere(0, 0, 0, 42)
         cn.addSolid(cs)
         self.boss.attachNewNode(cn)
