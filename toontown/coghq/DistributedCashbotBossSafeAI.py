@@ -174,8 +174,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
 
         direction = otherSafePos - thisSafePos
 
-        if direction[2] < 0:
-            direction[2] = 0 #prevents pushing safes into the floor
+        direction[2] = 0 #prevents pushing safes up/down
 
         direction.normalize()
 
