@@ -128,7 +128,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         #cs = CollisionSphere(0, 0, 0, 13)
         #cn.addSolid(cs)
 
-        collisionSolids = [CollisionTube(6.5, -7.5, 2, 6.5, 7.5, 2, 3), #tube1
+        collisionSolids = [CollisionTube(6.5, -7.5, 0, 6.5, 7.5, 0, 2.5), #tube1
                            CollisionTube(-6.5, -7.5, 0, -6.5, 7.5, 0, 2.5), #tube2
                            CollisionSphere(0, 0, 0, 8.35) #box (as sphere)
         ]
