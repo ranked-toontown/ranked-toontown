@@ -1400,6 +1400,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
             self.controlModel.clearTransparency()
 
     def enterFree(self):
+        self.__turnOffMagnet()
         if self.avId != localAvatar.doId:
             if self.fadeTrack:
                 self.fadeTrack.finish()
