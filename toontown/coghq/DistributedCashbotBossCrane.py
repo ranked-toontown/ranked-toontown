@@ -135,6 +135,8 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         self.pendingControl = False
         self.pendingFree = False
 
+        self.inputs = [0, 0, 0, 0] #up, down, left, right
+
     def getName(self):
         return 'NormalCrane-%s' % self.index
 
@@ -609,16 +611,13 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         self.accept('InputState-reverse', self.__downArrow)
         self.accept('InputState-turnLeft', self.__leftArrow)
         self.accept('InputState-turnRight', self.__rightArrow)
-        
-        # In case they don't figure it out, hit them over the head
-        # with it after a few seconds.
+
         taskMgr.add(self.__watchControls, 'watchCraneControls')
         
         # Up in the sky, it's hard to read what people are saying.
         NametagGlobals.setOnscreenChatForced(1)
-        
-        self.arrowVert = 0
-        self.arrowHorz = 0
+
+        self.inputs = [0, 0, 0, 0]
         return
 
     def __disableControlInterface(self):
@@ -647,9 +646,10 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         return
 
     def __watchControls(self, task):
-        if self.arrowHorz or self.arrowVert:
-            self.__moveCraneArcHinge(self.arrowHorz, self.arrowVert)
-        else:
+        self.arrowHorz = self.inputs[2] - self.inputs[3]
+        self.arrowVert = self.inputs[0] - self.inputs[1]
+        self.__moveCraneArcHinge(self.arrowHorz, self.arrowVert)
+        if not self.arrowHorz and not self.arrowVert:
             self.__setMoveSound(None)
         return Task.cont
 
@@ -709,35 +709,35 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
     def __upArrow(self, pressed):
         self.__incrementChangeSeq()
         if pressed:
-            self.arrowVert = 1
-        elif self.arrowVert > 0:
-            self.arrowVert = 0
+            self.inputs[0] = 1
+        else:
+            self.inputs[0] = 0
 
     def __downArrow(self, pressed):
         self.__incrementChangeSeq()
         if pressed:
-            self.arrowVert = -1
-        elif self.arrowVert < 0:
-            self.arrowVert = 0
-
-    def __rightArrow(self, pressed):
-        self.__incrementChangeSeq()
-        if pressed:
-            self.arrowHorz = 1
-        elif self.arrowHorz > 0:
-            self.arrowHorz = 0
+            self.inputs[1] = 1
+        else:
+            self.inputs[1] = 0
 
     def __leftArrow(self, pressed):
         self.__incrementChangeSeq()
         if pressed:
-            self.arrowHorz = -1
-        elif self.arrowHorz < 0:
-            self.arrowHorz = 0
+            self.inputs[2] = 1
+        else:
+            self.inputs[2] = 0
+
+    def __rightArrow(self, pressed):
+        self.__incrementChangeSeq()
+        if pressed:
+            self.inputs[3] = 1
+        else:
+            self.inputs[3] = 0
 
     def __moveCraneArcHinge(self, xd, yd):
         dt = globalClock.getDt()
         
-        h = self.arm.getH() - xd * self.rotateSpeed * dt
+        h = self.arm.getH() + xd * self.rotateSpeed * dt
         limitH = max(min(h, self.armMaxH), self.armMinH)
         self.arm.setH(limitH)
         
