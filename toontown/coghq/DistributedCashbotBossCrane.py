@@ -613,8 +613,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         # In case they don't figure it out, hit them over the head
         # with it after a few seconds.
         taskMgr.add(self.__watchControls, 'watchCraneControls')
-        taskMgr.doMethodLater(5, self.__displayCraneAdvice, self.craneAdviceName)
-        taskMgr.doMethodLater(10, self.__displayMagnetAdvice, self.magnetAdviceName)
         
         # Up in the sky, it's hard to read what people are saying.
         NametagGlobals.setOnscreenChatForced(1)
@@ -629,9 +627,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         if self.closeButton:
             self.closeButton.destroy()
             self.closeButton = None
-            
-        self.__cleanupCraneAdvice()
-        self.__cleanupMagnetAdvice()
         
         self.ignore('escape')
         self.ignore(base.controls.CRANE_GRAB_KEY)
@@ -651,30 +646,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         self.__setMoveSound(None)
         return
 
-    def __displayCraneAdvice(self, task):
-        if self.craneAdviceLabel == None:
-            self.craneAdviceLabel = DirectLabel(text=TTLocalizer.CashbotCraneAdvice, text_fg=VBase4(1, 1, 1, 1), text_align=TextNode.ACenter, relief=None, pos=(0, 0, 0.69), scale=0.1)
-        return
-
-    def __cleanupCraneAdvice(self):
-        if self.craneAdviceLabel:
-            self.craneAdviceLabel.destroy()
-            self.craneAdviceLabel = None
-        taskMgr.remove(self.craneAdviceName)
-        return
-
-    def __displayMagnetAdvice(self, task):
-        if self.magnetAdviceLabel == None:
-            self.magnetAdviceLabel = DirectLabel(text=TTLocalizer.CashbotMagnetAdvice, text_fg=VBase4(1, 1, 1, 1), text_align=TextNode.ACenter, relief=None, pos=(0, 0, 0.55), scale=0.1)
-        return
-
-    def __cleanupMagnetAdvice(self):
-        if self.magnetAdviceLabel:
-            self.magnetAdviceLabel.destroy()
-            self.magnetAdviceLabel = None
-        taskMgr.remove(self.magnetAdviceName)
-        return
-
     def __watchControls(self, task):
         if self.arrowHorz or self.arrowVert:
             self.__moveCraneArcHinge(self.arrowHorz, self.arrowVert)
@@ -686,8 +657,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         if self.closeButton:
             self.closeButton.destroy()
             self.closeButton = DirectLabel(relief=None, text=TTLocalizer.CashbotCraneLeaving, pos=(1.05, 0, -0.88), text_pos=(0, 0), text_scale=0.06, text_fg=VBase4(1, 1, 1, 1))
-        self.__cleanupCraneAdvice()
-        self.__cleanupMagnetAdvice()
         if self.isDisabled():
             return
         self.d_requestFree()
@@ -696,8 +665,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         if self.closeButton:
             self.closeButton.destroy()
             self.closeButton = DirectLabel(relief=None, text=TTLocalizer.CashbotCraneLeaving, pos=(1.05, 0, -0.88), text_pos=(0, 0), text_scale=0.06, text_fg=VBase4(1, 1, 1, 1))
-        self.__cleanupCraneAdvice()
-        self.__cleanupMagnetAdvice()
         self.demand('LocalFree')
         self.d_requestFree()
         return
@@ -706,7 +673,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         self.changeSeq = self.changeSeq + 1 & 255
 
     def __controlPressed(self):
-        self.__cleanupMagnetAdvice()
         self.__turnOnMagnet()
 
     def __controlReleased(self):
@@ -742,7 +708,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
     def __upArrow(self, pressed):
         self.__incrementChangeSeq()
-        self.__cleanupCraneAdvice()
         if pressed:
             self.arrowVert = 1
         elif self.arrowVert > 0:
@@ -750,7 +715,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
     def __downArrow(self, pressed):
         self.__incrementChangeSeq()
-        self.__cleanupCraneAdvice()
         if pressed:
             self.arrowVert = -1
         elif self.arrowVert < 0:
@@ -758,7 +722,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
     def __rightArrow(self, pressed):
         self.__incrementChangeSeq()
-        self.__cleanupCraneAdvice()
         if pressed:
             self.arrowHorz = 1
         elif self.arrowHorz > 0:
@@ -766,7 +729,6 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
 
     def __leftArrow(self, pressed):
         self.__incrementChangeSeq()
-        self.__cleanupCraneAdvice()
         if pressed:
             self.arrowHorz = -1
         elif self.arrowHorz < 0:
