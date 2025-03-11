@@ -25,6 +25,10 @@ ModelDict = {'s': 'phase_9/models/char/sellbotBoss',
 AnimList = ('Ff_speech', 'ltTurn2Wave', 'wave', 'Ff_lookRt', 'turn2Fb', 'Ff_neutral', 'Bb_neutral', 'Ff2Bb_spin', 'Bb2Ff_spin', 'Fb_neutral', 'Bf_neutral', 'Fb_firstHit', 'Fb_downNeutral', 'Fb_downHit', 'Fb_fall', 'Fb_down2Up', 'Fb_downLtSwing', 'Fb_downRtSwing', 'Fb_DownThrow', 'Fb_UpThrow', 'Fb_jump', 'golf_swing')
 
 class BossCog(Avatar.Avatar):
+    """
+    The BossCog is the big supervisor Cog that we have to fight at the
+    end of the CogHQ level.
+    """
     notify = DirectNotifyGlobal.directNotify.newCategory('BossCog')
 
     def __init__(self):
@@ -45,6 +49,9 @@ class BossCog(Avatar.Avatar):
         self.doorB = None
         self.bubbleL = None
         self.bubbleR = None
+
+        # These variables are used to track the current state for
+        # animation when you call doAnimate().
         self.raised = 1
         self.forward = 1
         self.happy = 1
@@ -58,6 +65,9 @@ class BossCog(Avatar.Avatar):
         self.treadsRightPos = 0
         self.healthBar = None
         self.healthCondition = 0
+
+        # We don't need to uniquify these since there is only one
+        # BossCog on a client at any given time.
         self.animDoneEvent = 'BossCogAnimDone'
         self.animIvalName = 'BossCogAnimIval'
         gui = loader.loadModel('phase_3.5/models/gui/inventory_gui.bam')
@@ -107,8 +117,13 @@ class BossCog(Avatar.Avatar):
         if self.style:
             pass
         else:
+            # store the DNA
             self.style = dna
             self.generateBossCog()
+
+            # this no longer works in the Avatar init!
+            # I moved it here for lack of a better place
+            # make the drop shadow
             self.initializeDropShadow()
             if base.wantNametags:
                 self.initializeNametag3d()
@@ -130,23 +145,36 @@ class BossCog(Avatar.Avatar):
         self.murmur = loader.loadSfx('phase_9/audio/sfx/Boss_COG_VO_murmur.ogg')
         self.statement = loader.loadSfx('phase_9/audio/sfx/Boss_COG_VO_statement.ogg')
         self.question = loader.loadSfx('phase_9/audio/sfx/Boss_COG_VO_question.ogg')
+
         self.dialogArray = [self.grunt,
          self.murmur,
          self.statement,
          self.question,
          self.statement,
          self.statement]
+
         dna = self.style
         filePrefix = ModelDict[dna.dept]
+
         self.loadModel(GenericModel + '-legs-zero', 'legs')
         self.loadModel(filePrefix + '-torso-zero', 'torso')
         self.loadModel(filePrefix + '-head-zero', 'head')
+
+        # This is true if the head model has two faces: happy on the
+        # front side, angry on the back side (e.g. sellbot).  It's
+        # false if the head model only has a front side (which is
+        # presumably angry, e.g. cashbot).
         self.twoFaced = dna.dept == 's'
+
         self.attach('head', 'torso', 'joint34')
         self.attach('torso', 'legs', 'joint_pelvis')
+
+        # He might need an extra node to rotate for going up ramps.
         self.rotateNode = self.attachNewNode('rotate')
         geomNode = self.getGeomNode()
         geomNode.reparentTo(self.rotateNode)
+
+        # A node for hosting the "rain of gears" particle attack.
         self.frontAttack = self.rotateNode.attachNewNode('frontAttack')
         self.frontAttack.setPos(0, -10, 10)
         self.frontAttack.setScale(2)
@@ -159,18 +187,25 @@ class BossCog(Avatar.Avatar):
 
             self.loadAnims(animDict, partName)
 
+        # We might need some stars if he gets dizzy.
         self.stars = BattleProps.globalPropPool.getProp('stun')
         self.stars.setPosHprScale(7, 0, 0, 0, 0, -90, 3, 3, 3)
         self.stars.loop('stun')
+
+        # Establish local control over some of the joints.
         self.pelvis = self.getPart('torso')
         self.pelvisForwardHpr = VBase3(0, 0, 0)
         self.pelvisReversedHpr = VBase3(-180, 0, 0)
         self.neck = self.getPart('head')
         self.neckForwardHpr = VBase3(0, 0, 0)
-        self.neckReversedHpr = VBase3(0, 180, 0)
+
+        # -540 makes him spin his head once and a half to switch directions.
+        self.neckReversedHpr = VBase3(0, -540, 0)
         self.axle = self.find('**/joint_axle')
         self.doorA = self.__setupDoor('**/joint_doorFront', 'doorA', self.doorACallback, VBase3(0, 0, 0), VBase3(0, 0, -80), CollisionBox(Point3(0, -4, 0), Point3(5, 4, 0.32)))
         self.doorB = self.__setupDoor('**/joint_doorRear', 'doorB', self.doorBCallback, VBase3(0, 0, 0), VBase3(0, 0, 80), CollisionBox(Point3(-5, -4, 0), Point3(0, 4, 0.84)))
+
+        # Get the treads in there.  They come from a separate model.
         treadsModel = loader.loadModel('%s-treads' % GenericModel)
         treadsModel.reparentTo(self.axle)
         self.treadsLeft = treadsModel.find('**/right_tread')
@@ -184,10 +219,15 @@ class BossCog(Avatar.Avatar):
             self.collNode.setCollideMask(self.collNode.getIntoCollideMask() | ToontownGlobals.PieBitmask)
 
     def generateHealthBar(self):
+        """
+        Create a health meter for the suit and put it on his chest
+        """
         self.removeHealthBar()
         chestNull = self.find('**/joint_lifeMeter')
         if chestNull.isEmpty():
             return
+
+        # Create health button for the suit
         model = loader.loadModel('phase_3.5/models/gui/matching_game_gui')
         button = model.find('**/minnieCircle')
         button.setScale(6.0)
@@ -262,32 +302,45 @@ class BossCog(Avatar.Avatar):
         return
 
     def reverseHead(self):
+        # Call this before playing an animation that shows him happy
+        # when he should be angry, or vice-versa.
         self.neck.setHpr(self.neckReversedHpr)
 
     def forwardHead(self):
+        # Call this to undo the effects of reverseHead().
         self.neck.setHpr(self.neckForwardHpr)
 
     def reverseBody(self):
+        # Call this before playing an animation that shows him facing
+        # the wrong direction.
         self.pelvis.setHpr(self.pelvisReversedHpr)
 
     def forwardBody(self):
+        # Call this to undo the effects of reverseBody().
         self.pelvis.setHpr(self.pelvisForwardHpr)
 
     def getShadowJoint(self):
         return self.getGeomNode()
 
     def getNametagJoints(self):
+        """
+        Return the CharacterJoint that animates the nametag, in a list.
+        """
         return []
 
     def getDialogueArray(self):
         return self.dialogArray
 
     def doorACallback(self, isOpen):
+        # Called whenever doorA opens or closes.
         pass
 
     def doorBCallback(self, isOpen):
+        # Called whenever doorB opens or closes.
         pass
 
+    # Get intervals that rolls the left and right treads forward or
+    # backward from the current position.
     def __rollTreadsInterval(self, object, start = 0, duration = 0, rate = 1):
 
         def rollTexMatrix(t, object = object):
@@ -305,6 +358,8 @@ class BossCog(Avatar.Avatar):
         self.treadsRightPos += duration * rate
         return self.__rollTreadsInterval(self.treadsRight, start=start, duration=duration, rate=rate)
 
+    # Manage the doors on the bottom that open and close for Cogs to
+    # walk out.
     class DoorFSM(FSM.FSM):
 
         def __init__(self, name, animate, callback, openedHpr, closedHpr, uniqueName):
@@ -371,6 +426,8 @@ class BossCog(Avatar.Avatar):
             self.animate.setHpr(self.closedHpr)
             self.callback(0)
 
+    # Find the door joint in the model and set it up for
+    # animation.
     def __setupDoor(self, jointName, name, callback, openedHpr, closedHpr, cPoly):
         joint = self.find(jointName)
         children = joint.getChildren()
@@ -380,13 +437,36 @@ class BossCog(Avatar.Avatar):
         cnode.setCollideMask(ToontownGlobals.PieBitmask | ToontownGlobals.WallBitmask | ToontownGlobals.CameraBitmask)
         cnode.addSolid(cPoly)
         animate.attachNewNode(cnode)
+        # Now we create a tiny FSM to manage the door's state.
         fsm = self.DoorFSM(name, animate, callback, openedHpr, closedHpr, self.uniqueName)
         return fsm
 
+    ### doAnimate and related functions ###
+
+    ## These functions are used to maintain a steady state of
+    ## animation on the boss.  To play a particular animation, call
+    ## doAnimate(anim = animName).  The animation will be queued for
+    ## playing when the Boss finishes his current cycle; to play it
+    ## immediately (and get a "pop" in the animation), pass now = 1.
+
+    ## When the list of currently queued animations is exhausted, the
+    ## boss will automatically switch back into whatever neutral cycle
+    ## is appropriate based on his last-played animation.
+
     def doAnimate(self, anim = None, now = 0, queueNeutral = 1, raised = None, forward = None, happy = None):
+        # Queue a particular cycle for playback, or start the
+        # smart-playback mechanism.  See comments above.
+
+        #self.notify.debug('BossCog.doAnimate anim=%s now=%s queueNeutral=%s raised=%s forward=%s happy=%s' % (anim, now,queueNeutral, raised, forward, happy))
+
         if now:
+        # Blow away the currently playing animation and saved
+        # queue; we want to see this animation now.
             self.stopAnimate()
+
         if not self.twoFaced:
+        # If he's only got one face, it's always "happy", or
+        # forward.
             happy = 1
         if raised == None:
             raised = self.raised
@@ -401,9 +481,12 @@ class BossCog(Avatar.Avatar):
         if self.currentAnimIval == None:
             self.accept(self.animDoneEvent, self.__getNextAnim)
         else:
+            # If we already have an animation playing, no need to
+            # queue up the neutral cycle.
             queueNeutral = 0
         ival, changed = self.__getAnimIval(anim, raised, forward, happy)
         if changed or queueNeutral:
+            # Queue up and/or play the particular requested anim.
             self.queuedAnimIvals.append((ival,
              self.raised,
              self.forward,
@@ -414,6 +497,7 @@ class BossCog(Avatar.Avatar):
         return
 
     def stopAnimate(self):
+        # Stop the currently playing and currently queued animations.
         self.ignore(self.animDoneEvent)
         self.queuedAnimIvals = []
         if self.currentAnimIval:
@@ -426,6 +510,8 @@ class BossCog(Avatar.Avatar):
         return
 
     def __getNextAnim(self):
+        # Picks the next animation in the queue when the current
+        # animation runs out.
         if self.queuedAnimIvals:
             ival, raised, forward, happy = self.queuedAnimIvals[0]
             del self.queuedAnimIvals[0]
@@ -445,25 +531,36 @@ class BossCog(Avatar.Avatar):
         return
 
     def __getAnimIval(self, anim, raised, forward, happy):
+        # Returns an interval to play the indicated animation, and
+        # also updates the internal state according to the nature of
+        # the animation.
         ival, changed = self.__doGetAnimIval(anim, raised, forward, happy)
         seq = Sequence(ival, name=self.animIvalName)
         seq.setDoneEvent(self.animDoneEvent)
         return (seq, changed)
 
     def __doGetAnimIval(self, anim, raised, forward, happy):
+        # First, we might need to insert some transition animations to
+        # match the new one.
         if raised == self.raised and forward == self.forward and happy == self.happy:
             return (self.getAnim(anim), anim != None)
+
+        # We are changing state.  Figure out how to get there.
         startsHappy = self.happy
         endsHappy = self.happy
         ival = Sequence()
+
         if raised and not self.raised:
+            # Pop up first.
             upIval = self.getAngryActorInterval('Fb_down2Up')
             if self.forward:
                 ival = upIval
             else:
                 ival = Sequence(Func(self.reverseBody), upIval, Func(self.forwardBody))
             ival = Parallel(SoundInterval(self.upSfx, node=self), ival)
+
         if forward != self.forward:
+            # Spin to new facing.
             if forward:
                 animName = 'Bb2Ff_spin'
             else:
@@ -471,6 +568,7 @@ class BossCog(Avatar.Avatar):
             ival = Sequence(ival, ActorInterval(self, animName))
             startsHappy = 1
             endsHappy = 1
+
         startNeckHpr = self.neckForwardHpr
         endNeckHpr = self.neckForwardHpr
         if self.happy != startsHappy:
@@ -481,18 +579,24 @@ class BossCog(Avatar.Avatar):
             ival = Sequence(Func(self.neck.setHpr, startNeckHpr), ParallelEndTogether(ival, Sequence(self.neck.hprInterval(0.5, endNeckHpr, startHpr=startNeckHpr, blendType='easeInOut'), Func(self.neck.setHpr, self.neckForwardHpr))))
         elif endNeckHpr != self.neckForwardHpr:
             ival = Sequence(Func(self.neck.setHpr, startNeckHpr), ival, Func(self.neck.setHpr, self.neckForwardHpr))
+
         if not raised and self.raised:
+            # Pop down after.
             downIval = self.getAngryActorInterval('Fb_down2Up', playRate=-1)
             if forward:
                 ival = Sequence(ival, downIval)
             else:
                 ival = Sequence(ival, Func(self.reverseBody), downIval, Func(self.forwardBody))
             ival = Parallel(SoundInterval(self.downSfx, node=self), ival)
+
         self.raised = raised
         self.forward = forward
         self.happy = happy
+
+        # Now tack on the animation we're trying for.
         if anim != None:
             ival = Sequence(ival, self.getAnim(anim))
+
         return (ival, 1)
 
     def setDizzy(self, dizzy):
@@ -508,6 +612,9 @@ class BossCog(Avatar.Avatar):
             self.birdsSfx.stop()
 
     def getAngryActorInterval(self, animName, **kw):
+        # Returns an ActorInterval to play the indicated angry
+        # animation.  If self.happy is true, flips the head around to
+        # show the happy (or only) face while playing it.
         if self.happy:
             ival = Sequence(Func(self.reverseHead), ActorInterval(self, animName, **kw), Func(self.forwardHead))
         else:
@@ -515,55 +622,81 @@ class BossCog(Avatar.Avatar):
         return ival
 
     def getAnim(self, anim):
-        ival = None
+        # A low-level function to return an interval to play the
+        # indicated animation, and update the internal state as if the
+        # animation has been played.  This may be called by external
+        # objects.
         if anim == None:
-            partName = None
             if self.happy:
                 animName = 'Ff_neutral'
             else:
                 animName = 'Fb_neutral'
+
             if self.raised:
+                # Play the animation on the whole boss.
                 ival = ActorInterval(self, animName)
             else:
+                # Play the animation on the upper part of the boss
+                # only, and play the lowered animation on the legs.
                 ival = Parallel(ActorInterval(self, animName, partName=['torso', 'head']), ActorInterval(self, 'Fb_downNeutral', partName='legs'))
+
             if not self.forward:
                 ival = Sequence(Func(self.reverseBody), ival, Func(self.forwardBody))
+
         elif anim == 'down2Up':
             ival = Parallel(SoundInterval(self.upSfx, node=self), self.getAngryActorInterval('Fb_down2Up'))
             self.raised = 1
+
         elif anim == 'up2Down':
+            # We fake this animation by playing down2Up backward.
             ival = Parallel(SoundInterval(self.downSfx, node=self), self.getAngryActorInterval('Fb_down2Up', playRate=-1))
             self.raised = 0
+
         elif anim == 'throw':
             self.doAnimate(None, raised=1, happy=0, queueNeutral=0)
             ival = Parallel(Sequence(SoundInterval(self.throwSfx, node=self), duration=0), self.getAngryActorInterval('Fb_UpThrow'))
+
         elif anim == 'hit':
             if self.raised:
+                # Hits always knock us down.
                 self.raised = 0
                 ival = self.getAngryActorInterval('Fb_firstHit')
             else:
                 ival = self.getAngryActorInterval('Fb_downHit')
             ival = Parallel(SoundInterval(self.reelSfx, node=self), ival)
+
         elif anim == 'ltSwing' or anim == 'rtSwing':
             self.doAnimate(None, raised=0, happy=0, queueNeutral=0)
             if anim == 'ltSwing':
                 ival = Sequence(Track((0, self.getAngryActorInterval('Fb_downLtSwing')), (0.9, SoundInterval(self.swingSfx, node=self)), (1, Func(self.bubbleL.unstash))), Func(self.bubbleL.stash))
             else:
                 ival = Sequence(Track((0, self.getAngryActorInterval('Fb_downRtSwing')), (0.9, SoundInterval(self.swingSfx, node=self)), (1, Func(self.bubbleR.unstash))), Func(self.bubbleR.stash))
+
         elif anim == 'frontAttack':
+            # This is a bit hacky, and involves code defined in
+            # DistributedSellbotBoss.py.
             self.doAnimate(None, raised=1, happy=0, queueNeutral=0)
             pe = BattleParticles.loadParticleFile('bossCogFrontAttack.ptf')
+            # Keep the head reversed so we play the spin animation
+            # with the sad face showing.
             ival = Sequence(Func(self.reverseHead), ActorInterval(self, 'Bb2Ff_spin'), Func(self.forwardHead))
+
             if self.forward:
+                # The animation starts with the torso reversed; undo this.
                 ival = Sequence(Func(self.reverseBody), ParallelEndTogether(ival, self.pelvis.hprInterval(0.5, self.pelvisForwardHpr, blendType='easeInOut')))
+
             ival = Sequence(Track((0, ival), (0, SoundInterval(self.spinSfx, node=self)), (0.9, Parallel(SoundInterval(self.rainGearsSfx, node=self), ParticleInterval(pe, self.frontAttack, worldRelative=0, duration=1.5, cleanup=True), duration=0)), (1.9, Func(self.bubbleF.unstash))), Func(self.bubbleF.stash))
+
             self.forward = 1
             self.happy = 0
             self.raised = 1
+
         elif anim == 'areaAttack':
+            # This is hacky too, just like above.
             if self.twoFaced:
                 self.doAnimate(None, raised=1, happy=0, queueNeutral=0)
             else:
+                #RAU the lawbot is one faced
                 self.doAnimate(None, raised=1, happy=1, queueNeutral=1)
             ival = Parallel(
                 ActorInterval(self, 'Fb_jump'),
@@ -581,11 +714,13 @@ class BossCog(Avatar.Avatar):
             else:
                 self.happy = 1
             self.raised = 1
+
         elif anim == 'Fb_fall':
             ival = Parallel(ActorInterval(self, 'Fb_fall'), Sequence(SoundInterval(self.reelSfx, node=self), SoundInterval(self.deathSfx)))
         elif isinstance(anim, str):
             ival = ActorInterval(self, anim)
         else:
+            # It must be an interval to play directly.
             ival = anim
         return ival
     
