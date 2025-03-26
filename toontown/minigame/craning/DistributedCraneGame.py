@@ -151,7 +151,11 @@ class DistributedCraneGame(DistributedMinigame):
         This is the distributed method that gets called on all clients.
         """
         super().setSpectators(spectatorIds)
-        
+
+        if self.gameFSM.getCurrentState() is not None:
+            if self.gameFSM.getCurrentState().getName() == 'play':
+                return
+
         # Update all toon indicators based on their spectator status
         for i, avId in enumerate(self.avIdList):
             toon = self.cr.getDo(avId)
@@ -162,36 +166,15 @@ class DistributedCraneGame(DistributedMinigame):
                 else:
                     self.createStatusIndicator(toon, isPlayer)
 
-                # Only apply ghost/transparency effects if we're not in the rules state
-                if not hasattr(self, 'rulesPanel') or self.rulesPanel is None:
-                    if toon.doId == base.localAvatar.doId:
-                        toon.setGhostMode(not isPlayer)
-                    else:
-                        if not isPlayer:
-                            toon.setTransparency(1)
-                            toon.setColorScale(1, 1, 1, 0)
-                        else:
-                            toon.clearColorScale()
-                            toon.clearTransparency()
-                            toon.show()
-
     def __checkSpectatorState(self, spectate=True):
         # If we're in the rules state, don't apply any visibility changes
         if hasattr(self, 'rulesPanel') and self.rulesPanel is not None:
             return
 
-        # Loop through every spectator and make them semi-transparent
         for toon in self.getSpectatingToons():
-            # If this is us, let's apply some special logic
-            if toon.isLocal():
+            if self.gameFSM.getCurrentState().getName() == 'play':
                 toon.setGhostMode(True)
-                toon.setPos(100, 100, 1000)  # Elevate spectators high above the arena
-                continue
-
-
-            # Make other spectators semi-transparent instead of invisible
-            toon.setTransparency(1)
-            toon.setColorScale(1, 1, 1, 0)
+                toon.setPos(100, 100, 1000)
 
         # Loop through every non-spectator and make sure we can see them
         for toon in self.getParticipantsNotSpectating():
@@ -558,40 +541,16 @@ class DistributedCraneGame(DistributedMinigame):
             pos=(-1.15, 0, 0.85),
             command=self.__handlePlayButton
         )
-        self.playButton.hide()
-
-        self.rulesPanelToggleButton = DirectButton(
-            relief=None,
-            text='Settings',
-            text_scale=0.055,
-            text_pos=(0, -0.02),
-            geom=(btnGeom.find('**/QuitBtn_UP'),
-                  btnGeom.find('**/QuitBtn_DN'),
-                  btnGeom.find('**/QuitBtn_RLVR')),
-            geom_scale=(0.7, 1, 1),
-            pos=(-0.85, 0, 0.85),
-            command=self.__toggleRulesPanel
-        )
+        self.playButton.hide()  # Play button starts hidden
         btnGeom.removeNode()
-        self.rulesPanelToggleButton.hide()
         return panel
 
     def __handlePlayButton(self):
         messenger.send(self.rulesDoneEvent)
 
-    def __toggleRulesPanel(self):
-        if self.rulesPanel:
-            if self.rulesPanel.isHidden():
-                self.rulesPanel.show()
-            else:
-                self.rulesPanel.hide()
-
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
         self.ignore('spotStatusChanged')
-        if self.rulesPanelToggleButton is not None:
-            self.rulesPanelToggleButton.destroy()
-            self.rulesPanelToggleButton = None
         if self.playButton is not None:
             self.playButton.destroy()
             self.playButton = None
@@ -634,8 +593,6 @@ class DistributedCraneGame(DistributedMinigame):
     def setGameStart(self, timestamp):
         if not self.hasLocalToon: return
         self.notify.debug("setGameStart")
-        # Make sure the rules panel is cleaned up for all clients
-        self.__cleanupRulesPanel()
         # base class will cause gameFSM to enter initial state
         DistributedMinigame.setGameStart(self, timestamp)
         # all players have finished reading the rules,
@@ -678,6 +635,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.introductionMovie.start()
         self.boss.prepareBossForBattle()
 
+        # Make absolutely sure all indicators are cleaned up
+        self.removeStatusIndicators()
+
     def exitPrepare(self):
         self.introductionMovie.pause()
         self.introductionMovie = None
@@ -689,6 +649,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.notify.debug("enterPlay")
         self.evWalls.unstash()
         base.playMusic(self.music, looping=1, volume=0.9)
+
+        # Make absolutely sure all indicators are cleaned up
+        self.removeStatusIndicators()
 
         # It is important to make sure this task runs immediately
         # before the collisionLoop of ShowBase.  That will fix up the
@@ -961,13 +924,15 @@ class DistributedCraneGame(DistributedMinigame):
         # Create and show the rules panel
         self.rulesPanel = self.__generateRulesPanel()
         self.rulesPanel.load()
-        # Hide the panel by default, but show the toggle button
+        # Hide the panel by default
         self.rulesPanel.hide()
-        self.rulesPanelToggleButton.show()
 
         # Only show the play button for the leader (first player in avIdList)
         if self.avIdList[0] == base.localAvatar.doId:
             self.playButton.show()
+        else:
+            # Non-leader players automatically trigger ready
+            messenger.send(self.rulesDoneEvent)
 
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
@@ -995,6 +960,7 @@ class DistributedCraneGame(DistributedMinigame):
         # Clean up click detection
         self.ignore('mouse1')
             
+        # Make sure to clean up all indicators
         self.removeStatusIndicators()
         self.__cleanupRulesPanel()
 
@@ -1049,31 +1015,17 @@ class DistributedCraneGame(DistributedMinigame):
         changedAvId = self.avIdList[spotIndex]
         changedToon = self.cr.getDo(changedAvId)
         if changedToon:
-            # Update or create the indicator for this toon
-            if changedAvId in self.statusIndicators:
-                self.updateStatusIndicator(changedToon, isPlayer)
-            else:
-                self.createStatusIndicator(changedToon, isPlayer)
-
-            # Only apply ghost/transparency effects if we're not in the rules state
-            if not hasattr(self, 'rulesPanel') or self.rulesPanel is None:
-                if changedToon.doId == base.localAvatar.doId:
-                    changedToon.setGhostMode(not isPlayer)
+                if changedAvId in self.statusIndicators:
+                    self.updateStatusIndicator(changedToon, isPlayer)
                 else:
-                    if not isPlayer:
-                        changedToon.setTransparency(1)
-                        changedToon.setColorScale(1, 1, 1, 0)
-                    else:
-                        changedToon.clearColorScale()
-                        changedToon.clearTransparency()
-                        changedToon.show()
+                    self.createStatusIndicator(changedToon, isPlayer)
 
     def createStatusIndicator(self, toon, isPlayer):
         """Creates a spotlight indicator for a toon's status (player or spectator)"""
         # Create the camera model and spotlight effect
         indicator = NodePath('statusIndicator')
         indicator.reparentTo(render)
-        
+            
         # Position the camera above
         cameraHeight = 8
         projector = Point3(0, 0, cameraHeight)
@@ -1214,8 +1166,8 @@ class DistributedCraneGame(DistributedMinigame):
                 floorColorWriter.setData4f(transparent)
 
     def removeStatusIndicators(self):
-        """Removes all status indicators"""
-        for avId, indicator in list(self.statusIndicators.items()):
+        """Removes all status indicators and cleans up their nodes."""
+        for indicator in self.statusIndicators.values():
             if not indicator.isEmpty():
                 indicator.removeNode()
         self.statusIndicators.clear()
