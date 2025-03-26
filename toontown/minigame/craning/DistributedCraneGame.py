@@ -543,6 +543,23 @@ class DistributedCraneGame(DistributedMinigame):
         from direct.gui.DirectButton import DirectButton
         from toontown.toonbase import TTLocalizer
         btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
+        
+
+        # Create play button next to settings
+        self.playButton = DirectButton(
+            relief=None,
+            text='Play',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(-1.15, 0, 0.85),
+            command=self.__handlePlayButton
+        )
+        self.playButton.hide()
+
         self.rulesPanelToggleButton = DirectButton(
             relief=None,
             text='Settings',
@@ -552,12 +569,15 @@ class DistributedCraneGame(DistributedMinigame):
                   btnGeom.find('**/QuitBtn_DN'),
                   btnGeom.find('**/QuitBtn_RLVR')),
             geom_scale=(0.7, 1, 1),
-            pos=(-1.15, 0, 0.85),
+            pos=(-0.85, 0, 0.85),
             command=self.__toggleRulesPanel
         )
         btnGeom.removeNode()
         self.rulesPanelToggleButton.hide()
         return panel
+
+    def __handlePlayButton(self):
+        messenger.send(self.rulesDoneEvent)
 
     def __toggleRulesPanel(self):
         if self.rulesPanel:
@@ -572,6 +592,9 @@ class DistributedCraneGame(DistributedMinigame):
         if self.rulesPanelToggleButton is not None:
             self.rulesPanelToggleButton.destroy()
             self.rulesPanelToggleButton = None
+        if self.playButton is not None:
+            self.playButton.destroy()
+            self.playButton = None
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -944,7 +967,7 @@ class DistributedCraneGame(DistributedMinigame):
 
         # Only show the play button for the leader (first player in avIdList)
         if self.avIdList[0] == base.localAvatar.doId:
-            self.rulesPanel.showPlayButton()
+            self.playButton.show()
 
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
