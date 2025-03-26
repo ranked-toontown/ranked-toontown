@@ -185,7 +185,9 @@ class DistributedCraneGame(DistributedMinigame):
             # If this is us, let's apply some special logic
             if toon.isLocal():
                 toon.setGhostMode(True)
+                toon.setPos(100, 100, 1000)  # Elevate spectators high above the arena
                 continue
+
 
             # Make other spectators semi-transparent instead of invisible
             toon.setTransparency(1)
@@ -689,6 +691,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.accept("LocalSetOuchMode", self.toOuchMode)
         self.accept("ChatMgr-enterMainMenu", self.chatClosed)
 
+        if base.WANT_FOV_EFFECTS and base.localAvatar.isSprinting:
+            base.localAvatar.lerpFov(base.localAvatar.fov, base.localAvatar.fallbackFov + base.localAvatar.currentMovementMode[base.localAvatar.FOV_INCREASE_ENUM])
+
         self.__checkSpectatorState()
 
     def exitPlay(self):
@@ -729,6 +734,7 @@ class DistributedCraneGame(DistributedMinigame):
         for toon in self.getParticipants():
             toon.setGhostMode(False)
             toon.show()
+            toon.setZ(0) # Reset Z position
         self.overlayText.removeNode()
         self.bossSpeedrunTimer.cleanup()
         del self.bossSpeedrunTimer
@@ -935,7 +941,11 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default, but show the toggle button
         self.rulesPanel.hide()
         self.rulesPanelToggleButton.show()
-        
+
+        # Only show the play button for the leader (first player in avIdList)
+        if self.avIdList[0] == base.localAvatar.doId:
+            self.rulesPanel.showPlayButton()
+
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
 
@@ -944,12 +954,12 @@ class DistributedCraneGame(DistributedMinigame):
             # Make sure the click ray is using our spotlight bitmask
             self.clickRayNode.setFromCollideMask(self.spotlightBitMask)
             self.accept('mouse1', self.handleMouseClick)
-        
+
         # Hide all toon shadows
         for toon in self.getParticipants():
             if toon and hasattr(toon, 'dropShadow') and toon.dropShadow:
                 toon.dropShadow.hide()
-        
+
         # Accept spot status change messages
         self.accept('spotStatusChanged', self.handleSpotStatusChanged)
 

@@ -109,23 +109,10 @@ class DistributedBossCogStripped(DistributedAvatar.DistributedAvatar, BossCog.Bo
         """
         tube1 = CollisionTube(6.5, -7.5, 2, 6.5, 7.5, 2, 2.5)
         tube2 = CollisionTube(-6.5, -7.5, 2, -6.5, 7.5, 2, 2.5)
-        roof = CollisionPolygon(Point3(-4.4, 7.1, 5.5), Point3(-4.4, -7.1, 5.5), Point3(4.4, -7.1, 5.5),
-                                Point3(4.4, 7.1, 5.5))
-        side1 = CollisionPolygon(Point3(-4.4, -7.1, 5.5), Point3(-4.4, 7.1, 5.5), Point3(-4.4, 7.1, 0),
-                                 Point3(-4.4, -7.1, 0))
-        side2 = CollisionPolygon(Point3(4.4, 7.1, 5.5), Point3(4.4, -7.1, 5.5), Point3(4.4, -7.1, 0),
-                                 Point3(4.4, 7.1, 0))
-        front1 = CollisionPolygon(Point3(4.4, -7.1, 5.5), Point3(-4.4, -7.1, 5.5), Point3(-4.4, -7.1, 5.2),
-                                  Point3(4.4, -7.1, 5.2))
-        back1 = CollisionPolygon(Point3(-4.4, 7.1, 5.5), Point3(4.4, 7.1, 5.5), Point3(4.4, 7.1, 5.2),
-                                 Point3(-4.4, 7.1, 5.2))
+        box = CollisionBox(Point3(0, 0, 2.75), 4.4, 7.1, 2.75)
         self.collNode.addSolid(tube1)
         self.collNode.addSolid(tube2)
-        self.collNode.addSolid(roof)
-        self.collNode.addSolid(side1)
-        self.collNode.addSolid(side2)
-        self.collNode.addSolid(front1)
-        self.collNode.addSolid(back1)
+        self.collNode.addSolid(box)
 
     def disable(self):
         DistributedAvatar.DistributedAvatar.disable(self)

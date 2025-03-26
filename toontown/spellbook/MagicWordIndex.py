@@ -1890,6 +1890,22 @@ class HitCFO(MagicWord):
         craneGame.recordHit(dmg, impact=1)
 
 
+class EndCFO(MagicWord):
+    aliases = ['end', 'finish']
+    desc = "Ends the C.F.O."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'USER'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from ..minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        craneGame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if craneGame is None:
+            return "You aren't in a crane round!"
+
+        craneGame.gameFSM.request('victory')
+        return "Ending Crane Round"
+
+
 class RestartCraneRound(MagicWord):
     aliases = ['rcr', 'restartcrane']
     desc = "Restarts the crane round"
@@ -2043,6 +2059,90 @@ class AimMode(MagicWord):
 
         minigame.practiceCheatHandler.numSafesWanted = safes
         minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.AIM_PRACTICE)
+        return message
+
+
+class AimRight(MagicWord):
+    aliases = ['ar']
+    desc = "Spawns a safe near you and goes further away as you drop an object. Optional: specify distance (default 10)"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    arguments = [("forwardDistance", int, False, 10)]
+    accessLevel = "MODERATOR"
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        minigame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if not minigame:
+            return "You aren't in the Crane Game!"
+
+        forwardDistance = args[0]
+        if forwardDistance < -5 or forwardDistance > 15:
+            return "Distance must be between -5 and 15!"
+
+        if minigame.gameFSM.getCurrentState().getName() != "play":
+            return f"Crane game must be in state 'play', was '{minigame.gameFSM.getCurrentState().getName()}'!"
+
+        on_off = 'OFF' if minigame.practiceCheatHandler.wantAimRightPractice else f'ON (distance: {forwardDistance})'
+        message = f"Safe Aim Practice => {on_off}"
+
+        minigame.practiceCheatHandler.forwardDistance = forwardDistance
+        minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.A_R_PRACTICE)
+        return message
+
+
+class AimLeft(MagicWord):
+    aliases = ['al']
+    desc = "Spawns a safe near you and goes further left as you drop an object. Optional: specify distance (default 10)"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    arguments = [("forwardDistance", int, False, 10)]
+    accessLevel = "MODERATOR"
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        minigame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if not minigame:
+            return "You aren't in the Crane Game!"
+
+        forwardDistance = args[0]
+        if forwardDistance < -5 or forwardDistance > 15:
+            return "distance must be between -5 and 15!"
+
+        if minigame.gameFSM.getCurrentState().getName() != "play":
+            return f"Crane game must be in state 'play', was '{minigame.gameFSM.getCurrentState().getName()}'!"
+
+        on_off = 'OFF' if minigame.practiceCheatHandler.wantAimLeftPractice else f'ON (distance: {forwardDistance})'
+        message = f"Safe Aim Practice => {on_off}"
+
+        minigame.practiceCheatHandler.forwardDistance = forwardDistance
+        minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.A_L_PRACTICE)
+        return message
+    
+class Alternate(MagicWord):
+    aliases = ['alt']
+    desc = "Spawns a safe near you and alternates between left and right as you drop objects. Optional: specify distance (default 10)"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    arguments = [("forwardDistance", int, False, 10)]
+    accessLevel = "MODERATOR"
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        minigame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if not minigame:
+            return "You aren't in the Crane Game!"
+
+        forwardDistance = args[0]
+        if forwardDistance < -5 or forwardDistance > 15:
+            return "distance must be between -5 and 15!"
+
+        if minigame.gameFSM.getCurrentState().getName() != "play":
+            return f"Crane game must be in state 'play', was '{minigame.gameFSM.getCurrentState().getName()}'!"
+
+        on_off = 'OFF' if minigame.practiceCheatHandler.wantAimAlternatePractice else f'ON (distance: {forwardDistance})'
+        message = f"Safe Alternating Practice => {on_off}"
+
+        minigame.practiceCheatHandler.forwardDistance = forwardDistance
+        minigame.practiceCheatHandler.isFirstAlternate = True  # Reset the alternating state
+        minigame.practiceCheatHandler.setPracticeParams(CraneGamePracticeCheatAI.A_ALT_PRACTICE)
         return message
 
 

@@ -129,7 +129,7 @@ class CraneGameRuleset:
         self.CFO_MAX_HP = 1_500  # How much HP should the CFO have?
         self.CFO_STUN_THRESHOLD = 24  # How much damage should a goon do to stun?
         self.SIDECRANE_IMPACT_STUN_THRESHOLD = 0.8  # How much impact should a side crane hit need to register a stun
-        self.SAFE_HELMET_COOLDOWN = 90 # How long should we wait before being able to safe helmet the CFO twice?
+        self.SAFE_HELMET_COOLDOWN = 180 # How long should we wait before being able to safe helmet the CFO twice?
 
         self.WANT_BACKWALL = False
         self.WANT_SIDECRANES = True
@@ -206,7 +206,7 @@ class CraneGameRuleset:
 
         self.WANT_LAFF_DRAIN = False  # Should we drain toon laff over time?
         self.LAFF_DRAIN_FREQUENCY = 1  # How often should we drain toon laff? Value is in seconds.
-        self.LAFF_DRAIN_KILLS_TOONS = False  # Should laff drain fully kill toons or leave them at 1 hp?
+        self.LAFF_DRAIN_KILLS_TOONS = True  # Should laff drain fully kill toons or leave them at 1 hp?
 
         self.WANT_LOW_LAFF_BONUS = False  # Should we award toons with low laff bonus points?
         self.LOW_LAFF_BONUS = .1  # How much will the bonus be worth? i.e. .1 = 10% bonus for ALL points

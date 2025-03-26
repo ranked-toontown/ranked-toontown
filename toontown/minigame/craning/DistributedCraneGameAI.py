@@ -6,8 +6,7 @@ from direct.fsm import ClassicFSM
 from direct.fsm import State
 from direct.showbase.PythonUtil import clamp
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, NodePath, Vec3, Point3
-
+from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, CollisionPolygon, CollisionBox, NodePath, Vec3, Point3
 from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.coghq.CraneLeagueGlobals import ScoreReason
@@ -29,7 +28,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     DESPERATION_MODE_ACTIVATE_THRESHOLD = 1800
 
     # If time limit is enabled, how many seconds should be remaining to activate when an overtake happens?
-    OVERTIME_OVERTAKE_ACTIVATION_THRESHOLD = 10
+    OVERTIME_OVERTAKE_ACTIVATION_THRESHOLD = 15
 
     def __init__(self, air, minigameId):
         DistributedMinigameAI.__init__(self, air, minigameId)
@@ -126,8 +125,17 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # And some solids to keep the goons constrained to our room.
         cn = CollisionNode('walls')
-        cs = CollisionSphere(0, 0, 0, 13)
-        cn.addSolid(cs)
+        #cs = CollisionSphere(0, 0, 0, 13)
+        #cn.addSolid(cs)
+
+        collisionSolids = [CollisionTube(6.5, -7.5, 0, 6.5, 7.5, 0, 2.5), #tube1
+                           CollisionTube(-6.5, -7.5, 0, -6.5, 7.5, 0, 2.5), #tube2
+                           CollisionSphere(0, 0, 0, 8.35) #box (as sphere)
+        ]
+
+        for collisionSolid in collisionSolids:
+            cn.addSolid(collisionSolid)
+
         cs = CollisionInvSphere(0, 0, 0, 42)
         cn.addSolid(cs)
         self.boss.attachNewNode(cn)
@@ -1029,7 +1037,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Check for special logic if we are restarting the round with cheats enabled previously.
         self.practiceCheatHandler.checkCheatModifier()
-        if self.practiceCheatHandler.wantAimPractice:
+        if self.practiceCheatHandler.wantAimPractice or self.practiceCheatHandler.wantAimRightPractice or self.practiceCheatHandler.wantAimLeftPractice or self.practiceCheatHandler.wantAimAlternatePractice or self.practiceCheatHandler.wantGoonPractice:
             self.practiceCheatHandler.setupAimMode()
         if self.practiceCheatHandler.cheatIsEnabled():
             taskMgr.remove(self.uniqueName('times-up-task'))

@@ -108,6 +108,10 @@ class DistributedCashbotBossCraneAI(DistributedObjectAI.DistributedObjectAI, FSM
     def enterControlled(self, avId):
         self.avId = avId
         self.d_setState('C', avId)
+        
+        if self.boss.practiceCheatHandler.wantAimPractice or self.boss.practiceCheatHandler.wantAimRightPractice or self.boss.practiceCheatHandler.wantAimLeftPractice or self.boss.practiceCheatHandler.wantAimAlternatePractice:
+            # Force a safe drop to position initial safes
+            self.boss.practiceCheatHandler.handleSafeDropped(None)
 
     def exitControlled(self):
         if self.objectId:

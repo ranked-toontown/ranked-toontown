@@ -106,8 +106,8 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         safePos = safe.getPos()
 
         direction = safePos - goonPos
-        if direction.length() > 0:
-            direction.normalize()
+        direction[2] = 0 #prevents pushing safes up/down
+        direction.normalize()
 
         pushDistance = self.velocity * globalClock.getDt()
         newSafePos = safePos + direction * pushDistance
@@ -175,15 +175,18 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # How long will it take to rotate to position?
         origH = self.getH()
         h = PythonUtil.fitDestAngle2Src(origH, targetH)
-        delta = abs(h - origH)
-        turnTime = delta / (self.velocity * 5)
+        delta = h - origH
+        turnTime = abs(delta) / (self.velocity * 5)
         
         # And how long will it take to walk to position?
         walkTime = dist / self.velocity
-        
-        self.setH(targetH)
-        self.target = self.boss.scene.getRelativePoint(self, Point3(0, dist, 0))
-        
+        self.target = self.boss.scene.getRelativePoint(self, Point3(dist * math.cos(deg2Rad(delta) + math.pi / 2),
+                                                              dist * math.sin(deg2Rad(delta) + math.pi / 2),
+                                                              0))
+
+        taskMgr.doMethodLater(turnTime, self.setH, self.uniqueName('turnedToTarget'), extraArgs=[targetH])
+        taskMgr.doMethodLater(turnTime, self.__startWalk, self.uniqueName('startingWalk'), extraArgs=[])
+
         self.departureTime = globalClock.getFrameTime()
         self.arrivalTime = self.departureTime + turnTime + walkTime + extraDelay
         self.d_setTarget(self.target[0], self.target[1], h, turnTime + walkTime + extraDelay)
@@ -254,6 +257,27 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.notify.warning('Fell off end of weighted table.')
         return (0, self.legLength)
 
+    def __updatePosition(self):
+        #Updates goon position/orientation when states change while walking
+        currentTime = globalClock.getFrameTime()
+        turnTask = taskMgr.getTasksNamed(self.uniqueName('turnedToTarget'))
+        if turnTask:
+            delayTime = turnTask[0].delayTime
+            wakeTime = turnTask[0].wakeTime
+
+            origH = self.getH()
+            targetH = turnTask[0].getArgs()[0]
+            taskMgr.remove(self.uniqueName('turnedToTarget'))
+            taskMgr.remove(self.uniqueName('startingWalk'))
+            correctedH = (1 - (wakeTime - currentTime) / delayTime) * PythonUtil.reduceAngle((targetH - origH)) + origH
+            self.setH(correctedH)
+
+        if taskMgr.getTasksNamed(self.uniqueName('reachedTarget')):
+            self.__stopWalk()
+            taskMgr.remove(self.uniqueName('reachedTarget'))
+
+
+
     def __startWalk(self):
         # Generate a do-later method to "walk" the goon to his target
         # square by the specified time.  Actually, on the AI the goon
@@ -303,7 +327,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def __reachedTarget(self, task):
         self.__stopWalk()
         self.__chooseTarget()
-        self.__startWalk()
 
     def __recoverWalk(self, task):
         self.demand('Walk')
@@ -410,6 +433,9 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     def enterOff(self):
         self.tubeNodePath.stash()
         self.feelerNodePath.stash()
+        taskMgr.remove(self.uniqueName('reachedTarget'))
+        taskMgr.remove(self.uniqueName('turnedToTarget'))
+        taskMgr.remove(self.uniqueName('startingWalk'))
 
     def exitOff(self):
         self.tubeNodePath.unstash()
@@ -422,6 +448,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         # If a goon is grabbed while he's just waking up, it
         # interrupts the wake-up process.  Ditto for a goon in battle
         # mode.
+        self.__updatePosition()
         taskMgr.remove(self.taskName('recovery'))
         taskMgr.remove(self.taskName('resumeWalk'))
 
@@ -431,7 +458,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.isStunned = 0
 
         if self.__chooseTarget():
-            self.__startWalk()
             self.d_setObjectState('W', 0, 0)
 
     def exitWalk(self):
@@ -516,6 +542,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         taskMgr.remove(self.uniqueName('checkSafeCollisions'))
 
     def enterBattle(self):
+        self.__updatePosition()
         self.d_setObjectState('B', 0, 0)
 
     def exitBattle(self):
@@ -523,6 +550,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
 
     def enterStunned(self):
         self.isStunned = 1
+        self.__updatePosition()
         self.d_setObjectState('S', 0, 0)
 
     def exitStunned(self):

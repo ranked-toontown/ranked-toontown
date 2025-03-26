@@ -63,6 +63,7 @@ class Walk(StateData.StateData):
 
     def exitWalking(self):
         base.localAvatar.stopTrackAnimToSpeed()
+        base.localAvatar.finishLerpFov()
 
     def setSwimSoundAudible(self, IsSwimSoundAudible):
         self.IsSwimSoundAudible = IsSwimSoundAudible

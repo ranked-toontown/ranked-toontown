@@ -124,6 +124,7 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
         }
 
         self.isSprinting = 0
+        self.fovSprintLerpSequence = None
 
         self.currentMovementMode = self.TTCC_MOVEMENT_VALUES
         self.updateMovementMode()
@@ -225,9 +226,21 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
         localAvatar.setCameraFov(fov, updateFallback=False)
 
     def lerpFov(self, start, target):
-        LerpFunc(
+        self.pauseLerpFov()
+        self.fovSprintLerpSequence = LerpFunc(
             self.__setFov, fromData=start, toData=target, duration=.3, blendType='easeInOut'
-        ).start()
+        )
+        self.fovSprintLerpSequence.start()
+
+    def finishLerpFov(self):
+        if self.fovSprintLerpSequence is not None:
+            self.fovSprintLerpSequence.finish()
+            self.fovSprintLerpSequence = None
+
+    def pauseLerpFov(self):
+        if self.fovSprintLerpSequence is not None:
+            self.fovSprintLerpSequence.pause()
+            self.fovSprintLerpSequence = None
 
     def setSprinting(self):
         self.currentSpeed = self.currentMovementMode[self.SPRINT_SPEED_ENUM]
@@ -253,6 +266,10 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
 
         if base.WANT_FOV_EFFECTS and lerpFov:
             self.lerpFov(self.fov, self.fallbackFov)
+
+        if not lerpFov:
+            self.finishLerpFov()
+            self.setCameraFov(self.fallbackFov, updateFallback=False)
 
         self.isSprinting = 0
 
