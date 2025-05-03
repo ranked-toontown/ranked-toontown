@@ -378,7 +378,7 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         return FSM.FSM.defaultFilter(self, request, args)
         
     def updateClientPositions(self, x, y, z, h, p, r):
-        if self.state != 'Free':
+        if self.state in ['LocalGrabbed', 'LocalDropped', 'Grabbed', 'Dropped']:
             return
         else:
             self.setPosHpr(x, y, z, h, p, r)
