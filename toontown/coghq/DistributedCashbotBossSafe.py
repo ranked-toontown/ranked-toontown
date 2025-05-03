@@ -174,4 +174,6 @@ class DistributedCashbotBossSafe(DistributedCashbotBossObject.DistributedCashbot
             self.unstash()
             
     def move(self, x, y, z, rotation):
+        if self.state in ['LocalGrabbed', 'LocalDropped', 'Grabbed', 'Dropped']:
+            return
         self.setPosHpr(x, y, z, rotation, 0, 0)

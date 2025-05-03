@@ -1538,6 +1538,7 @@ dclass DistributedCashbotBossObject : DistributedSmoothNode {
   setSmPosHpr : setComponentX, setComponentY, setComponentZ, setComponentH, setComponentP, setComponentR, setComponentT;
   setSmPosHprL : setComponentL, setComponentX, setComponentY, setComponentZ, setComponentH, setComponentP, setComponentR, setComponentT;
   clearSmoothing(int8) broadcast clsend;
+  updateClientPositions(int16/10, int16/10, int16/10, int16%360/10, int16%360/10, int16%360/10) broadcast ram;
 };
 
 dclass DistributedCashbotBossSafe : DistributedCashbotBossObject {

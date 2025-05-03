@@ -64,7 +64,8 @@ class DistributedCashbotBossObjectAI(DistributedSmoothNodeAI.DistributedSmoothNo
             self.demand('Free')
             p = self.getPos()
             h = self.getH()
-            self.d_setPosHpr(p[0], p[1], 0, h, 0, 0)
+            self.setPosHpr(p[0], p[1], 0, h, 0, 0)
+            self.sendUpdate('updateClientPositions', [p[0], p[1], 0, h, 0, 0])
         return Task.done
         
         

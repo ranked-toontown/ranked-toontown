@@ -321,7 +321,6 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         self.boss = base.cr.doId2do[bossCogId]
 
     def setObjectState(self, state, avId, craneId):
-
         if self.state == 'Off':
             return
 
@@ -377,8 +376,12 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
             raise FSM.RequestDenied(request)
             
         return FSM.FSM.defaultFilter(self, request, args)
-
-
+        
+    def updateClientPositions(self, x, y, z, h, p, r):
+        if self.state in ['LocalGrabbed', 'LocalDropped', 'Grabbed', 'Dropped']:
+            return
+        else:
+            self.setPosHpr(x, y, z, h, p, r)
 
     ### FSM States ###
 
