@@ -123,7 +123,8 @@ class DistributedCashbotBossObjectAI(DistributedSmoothNodeAI.DistributedSmoothNo
         avId = self.air.getAvatarIdFromSender()
         
         if avId == self.avId:
-            self.setPosHpr(x, y, 0, h, 0, 0)
+            #self.setPosHpr(x, y, 0, h, 0, 0)
+            self.sendUpdate('updateClientPositions', [x, y, 0, h, 0, 0])
             self.demand('WaitFree')
 
     def hitBoss(self, impact, craneId):
