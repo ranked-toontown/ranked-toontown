@@ -62,6 +62,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
+        # Elemental mode system
+        self.elementalMode = False  # Default to vanilla mode
+        self.fireElementalSafes = set()  # Set of safe doIds that are currently Fire elemental
+        self.elementalTaskName = None  # Task name for elemental system
+
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
 
         self.gameFSM = ClassicFSM.ClassicFSM('DistributedMinigameTemplateAI',
@@ -180,6 +185,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Initialize best-of settings
         self.d_setBestOf()
         self.d_setRoundInfo()
+        # Initialize elemental mode setting
+        self.d_setElementalMode()
 
     def setupRuleset(self):
 
@@ -860,6 +867,120 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             roundWinsList.append(self.roundWins.get(avId, 0))
         self.sendUpdate('setRoundInfo', [self.currentRound, roundWinsList])
 
+    def setElementalMode(self, enabled):
+        """Handle elemental mode setting from the leader"""
+        # Verify the sender is the leader (first player in avIdList)
+        senderId = self.air.getAvatarIdFromSender()
+        if senderId != self.avIdList[0]:
+            self.notify.warning(f"Non-leader {senderId} tried to set elemental mode")
+            return
+            
+        self.elementalMode = enabled
+        self.d_setElementalMode()
+        self.notify.info(f"Elemental mode set to {'On' if enabled else 'Off'} by leader {senderId}")
+
+    def d_setElementalMode(self):
+        """Send elemental mode setting to all clients"""
+        self.sendUpdate('setElementalMode', [self.elementalMode])
+
+    def d_setSafeFireElemental(self, safeDoId, isFireElemental):
+        """Send fire elemental status update to all clients"""
+        self.sendUpdate('setSafeFireElemental', [safeDoId, isFireElemental])
+
+    def startElementalSystem(self):
+        """Start the elemental system if elemental mode is enabled"""
+        self.notify.info(f"startElementalSystem called - elementalMode: {self.elementalMode}")
+        if not self.elementalMode:
+            self.notify.info("Elemental mode is disabled, not starting elemental system")
+            return
+            
+        self.stopElementalSystem()  # Stop any existing task
+        self.elementalTaskName = self.uniqueName('elementalSystem')
+        taskMgr.doMethodLater(5.0, self.__elementalSystemTask, self.elementalTaskName)
+        self.notify.info(f"Elemental system started with task name: {self.elementalTaskName}")
+
+    def stopElementalSystem(self):
+        """Stop the elemental system"""
+        if self.elementalTaskName:
+            taskMgr.remove(self.elementalTaskName)
+            self.elementalTaskName = None
+        
+        # Clear all fire elemental safes and notify clients
+        for safeDoId in list(self.fireElementalSafes):
+            self.d_setSafeFireElemental(safeDoId, False)
+        self.fireElementalSafes.clear()
+        
+        self.notify.info("Elemental system stopped")
+
+    def __elementalSystemTask(self, task):
+        """Task that runs every 5 seconds to potentially assign fire elements to safes"""
+        self.notify.info(f"Elemental system task running - elementalMode: {self.elementalMode}")
+        if not self.elementalMode:
+            self.notify.info("Elemental mode disabled during task, stopping")
+            return task.done
+            
+        # Check all available safes for fire elemental chance
+        self.__checkAllSafesForFireElemental()
+        
+        # Schedule next check in 5 seconds
+        return task.again
+
+    def __checkAllSafesForFireElemental(self):
+        """Check all available safes for fire elemental assignment"""
+        self.notify.info(f"Checking all safes for fire elemental - total safes: {len(self.safes)}")
+        
+        # Get all safes that are available (not grabbed, not already fire elemental)
+        availableSafes = []
+        for safe in self.safes:
+            # Include more states: Initial, Free, Dropped, SlidingFloor, WaitFree
+            if (safe.doId not in self.fireElementalSafes and 
+                safe.state in ['Initial', 'Free', 'Dropped', 'SlidingFloor', 'WaitFree']):
+                availableSafes.append(safe)
+        
+        self.notify.info(f"Available safes for fire element: {len(availableSafes)}")
+        if not availableSafes:
+            self.notify.info("No available safes for fire element")
+            return
+        
+        # Check each safe individually for fire elemental chance
+        safesAssigned = 0
+        for safe in availableSafes:
+            # Each safe has a 50% chance to become fire elemental (adjust as needed)
+            roll = random.random()
+            if roll < 0.5:  # 50% chance per safe
+                self.__assignFireElementalToSafe(safe)
+                safesAssigned += 1
+        
+        self.notify.info(f"Assigned fire elemental to {safesAssigned} safes this cycle")
+
+    def __assignFireElementalToSafe(self, safe):
+        """Assign Fire element to a specific safe"""
+        self.fireElementalSafes.add(safe.doId)
+        
+        # Notify clients about the fire elemental status
+        self.d_setSafeFireElemental(safe.doId, True)
+        
+        # Schedule removal of fire element after 10 seconds
+        taskName = self.uniqueName(f'removeFireElement-{safe.doId}')
+        taskMgr.doMethodLater(10.0, self.__removeFireElement, taskName, extraArgs=[safe.doId])
+        
+        self.notify.info(f"Safe {safe.doId} became Fire elemental")
+
+    def __removeFireElement(self, safeDoId, task=None):
+        """Remove Fire element from a safe"""
+        if safeDoId in self.fireElementalSafes:
+            self.fireElementalSafes.remove(safeDoId)
+            
+            # Notify clients about the fire elemental status removal
+            self.d_setSafeFireElemental(safeDoId, False)
+            
+            self.notify.info(f"Safe {safeDoId} lost Fire elemental status")
+        return task.done if task else None
+
+    def isSafeFireElemental(self, safeDoId):
+        """Check if a safe is currently Fire elemental"""
+        return safeDoId in self.fireElementalSafes
+
     def nextRound(self):
         """Handle transition to next round in best-of matches"""
         if self.bestOfValue <= 1:
@@ -1172,6 +1293,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             taskMgr.remove(self.uniqueName('times-up-task'))
             self.d_updateTimer()
 
+        # Start elemental system if enabled
+        self.startElementalSystem()
+
     # Called when we actually run out of time, simply tell the clients we ran out of time then handle it later
     def __timesUp(self, task=None):
         taskMgr.remove(self.uniqueName('times-up-task'))
@@ -1292,6 +1416,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.currentlyInOvertime = False
         self.overtimeWillHappen = False
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
+
+        # Stop elemental system
+        self.stopElementalSystem()
 
         # Ignore death messages.
         self.ignoreToonDeaths()
