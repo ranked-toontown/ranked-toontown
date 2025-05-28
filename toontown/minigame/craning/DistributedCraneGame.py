@@ -36,6 +36,7 @@ from direct.gui.DirectScrolledList import DirectScrolledList
 from direct.gui.DirectLabel import DirectLabel
 from direct.gui.DirectButton import DirectButton
 from direct.showbase.ShowBaseGlobal import aspect2d
+from direct.task import Task
 
 
 class DistributedCraneGame(DistributedMinigame):
@@ -68,9 +69,13 @@ class DistributedCraneGame(DistributedMinigame):
         self.rulesPanelToggleButton = None
         self.playButton = None
         self.participantsButton = None
+        self.bestOfButton = None
         self.participantsPanel = None
         self.participantsList = None
         self.participantsPanelVisible = False
+        self.bestOfValue = 1  # Default to Best of 1
+        self.currentRound = 1
+        self.roundWins = {}  # Maps avId -> number of rounds won
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -568,6 +573,21 @@ class DistributedCraneGame(DistributedMinigame):
         )
         self.participantsButton.hide()  # Participants button starts hidden
         
+        # Create best of button next to participants button
+        self.bestOfButton = DirectButton(
+            relief=None,
+            text=f'Best of {self.bestOfValue}',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(0.45, 0, 0.85),
+            command=self.__handleBestOfButton
+        )
+        self.bestOfButton.hide()  # Best of button starts hidden
+        
         btnGeom.removeNode()
         
         # Initialize participants panel variables
@@ -843,6 +863,9 @@ class DistributedCraneGame(DistributedMinigame):
         if self.participantsButton is not None:
             self.participantsButton.destroy()
             self.participantsButton = None
+        if self.bestOfButton is not None:
+            self.bestOfButton.destroy()
+            self.bestOfButton = None
         if self.participantsPanel is not None:
             self.participantsPanel.destroy()
             self.participantsPanel = None
@@ -1000,12 +1023,27 @@ class DistributedCraneGame(DistributedMinigame):
 
         victor.setAnimState("victory")
 
-        taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        # Check if this is a multi-round match
+        if self.bestOfValue > 1:
+            # Check round wins
+            roundWins = self.roundWins.get(self.victor, 0)
+            winsNeeded = (self.bestOfValue + 1) // 2
+            if roundWins >= winsNeeded:
+                # Match is over - use normal victory flow
+                taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+            else:
+                # Round is over, but match continues - shorter victory time
+                taskMgr.doMethodLater(5, self.__nextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+        else:
+            # Single round match
+            taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        
         for crane in self.cranes.values():
             crane.stopFlicker()
 
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))
+        taskMgr.remove(self.uniqueName("craneGameNextRound"))
         camera.reparentTo(base.localAvatar)
 
     def enterCleanup(self):
@@ -1225,6 +1263,7 @@ class DistributedCraneGame(DistributedMinigame):
         if self.avIdList[0] == base.localAvatar.doId:
             self.playButton.show()
             self.participantsButton.show()
+            self.bestOfButton.show()
         else:
             # Non-leader players automatically trigger ready
             messenger.send(self.rulesDoneEvent)
@@ -1484,3 +1523,49 @@ class DistributedCraneGame(DistributedMinigame):
         # Update the participants panel if it's visible
         if self.participantsPanelVisible and self.participantsList is not None:
             self.__updateParticipantsList()
+
+    def __handleBestOfButton(self):
+        """Handle the "Best of" button click"""
+        # Cycle through Best of 1, 3, 5, 7
+        if self.bestOfValue == 1:
+            self.bestOfValue = 3
+        elif self.bestOfValue == 3:
+            self.bestOfValue = 5
+        elif self.bestOfValue == 5:
+            self.bestOfValue = 7
+        else:
+            self.bestOfValue = 1
+        
+        # Update button text
+        self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
+        
+        # Send update to server if we're the leader
+        if self.avIdList[0] == base.localAvatar.doId:
+            self.sendUpdate('setBestOf', [self.bestOfValue])
+
+    def setBestOf(self, value):
+        """Receive best-of setting from server"""
+        self.bestOfValue = value
+        if self.bestOfButton:
+            self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
+        self.notify.info(f"Best of value set to: {self.bestOfValue}")
+
+    def setRoundInfo(self, currentRound, roundWins):
+        """Receive round information from server"""
+        self.currentRound = currentRound
+        
+        # Convert roundWins list back to dict using avIdList
+        self.roundWins = {}
+        for i, avId in enumerate(self.avIdList):
+            if i < len(roundWins):
+                self.roundWins[avId] = roundWins[i]
+        
+        # Update scoreboard with round information
+        if self.scoreboard:
+            self.scoreboard.setRoundInfo(currentRound, roundWins, self.bestOfValue)
+
+    def __nextRound(self, task=None):
+        """Transition to the next round"""
+        # The server will handle the transition to the next round automatically
+        # We just need to clean up the victory state
+        return Task.done

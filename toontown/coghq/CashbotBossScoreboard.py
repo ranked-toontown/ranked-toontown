@@ -210,6 +210,7 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.place = place
         self.avId = avId
         self.points = 0
+        self.roundWins = 0  # Track round wins for this toon
         self.damage, self.stuns, self.stomps = 0, 0, 0
         self.frame = DirectFrame(parent=scoreboard_frame)
         self.toon_head = self.createToonHead(avId, scale=.125)
@@ -225,21 +226,29 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.toon_head.startBlink()
         self.points_text = OnscreenText(parent=self.frame, text=str(self.points), style=3, fg=WHITE,
                                         align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X, 0), font=ToontownGlobals.getCompetitionFont())
+        
+        # Add round wins text (positioned between Pts and expandable stats)
+        self.round_wins_text = OnscreenText(parent=self.frame, text=str(self.roundWins), style=3, fg=WHITE,
+                                           align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X + .15, 0), font=ToontownGlobals.getCompetitionFont())
+        
         self.combo_text = OnscreenText(parent=self.frame, text='x' + '0', style=3, fg=CYAN, align=TextNode.ACenter,
                                        scale=.055, pos=(self.FIRST_PLACE_HEAD_X + .1, +.055), font=ToontownGlobals.getCompetitionFont())
         self.sad_text = OnscreenText(parent=self.frame, text='SAD!', style=3, fg=RED, align=TextNode.ACenter,
                                      scale=.065, pos=(self.FIRST_PLACE_HEAD_X, 0), roll=-15, font=ToontownGlobals.getCompetitionFont())
 
-        self.extra_stats_text = OnscreenText(parent=self.frame, text='', style=3, fg=WHITE, align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X+.47, 0), font=ToontownGlobals.getCompetitionFont())
+        # Adjust extra stats position to make room for Wins column
+        self.extra_stats_text = OnscreenText(parent=self.frame, text='', style=3, fg=WHITE, align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X+.62, 0), font=ToontownGlobals.getCompetitionFont())
 
 
         self.combo_text.hide()
         self.sad_text.hide()
         if self.avId == base.localAvatar.doId:
             self.points_text['fg'] = GOLD
+            self.round_wins_text['fg'] = GOLD
             self.extra_stats_text['fg'] = GOLD
 
         self.extra_stats_text.hide()
+        # Round wins are always visible in best-of matches, will be hidden in single round matches
 
         self.sadSecondsLeft = -1
 
@@ -422,6 +431,11 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.stomps += 1
         self.updateExtraStatsLabel()
 
+    def updateRoundWins(self, wins):
+        """Update the round wins display for this toon"""
+        self.roundWins = wins
+        self.round_wins_text.setText(str(self.roundWins))
+
     def expand(self):
         self.updateExtraStatsLabel()
         self.extra_stats_text.show()
@@ -433,11 +447,13 @@ class CashbotBossScoreboardToonRow(DirectObject):
         if self.isBeingSpectated:
             self.stopSpectating()
         self.points = 0
+        self.roundWins = 0
         self.damage = 0
         self.stuns = 0
         self.stomps = 0
         self.updateExtraStatsLabel()
         self.points_text.setText('0')
+        self.round_wins_text.setText('0')
         self.combo_text.setText('COMBO x0')
         self.combo_text.hide()
         taskMgr.remove('sadtimer-' + str(self.avId))
@@ -457,6 +473,9 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.points_text.cleanup()
         self.points_text.removeNode()
         del self.points_text
+        self.round_wins_text.cleanup()
+        self.round_wins_text.removeNode()
+        del self.round_wins_text
         self.combo_text.cleanup()
         self.combo_text.removeNode()
         del self.combo_text
@@ -470,6 +489,10 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.extra_stats_text.cleanup()
         self.extra_stats_text.removeNode()
         del self.extra_stats_text
+        if hasattr(self, 'roundWinsText'):
+            self.roundWinsText.cleanup()
+            self.roundWinsText.removeNode()
+            del self.roundWinsText
         del self.ruleset
         self.frame.destroy()
         self.frame.removeNode()
@@ -479,11 +502,13 @@ class CashbotBossScoreboardToonRow(DirectObject):
 
     def show(self):
         self.points_text.show()
+        self.round_wins_text.show()
         self.toon_head.show()
 
     def hide(self):
         self.extra_stats_text.hide()
         self.points_text.hide()
+        self.round_wins_text.hide()
         self.toon_head.hide()
         self.combo_text.hide()
         self.sad_text.hide()
@@ -532,10 +557,46 @@ class CashbotBossScoreboard(DirectObject):
         self.expand_tip = OnscreenText(parent=self.frame, text="Press F1 to show more stats", style=3, fg=WHITE, align=TextNode.ACenter, scale=.05, pos=(0.22, 0.1), font=ToontownGlobals.getCompetitionFont())
         self.expand_tip.hide()
 
+        # Round tracking
+        self.currentRound = 1
+        self.bestOfValue = 1
+        self.roundWins = {}
+        self.roundInfoText = OnscreenText(parent=self.frame, text="", style=3, fg=WHITE, align=TextNode.ACenter, scale=.06, pos=(0.22, 0.65), font=ToontownGlobals.getCompetitionFont())
+        self.roundInfoText.hide()
+
     def set_ruleset(self, ruleset):
         self.ruleset = ruleset
         for r in list(self.rows.values()):
             r.ruleset = ruleset
+
+    def setRoundInfo(self, currentRound, roundWins, bestOfValue):
+        """Update round information display"""
+        self.currentRound = currentRound
+        self.bestOfValue = bestOfValue
+        
+        # Convert roundWins list back to dict
+        self.roundWins = {}
+        for i, avId in enumerate(self.getToons()):
+            if i < len(roundWins):
+                self.roundWins[avId] = roundWins[i]
+        
+        # Update display
+        if self.bestOfValue > 1:
+            winsNeeded = (self.bestOfValue + 1) // 2
+            roundText = f"Round {self.currentRound} (Best of {self.bestOfValue} - {winsNeeded} wins needed)"
+            self.roundInfoText['text'] = roundText
+            self.roundInfoText.show()
+            
+            # Update individual row displays with round wins using the new method
+            for avId, row in self.rows.items():
+                wins = self.roundWins.get(avId, 0)
+                row.updateRoundWins(wins)
+                row.round_wins_text.show()  # Make sure Wins column is visible
+        else:
+            self.roundInfoText.hide()
+            # Hide round wins displays for single round matches
+            for row in self.rows.values():
+                row.round_wins_text.hide()
 
     def _consider_expand(self):
 
@@ -546,19 +607,26 @@ class CashbotBossScoreboard(DirectObject):
 
     def expand(self):
         self.is_expanded = True
-        self.default_row.setText('%-10s %-9s %-7s %-7s %-8s\0' % ('Toon', 'Pts', 'Dmg', 'Stuns', 'Stomps'))
+        self.default_row.setText('%-10s %-9s %-6s %-7s %-7s %-8s\0' % ('Toon', 'Pts', 'Wins', 'Dmg', 'Stuns', 'Stomps'))
         for r in list(self.rows.values()):
             r.expand()
 
     def collapse(self):
         self.is_expanded = False
-        self.default_row.setText('%-10s %-7s\0' % ('Toon', 'Pts'))
+        self.default_row.setText('%-10s %-7s %-6s\0' % ('Toon', 'Pts', 'Wins'))
         for r in list(self.rows.values()):
             r.collapse()
 
     def addToon(self, avId):
         if avId not in self.rows and avId in base.cr.doId2do:
             self.rows[avId] = CashbotBossScoreboardToonRow(self.frame, avId, len(self.rows), ruleset=self.ruleset)
+            
+            # Set initial visibility of Wins column based on current best-of setting
+            if self.bestOfValue > 1:
+                self.rows[avId].round_wins_text.show()
+            else:
+                self.rows[avId].round_wins_text.hide()
+                
         self.show()
 
     def clearToons(self):
@@ -600,6 +668,9 @@ class CashbotBossScoreboard(DirectObject):
         del self.default_row
         self.default_row_path.removeNode()
         del self.default_row_path
+        self.roundInfoText.cleanup()
+        self.roundInfoText.removeNode()
+        del self.roundInfoText
         self.frame.destroy()
         self.frame.removeNode()
         del self.frame

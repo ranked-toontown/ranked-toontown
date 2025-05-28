@@ -1891,8 +1891,8 @@ class HitCFO(MagicWord):
 
 
 class EndCFO(MagicWord):
-    aliases = ['end', 'finish']
-    desc = "Ends the C.F.O."
+    aliases = ['end', 'finish', 'forfeit', 'ff']
+    desc = "Ends the C.F.O. and forfeits, putting you in last place."
     execLocation = MagicWordConfig.EXEC_LOC_SERVER
     accessLevel = 'USER'
 
@@ -1902,8 +1902,29 @@ class EndCFO(MagicWord):
         if craneGame is None:
             return "You aren't in a crane round!"
 
+        # Forfeit: Set the invoker's score to ensure they come in last place
+        if invoker.doId in craneGame.scoreDict:
+            # Get the current score before modifying it
+            currentScore = craneGame.scoreDict[invoker.doId]
+            
+            # Find the lowest score among all players
+            lowestScore = min(craneGame.scoreDict.values()) if craneGame.scoreDict else 0
+            
+            # Set invoker's score to be lower than the lowest score
+            forfeitScore = lowestScore - 100
+            
+            # Calculate the score difference and update the scoreboard
+            scoreDifference = forfeitScore - currentScore
+            craneGame.scoreDict[invoker.doId] = forfeitScore
+            craneGame.d_addScore(invoker.doId, scoreDifference)
+        else:
+            # Player not in scoreDict yet, just set them to a very low score
+            forfeitScore = -100
+            craneGame.scoreDict[invoker.doId] = forfeitScore
+            craneGame.d_addScore(invoker.doId, forfeitScore)
+
         craneGame.gameFSM.request('victory')
-        return "Ending Crane Round"
+        return f"Forfeiting crane round - {toon.getName()} will be placed in last place."
 
 
 class RestartCraneRound(MagicWord):

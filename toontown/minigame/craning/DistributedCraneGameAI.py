@@ -55,6 +55,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.customSpawnPositions = {}
         self.customSpawnOrderSet = False  # Track if spawn order has been manually set by leader
+        self.bestOfValue = 1  # Default to Best of 1
+        self.currentRound = 1
+        self.roundWins = {}  # Maps avId -> number of rounds won
+        self.originalSpawnOrder = []  # Store original spawn order for rotation
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
@@ -168,6 +172,14 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.setupSpawnpoints()
         # Reset custom spawn order flag for new games (not restarts)
         self.resetCustomSpawnOrder()
+        # Reset round information for new games
+        self.currentRound = 1
+        self.roundWins = {}
+        self.originalSpawnOrder = []
+        self._inMultiRoundMatch = False
+        # Initialize best-of settings
+        self.d_setBestOf()
+        self.d_setRoundInfo()
 
     def setupRuleset(self):
 
@@ -819,6 +831,93 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.d_setToonSpawnpointOrder()
         self.notify.info(f"Spawn order updated by leader {senderId}: {self.toonSpawnpointOrder}")
 
+    def setBestOf(self, value):
+        """Handle best-of setting from the leader"""
+        # Verify the sender is the leader (first player in avIdList)
+        senderId = self.air.getAvatarIdFromSender()
+        if senderId != self.avIdList[0]:
+            self.notify.warning(f"Non-leader {senderId} tried to set best-of value")
+            return
+            
+        # Validate the value
+        if value not in [1, 3, 5, 7]:
+            self.notify.warning(f"Invalid best-of value from {senderId}: {value}")
+            return
+            
+        self.bestOfValue = value
+        self.d_setBestOf()
+        self.notify.info(f"Best-of value set to {value} by leader {senderId}")
+
+    def d_setBestOf(self):
+        """Send best-of value to all clients"""
+        self.sendUpdate('setBestOf', [self.bestOfValue])
+
+    def d_setRoundInfo(self):
+        """Send round information to all clients"""
+        # Convert roundWins dict to list format for transmission
+        roundWinsList = []
+        for avId in self.avIdList:
+            roundWinsList.append(self.roundWins.get(avId, 0))
+        self.sendUpdate('setRoundInfo', [self.currentRound, roundWinsList])
+
+    def nextRound(self):
+        """Handle transition to next round in best-of matches"""
+        if self.bestOfValue <= 1:
+            return  # Not a best-of match
+        
+        self.currentRound += 1
+        self._inMultiRoundMatch = True  # Flag to indicate we're in a multi-round match
+        
+        # Start the next round after a brief delay
+        taskMgr.doMethodLater(0.5, self.__startNextRound, self.uniqueName("startNextRound"))
+
+    def __startNextRound(self, task=None):
+        """Start the next round in a best-of match"""
+        # Reset scores for the new round
+        for avId in self.scoreDict:
+            self.scoreDict[avId] = 0
+        
+        # Rotate spawn positions for variety
+        self.__rotateSpawnPositions()
+        
+        # Use proper FSM transitions like the RestartCraneRound magic word
+        self.gameFSM.request("cleanup")
+        self.gameFSM.request('prepare')
+        
+        # Send round info to clients immediately after restart
+        self.d_setRoundInfo()
+
+    def __rotateSpawnPositions(self):
+        """Rotate spawn positions for the next round"""
+        # Get participating toons (not spectating)
+        participatingToons = self.getParticipantIdsNotSpectating()
+        numParticipants = len(participatingToons)
+        
+        if numParticipants <= 1:
+            return  # No rotation needed for single player
+        
+        # Store the original spawn positions if this is the first rotation
+        if not hasattr(self, 'originalSpawnOrder') or not self.originalSpawnOrder:
+            self.originalSpawnOrder = self.toonSpawnpointOrder[:numParticipants]
+        
+        # Get the current spawn positions for participating players
+        currentPositions = self.toonSpawnpointOrder[:numParticipants]
+        
+        # Rotate positions: each player moves to the next position
+        # Player at position 0 -> position 1, position 1 -> position 2, etc.
+        # Last player wraps around to position 0
+        rotatedPositions = [currentPositions[(i + 1) % numParticipants] for i in range(numParticipants)]
+        
+        # Update the spawn order with rotated positions
+        for i in range(numParticipants):
+            self.toonSpawnpointOrder[i] = rotatedPositions[i]
+        
+        # Mark spawn order as customized so setupSpawnpoints() doesn't override it
+        self.customSpawnOrderSet = True
+        
+        self.d_setToonSpawnpointOrder()
+        self.notify.info(f"Rotated spawn positions for round {self.currentRound}: {self.toonSpawnpointOrder[:numParticipants]}")
+
     def getRawRuleset(self):
         return self.ruleset.asStruct()
 
@@ -988,8 +1087,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def enterPrepare(self):
         self.notify.debug("enterPrepare")
-
-        # Start up the big boy.
         if not self.__bossExists():
             self.__makeBoss()
         self.boss.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
@@ -997,6 +1094,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.__resetCraningObjects()
         self.setupRuleset()
         self.setupSpawnpoints()
+
+        # Send round info to clients if this is a best-of match
+        if self.bestOfValue > 1:
+            self.d_setRoundInfo()
 
         # Calculate how long we should wait to actually start the game.
         # If more than 1 player is present, we want to have a delay present for a cutscene to play.
@@ -1231,11 +1332,33 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def enterVictory(self):
         victorId = max(self.scoreDict.items(), key=itemgetter(1))[0]
-        self.sendUpdate("declareVictor", [victorId])
-        taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        
+        # Handle best-of matches
+        if self.bestOfValue > 1:
+            # Track round wins
+            self.roundWins[victorId] = self.roundWins.get(victorId, 0) + 1
+            winsNeeded = (self.bestOfValue + 1) // 2
+            
+            # Send round info to clients
+            self.d_setRoundInfo()
+            
+            # Check if match is complete
+            if self.roundWins[victorId] >= winsNeeded:
+                # Match is complete
+                self.sendUpdate("declareVictor", [victorId])
+                taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+            else:
+                # Round is complete, but match continues
+                self.sendUpdate("declareVictor", [victorId])
+                taskMgr.doMethodLater(3, self.__startNextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+        else:
+            # Single round match
+            self.sendUpdate("declareVictor", [victorId])
+            taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
 
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))
+        taskMgr.remove(self.uniqueName("craneGameNextRound"))
 
     def enterCleanup(self):
         self.notify.debug("enterCleanup")
