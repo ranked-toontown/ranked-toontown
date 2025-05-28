@@ -101,42 +101,127 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 # Apply elemental effects if this safe has any elemental status
                 elementType = self.boss.getSafeElementType(self.doId)
                 if elementType != 0:  # ElementType.NONE = 0
-                    # Apply elemental DoT effect based on element type
-                    self.boss.applyElementalDoT(avId, elementType, damage)
-                    
-                    elementName = {1: 'Fire'}.get(elementType, f'Element{elementType}')  # ElementType.FIRE = 1
-                    self.boss.notify.info(f"{elementName} elemental safe {self.doId} applied DoT effect!")
+                    # Check for VOLT re-stun ability
+                    if elementType == 2:  # ElementType.VOLT = 2
+                        # VOLT safes can re-stun (extend stun time) even when CFO is already stunned
+                        self.__performVoltReStun(impact, craneId, avId, damage)
+                        return  # Exit early, re-stun handles everything
+                    elif elementType != 2:  # Only apply DoT for non-VOLT elements
+                        # Apply elemental DoT effect based on element type
+                        self.boss.applyElementalDoT(avId, elementType, damage)
+                        
+                        elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
+                        self.boss.notify.info(f"{elementName} elemental safe {self.doId} applied DoT effect!")
                 
                 damage = math.ceil(damage)
                 
                 self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
             else:
-                # If he's not dizzy, he grabs the safe and makes a
-                # helmet out of it only if he is allowed to safe helmet.
-                if self.boss.ruleset.DISABLE_SAFE_HELMETS:
-                    return
+                # Check if this is a VOLT elemental safe
+                elementType = self.boss.getSafeElementType(self.doId)
+                isVoltSafe = (elementType == 2)  # ElementType.VOLT = 2
+                
+                if isVoltSafe:
+                    # VOLT safes stun the CFO instead of creating helmets
+                    self.__performVoltStun(impact, craneId, avId)
+                else:
+                    # Regular safe behavior: Create helmet if allowed
+                    # If he's not dizzy, he grabs the safe and makes a
+                    # helmet out of it only if he is allowed to safe helmet.
+                    if self.boss.ruleset.DISABLE_SAFE_HELMETS:
+                        return
 
-                # Is there a cooldown for this toon on intentionally giving the boss a safe helmet?
-                if not self.boss.getBoss().allowedToSafeHelmet(avId):
-                    return
+                    # Is there a cooldown for this toon on intentionally giving the boss a safe helmet?
+                    if not self.boss.getBoss().allowedToSafeHelmet(avId):
+                        return
 
-                self.demand('Grabbed', self.boss.getBoss().doId, self.boss.getBoss().doId)
-                self.boss.getBoss().heldObject = self
+                    self.demand('Grabbed', self.boss.getBoss().doId, self.boss.getBoss().doId)
+                    self.boss.getBoss().heldObject = self
 
-                self.boss.addScore(avId, self.boss.ruleset.POINTS_PENALTY_SAFEHEAD, reason=CraneLeagueGlobals.ScoreReason.APPLIED_HELMET)
+                    self.boss.addScore(avId, self.boss.ruleset.POINTS_PENALTY_SAFEHEAD, reason=CraneLeagueGlobals.ScoreReason.APPLIED_HELMET)
 
-                # Don't allow this toon to safe helmet again for some period of time.
-                self.boss.getBoss().addSafeHelmetCooldown(avId)
+                    # Don't allow this toon to safe helmet again for some period of time.
+                    self.boss.getBoss().addSafeHelmetCooldown(avId)
                 
         elif impact >= ToontownGlobals.CashbotBossSafeKnockImpact:
-            self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE,reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
+            # Check if this is a VOLT elemental safe
+            elementType = self.boss.getSafeElementType(self.doId)
+            isVoltSafe = (elementType == 2)  # ElementType.VOLT = 2
+            
+            self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE, reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
             boss = self.boss.getBoss()
             boss.heldObject.demand('Dropped', avId, self.boss.doId)
             boss.heldObject.avoidHelmet = 1
             boss.heldObject = None
             self.avoidHelmet = 1
             boss.waitForNextHelmet()
+            
+            if isVoltSafe:
+                # VOLT safes also stun the CFO after knocking off helmet
+                self.__performVoltStun(impact, craneId, avId, afterHelmetKnockoff=True)
         return
+
+    def __performVoltStun(self, impact, craneId, avId, afterHelmetKnockoff=False):
+        """Perform VOLT elemental stunning effect on the CFO"""
+        crane = simbase.air.doId2do.get(craneId)
+        if not crane:
+            return
+            
+        # Calculate damage for VOLT stun - make it competitive with regular safe damage
+        # Regular safes do impact * 50 when CFO is stunned
+        # VOLT safes should do similar or better damage since they provide stunning utility
+        damage = int(impact * 50 * 0.75)  # Slightly less than regular safe but still substantial
+        damage *= crane.getDamageMultiplier()
+        damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
+        damage = math.ceil(max(damage, 2))
+        
+        # Force the CFO to be stunnable by VOLT regardless of normal stun requirements
+        boss = self.boss.getBoss()
+        
+        if afterHelmetKnockoff:
+            self.boss.notify.info(f"VOLT safe {self.doId} stunned CFO after helmet knockoff!")
+            # Give bonus points for the extra stun after helmet knockoff
+            self.boss.addScore(avId, self.boss.ruleset.POINTS_STUN, reason=CraneLeagueGlobals.ScoreReason.STUN)
+        else:
+            self.boss.notify.info(f"VOLT safe {self.doId} stunned CFO instead of creating helmet!")
+            # Give stun points instead of helmet penalty
+            self.boss.addScore(avId, self.boss.ruleset.POINTS_STUN, reason=CraneLeagueGlobals.ScoreReason.STUN)
+        
+        # Apply the stun effect - force boss to be dizzy
+        delayTime = self.boss.progressValue(6, 3)  # Same delay as normal stuns
+        
+        # Reset helmet cooldowns like goons do when they stun the CFO
+        boss.stopHelmets()
+        
+        boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=delayTime)
+        
+        # Apply the damage from the VOLT stun
+        self.boss.recordHit(damage, impact, craneId, objId=self.doId)
+
+    def __performVoltReStun(self, impact, craneId, avId, damage):
+        """Perform VOLT re-stun effect on the CFO when already stunned"""
+        crane = simbase.air.doId2do.get(craneId)
+        if not crane:
+            return
+            
+        boss = self.boss.getBoss()
+        
+        # Calculate the extension time: half of normal stun duration, minimum 3 seconds
+        extensionTime = self.boss.progressValue(6, 3)  # Half duration, minimum 3 seconds
+        
+        # Extend the current stun by the extension time
+        boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=extensionTime)
+        
+        # Reset helmet cooldowns like goons do when they stun the CFO
+        boss.stopHelmets()
+        
+        # Give points for the re-stun
+        self.boss.addScore(avId, self.boss.ruleset.POINTS_STUN, reason=CraneLeagueGlobals.ScoreReason.STUN)
+        
+        # Apply the damage from the VOLT re-stun (use original damage calculation)
+        self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
+        
+        self.boss.notify.info(f"VOLT safe {self.doId} re-stunned CFO! Extended stun by {extensionTime:.1f} seconds")
 
     def requestInitial(self):
         # The client controlling the safe dropped it through the

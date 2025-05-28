@@ -43,10 +43,10 @@ from direct.task import Task
 class ElementType:
     NONE = 0
     FIRE = 1
+    VOLT = 2
     # Future elements can be added here:
-    # ICE = 2
-    # POISON = 3
-    # LIGHTNING = 4
+    # ICE = 3
+    # POISON = 4
 
 
 class DistributedCraneGame(DistributedMinigame):
@@ -1607,7 +1607,13 @@ class DistributedCraneGame(DistributedMinigame):
         elementProperties = {
             ElementType.FIRE: {
                 'text': 'FIRE',
-                'color': (1, 0.3, 0, 1),  # Orange-red
+                'color': (1.0, 0.4, 0.0, 1.0),  # Orange-red
+                'scale': 1.5,
+                'height': 10
+            },
+            ElementType.VOLT: {
+                'text': 'VOLT',
+                'color': (1.0, 0.98, 0.0, 1.0),  # Electric yellow
                 'scale': 1.5,
                 'height': 10
             },
