@@ -63,7 +63,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMaxScale = 2.4
 
         # Elemental mode system
-        self.elementalMode = False  # Default to vanilla mode
         self.fireElementalSafes = set()  # Set of safe doIds that are currently Fire elemental
         self.elementalTaskName = None  # Task name for elemental system
 
@@ -867,21 +866,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             roundWinsList.append(self.roundWins.get(avId, 0))
         self.sendUpdate('setRoundInfo', [self.currentRound, roundWinsList])
 
-    def setElementalMode(self, enabled):
-        """Handle elemental mode setting from the leader"""
-        # Verify the sender is the leader (first player in avIdList)
-        senderId = self.air.getAvatarIdFromSender()
-        if senderId != self.avIdList[0]:
-            self.notify.warning(f"Non-leader {senderId} tried to set elemental mode")
-            return
-            
-        self.elementalMode = enabled
-        self.d_setElementalMode()
-        self.notify.info(f"Elemental mode set to {'On' if enabled else 'Off'} by leader {senderId}")
-
     def d_setElementalMode(self):
         """Send elemental mode setting to all clients"""
-        self.sendUpdate('setElementalMode', [self.elementalMode])
+        self.sendUpdate('setElementalMode', [self.ruleset.ELEMENTAL_MODE])
 
     def d_setSafeFireElemental(self, safeDoId, isFireElemental):
         """Send fire elemental status update to all clients"""
@@ -889,8 +876,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def startElementalSystem(self):
         """Start the elemental system if elemental mode is enabled"""
-        self.notify.info(f"startElementalSystem called - elementalMode: {self.elementalMode}")
-        if not self.elementalMode:
+        self.notify.info(f"startElementalSystem called - elementalMode: {self.ruleset.ELEMENTAL_MODE}")
+        if not self.ruleset.ELEMENTAL_MODE:
             self.notify.info("Elemental mode is disabled, not starting elemental system")
             return
             
@@ -914,8 +901,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __elementalSystemTask(self, task):
         """Task that runs every 5 seconds to potentially assign fire elements to safes"""
-        self.notify.info(f"Elemental system task running - elementalMode: {self.elementalMode}")
-        if not self.elementalMode:
+        self.notify.info(f"Elemental system task running - elementalMode: {self.ruleset.ELEMENTAL_MODE}")
+        if not self.ruleset.ELEMENTAL_MODE:
             self.notify.info("Elemental mode disabled during task, stopping")
             return task.done
             
