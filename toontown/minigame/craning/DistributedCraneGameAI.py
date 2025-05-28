@@ -24,6 +24,16 @@ from toontown.toon.DistributedToonAI import DistributedToonAI
 from toontown.toonbase import ToontownGlobals
 
 
+# Element type constants for expandable elemental system
+class ElementType:
+    NONE = 0
+    FIRE = 1
+    # Future elements can be added here:
+    # ICE = 2
+    # POISON = 3
+    # LIGHTNING = 4
+
+
 class DistributedCraneGameAI(DistributedMinigameAI):
     DESPERATION_MODE_ACTIVATE_THRESHOLD = 1800
 
@@ -62,10 +72,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
-        # Elemental mode system
-        self.fireElementalSafes = set()  # Set of safe doIds that are currently Fire elemental
+        # Elemental mode system - refactored for multiple element types
+        self.elementalSafes = {}  # Maps safe doId -> ElementType for tracking active elementals
         self.elementalTaskName = None  # Task name for elemental system
-        self.fireDoTTasks = {}  # Maps unique DoT ID -> task info for tracking active DoTs
+        self.elementalDoTTasks = {}  # Maps unique DoT ID -> task info for tracking active DoTs
         self.nextDoTId = 0  # Counter for unique DoT IDs
 
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
@@ -872,9 +882,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         """Send elemental mode setting to all clients"""
         self.sendUpdate('setElementalMode', [self.ruleset.ELEMENTAL_MODE])
 
-    def d_setSafeFireElemental(self, safeDoId, isFireElemental):
-        """Send fire elemental status update to all clients"""
-        self.sendUpdate('setSafeFireElemental', [safeDoId, isFireElemental])
+    def d_setSafeElemental(self, safeDoId, elementType):
+        """Send elemental status update to all clients"""
+        self.sendUpdate('setSafeElemental', [safeDoId, elementType])
 
     def startElementalSystem(self):
         """Start the elemental system if elemental mode is enabled"""
@@ -894,10 +904,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             taskMgr.remove(self.elementalTaskName)
             self.elementalTaskName = None
         
-        # Clear all fire elemental safes and notify clients
-        for safeDoId in list(self.fireElementalSafes):
-            self.d_setSafeFireElemental(safeDoId, False)
-        self.fireElementalSafes.clear()
+        # Clear all elemental safes and notify clients
+        for safeDoId in list(self.elementalSafes):
+            self.d_setSafeElemental(safeDoId, ElementType.NONE)
+        self.elementalSafes.clear()
         
         self.notify.info("Elemental system stopped")
 
@@ -922,7 +932,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         availableSafes = []
         for safe in self.safes:
             # Include more states: Initial, Free, Dropped, SlidingFloor, WaitFree
-            if (safe.doId not in self.fireElementalSafes and 
+            if (safe.doId not in self.elementalSafes and 
                 safe.state in ['Initial', 'Free', 'Dropped', 'SlidingFloor', 'WaitFree']):
                 availableSafes.append(safe)
         
@@ -944,10 +954,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __assignFireElementalToSafe(self, safe):
         """Assign Fire element to a specific safe"""
-        self.fireElementalSafes.add(safe.doId)
+        self.elementalSafes[safe.doId] = ElementType.FIRE
         
-        # Notify clients about the fire elemental status
-        self.d_setSafeFireElemental(safe.doId, True)
+        # Notify clients about the elemental status
+        self.d_setSafeElemental(safe.doId, ElementType.FIRE)
         
         # Schedule removal of fire element after 10 seconds
         taskName = self.uniqueName(f'removeFireElement-{safe.doId}')
@@ -957,18 +967,28 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __removeFireElement(self, safeDoId, task=None):
         """Remove Fire element from a safe"""
-        if safeDoId in self.fireElementalSafes:
-            self.fireElementalSafes.remove(safeDoId)
+        if safeDoId in self.elementalSafes:
+            del self.elementalSafes[safeDoId]
             
-            # Notify clients about the fire elemental status removal
-            self.d_setSafeFireElemental(safeDoId, False)
+            # Notify clients about the elemental status removal
+            self.d_setSafeElemental(safeDoId, ElementType.NONE)
             
             self.notify.info(f"Safe {safeDoId} lost Fire elemental status")
         return task.done if task else None
 
     def isSafeFireElemental(self, safeDoId):
-        """Check if a safe is currently Fire elemental"""
-        return safeDoId in self.fireElementalSafes
+        """Check if a safe is currently Fire elemental - legacy method for compatibility"""
+        return self.isSafeElemental(safeDoId, ElementType.FIRE)
+
+    def getSafeElementType(self, safeDoId):
+        """Get the element type of a safe"""
+        return self.elementalSafes.get(safeDoId, ElementType.NONE)
+
+    def isSafeElemental(self, safeDoId, elementType=None):
+        """Check if a safe has any elemental effect, or a specific element type"""
+        if elementType is None:
+            return safeDoId in self.elementalSafes
+        return self.elementalSafes.get(safeDoId) == elementType
 
     def nextRound(self):
         """Handle transition to next round in best-of matches"""
@@ -1410,7 +1430,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.stopElementalSystem()
 
         # Clean up all active fire DoTs
-        self.__cleanupAllFireDoTs()
+        self.__cleanupAllElementalDoTs()
 
         # Ignore death messages.
         self.ignoreToonDeaths()
@@ -1507,8 +1527,39 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Broadcast the spot status change to all clients
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
 
-    def applyFireDoT(self, avId, dotDamage, ticks):
-        """Apply a fire damage-over-time effect to the CFO"""
+    def applyElementalDoT(self, avId, elementType, baseDamage):
+        """Apply an elemental damage-over-time effect to the CFO based on element type"""
+        # Define element-specific DoT properties
+        elementProperties = {
+            ElementType.FIRE: {
+                'damagePerTick': int(baseDamage * 0.1),  # 10% of original damage per tick
+                'ticks': 5,                              # 5 ticks total
+                'tickInterval': 1.0,                     # 1 second between ticks
+                'startDelay': 1.0                        # 1 second delay before starting
+            },
+            # Future elements can have different properties:
+            # ElementType.ICE: {
+            #     'damagePerTick': int(baseDamage * 0.05),  # 5% per tick but more ticks
+            #     'ticks': 8,                               # 8 ticks total
+            #     'tickInterval': 0.75,                     # Faster ticks
+            #     'startDelay': 0.5                         # Faster start
+            # },
+            # ElementType.POISON: {
+            #     'damagePerTick': int(baseDamage * 0.08),  # 8% per tick
+            #     'ticks': 6,                               # 6 ticks total
+            #     'tickInterval': 1.5,                      # Slower ticks
+            #     'startDelay': 2.0                         # Longer delay
+            # }
+        }
+        
+        if elementType not in elementProperties:
+            self.notify.warning(f"Unknown element type for DoT: {elementType}")
+            return
+            
+        props = elementProperties[elementType]
+        dotDamage = props['damagePerTick']
+        ticks = props['ticks']
+        
         if dotDamage <= 0 or ticks <= 0:
             return
             
@@ -1518,48 +1569,60 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Store DoT information
         dotInfo = {
             'avId': avId,
+            'elementType': elementType,
             'damage': dotDamage,
             'remainingTicks': ticks,
-            'originalTicks': ticks
+            'originalTicks': ticks,
+            'tickInterval': props['tickInterval']
         }
         
-        self.fireDoTTasks[dotId] = dotInfo
+        self.elementalDoTTasks[dotId] = dotInfo
         
-        # Start the DoT ticking after a 1-second delay
-        taskName = self.uniqueName(f'fireDoTTick-{dotId}')
-        taskMgr.doMethodLater(1.0, self.__doFireDoTTick, taskName, extraArgs=[dotId])
+        # Start the DoT ticking after the element-specific delay
+        taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
+        taskMgr.doMethodLater(props['startDelay'], self.__doElementalDoTTick, taskName, extraArgs=[dotId])
         
-        self.notify.info(f"Applied Fire DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks (starting in 1 second)")
+        elementName = {ElementType.FIRE: 'Fire'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"Applied {elementName} DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks")
 
-    def __doFireDoTTick(self, dotId):
-        """Execute one tick of fire DoT damage"""
-        dotInfo = self.fireDoTTasks.get(dotId)
+    def applyFireDoT(self, avId, dotDamage, ticks):
+        """Apply a fire damage-over-time effect to the CFO - legacy method for compatibility"""
+        # Calculate base damage from the old parameters
+        baseDamage = dotDamage * 10  # Reverse the 10% calculation
+        self.applyElementalDoT(avId, ElementType.FIRE, baseDamage)
+
+    def __doElementalDoTTick(self, dotId):
+        """Execute one tick of elemental DoT damage"""
+        dotInfo = self.elementalDoTTasks.get(dotId)
         if not dotInfo:
             return  # DoT was cleaned up
             
         # Apply the DoT damage (without flinching)
         damage = dotInfo['damage']
         avId = dotInfo['avId']
+        elementType = dotInfo['elementType']
         
         # Record the DoT damage without causing flinch or combo increment
-        self.__recordDoTHit(damage, avId, dotId)
+        self.__recordElementalDoTHit(damage, avId, elementType, dotId)
         
         # Decrement remaining ticks
         dotInfo['remainingTicks'] -= 1
         
-        self.notify.info(f"Fire DoT {dotId} tick: {damage} damage, {dotInfo['remainingTicks']} ticks remaining")
+        elementName = {ElementType.FIRE: 'Fire'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"{elementName} DoT {dotId} tick: {damage} damage, {dotInfo['remainingTicks']} ticks remaining")
         
         # Schedule next tick or cleanup
         if dotInfo['remainingTicks'] > 0:
-            # Schedule next tick in 1 second
-            taskName = self.uniqueName(f'fireDoTTick-{dotId}')
-            taskMgr.doMethodLater(1.0, self.__doFireDoTTick, taskName, extraArgs=[dotId])
+            # Schedule next tick using element-specific interval
+            taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
+            tickInterval = dotInfo['tickInterval']
+            taskMgr.doMethodLater(tickInterval, self.__doElementalDoTTick, taskName, extraArgs=[dotId])
         else:
             # DoT is finished, clean up
-            self.__cleanupFireDoT(dotId)
+            self.__cleanupElementalDoT(dotId)
 
-    def __recordDoTHit(self, damage, avId, dotId):
-        """Record a DoT hit without causing flinch effects or combo increment"""
+    def __recordElementalDoTHit(self, damage, avId, elementType, dotId):
+        """Record an elemental DoT hit without causing flinch effects or combo increment"""
         # Don't process a hit if we aren't in the play state
         if self.gameFSM.getCurrentState().getName() != 'play':
             return
@@ -1582,20 +1645,21 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.toonsWon = True
             self.gameFSM.request('victory')
             
-        self.notify.info(f"DoT {dotId} dealt {damage} damage (no flinch, no combo)")
+        elementName = {ElementType.FIRE: 'Fire'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"{elementName} DoT {dotId} dealt {damage} damage (no flinch, no combo)")
 
-    def __cleanupFireDoT(self, dotId):
-        """Clean up a finished DoT effect"""
-        if dotId in self.fireDoTTasks:
-            del self.fireDoTTasks[dotId]
+    def __cleanupElementalDoT(self, dotId):
+        """Clean up a finished elemental DoT effect"""
+        if dotId in self.elementalDoTTasks:
+            del self.elementalDoTTasks[dotId]
             
         # Remove any pending task
-        taskName = self.uniqueName(f'fireDoTTick-{dotId}')
+        taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
         taskMgr.remove(taskName)
         
-        self.notify.info(f"Cleaned up Fire DoT {dotId}")
+        self.notify.info(f"Cleaned up elemental DoT {dotId}")
 
-    def __cleanupAllFireDoTs(self):
-        """Clean up all active fire DoT effects"""
-        for dotId in list(self.fireDoTTasks.keys()):
-            self.__cleanupFireDoT(dotId)
+    def __cleanupAllElementalDoTs(self):
+        """Clean up all active elemental DoT effects"""
+        for dotId in list(self.elementalDoTTasks.keys()):
+            self.__cleanupElementalDoT(dotId)

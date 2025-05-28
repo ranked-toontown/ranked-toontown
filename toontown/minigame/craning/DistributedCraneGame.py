@@ -39,6 +39,16 @@ from direct.showbase.ShowBaseGlobal import aspect2d
 from direct.task import Task
 
 
+# Element type constants for expandable elemental system (client-side)
+class ElementType:
+    NONE = 0
+    FIRE = 1
+    # Future elements can be added here:
+    # ICE = 2
+    # POISON = 3
+    # LIGHTNING = 4
+
+
 class DistributedCraneGame(DistributedMinigame):
 
     # define constants that you won't want to tweak here
@@ -1576,16 +1586,53 @@ class DistributedCraneGame(DistributedMinigame):
         self.elementalMode = enabled
         self.notify.info(f"Elemental mode set to: {'On' if self.elementalMode else 'Off'}")
 
-    def setSafeFireElemental(self, safeDoId, isFireElemental):
-        """Handle fire elemental status updates from server"""
-        if isFireElemental:
-            self.__createFireElementalIndicator(safeDoId)
+    def setSafeElemental(self, safeDoId, elementType):
+        """Handle elemental status updates from server - generic method for all element types"""
+        if elementType == ElementType.NONE:
+            self.__removeElementalIndicator(safeDoId)
         else:
-            self.__removeFireElementalIndicator(safeDoId)
+            self.__createElementalIndicator(safeDoId, elementType)
 
     def __createFireElementalIndicator(self, safeDoId):
-        """Create a 'Fire' text indicator above a safe"""
-        # Find the safe object in the boss's safes dictionary
+        """Create a 'Fire' text indicator above a safe - legacy method for compatibility"""
+        self.__createElementalIndicator(safeDoId, ElementType.FIRE)
+
+    def __removeFireElementalIndicator(self, safeDoId):
+        """Remove the fire elemental indicator from a safe - legacy method for compatibility"""
+        self.__removeElementalIndicator(safeDoId)
+
+    def __createElementalIndicator(self, safeDoId, elementType):
+        """Create an elemental text indicator above a safe based on element type"""
+        # Define element-specific visual properties
+        elementProperties = {
+            ElementType.FIRE: {
+                'text': 'FIRE',
+                'color': (1, 0.3, 0, 1),  # Orange-red
+                'scale': 1.5,
+                'height': 10
+            },
+            # Future elements can have different visual styles:
+            # ElementType.ICE: {
+            #     'text': 'Ice',
+            #     'color': (0.3, 0.7, 1, 1),  # Light blue
+            #     'scale': 1.4,
+            #     'height': 18
+            # },
+            # ElementType.POISON: {
+            #     'text': 'Poison',
+            #     'color': (0.5, 1, 0.2, 1),  # Bright green
+            #     'scale': 1.3,
+            #     'height': 22
+            # }
+        }
+        
+        if elementType not in elementProperties:
+            self.notify.warning(f"Unknown element type for indicator: {elementType}")
+            return
+            
+        props = elementProperties[elementType]
+        
+        # Find the safe object
         safe = None
         if self.boss and hasattr(self.boss, 'safes'):
             for safeIndex, safeObj in self.boss.safes.items():
@@ -1598,39 +1645,39 @@ class DistributedCraneGame(DistributedMinigame):
             safe = base.cr.doId2do.get(safeDoId)
         
         if not safe:
-            self.notify.warning(f"Could not find safe {safeDoId} for fire elemental indicator")
+            self.notify.warning(f"Could not find safe {safeDoId} for elemental indicator")
             return
         
         # Remove existing indicator if present
-        self.__removeFireElementalIndicator(safeDoId)
+        self.__removeElementalIndicator(safeDoId)
         
-        # Create fire text indicator using TextNode for proper 3D positioning
-        textNode = TextNode('fireElementalText')
-        textNode.setText('FIRE')
-        textNode.setFont(ToontownGlobals.getInterfaceFont())
-        textNode.setTextColor(1, 0.2, 0, 1)  # Bright orange-red color
+        # Create elemental text indicator using TextNode for proper 3D positioning
+        textNode = TextNode(f'{props["text"].lower()}ElementalText')
+        textNode.setText(props['text'])
+        textNode.setTextColor(*props['color'])
+        textNode.setAlign(TextNode.ACenter)
         textNode.setShadow(0.05, 0.05)
         textNode.setShadowColor(0, 0, 0, 1)  # Black shadow
-        textNode.setAlign(TextNode.ACenter)
         
-        # Create NodePath from TextNode
-        fireText = safe.attachNewNode(textNode)
-        fireText.setScale(2.0)  # Large scale to be visible
-        fireText.setPos(0, 0, 10)  # Position above the safe
-        fireText.setBillboardPointEye()  # Make it always face the camera
+        # Create NodePath and set properties
+        elementalText = safe.attachNewNode(textNode)
+        elementalText.setScale(props['scale'])
+        elementalText.setPos(0, 0, props['height'])  # Position above the safe
+        elementalText.setBillboardPointEye()  # Always face the camera
         
-        # Store the indicator for later cleanup
-        self.fireElementalIndicators[safeDoId] = fireText
+        # Store the indicator (using the old dict for compatibility)
+        self.fireElementalIndicators[safeDoId] = elementalText
         
-        self.notify.info(f"Created fire elemental indicator for safe {safeDoId}")
+        elementName = props['text']
+        self.notify.info(f"Created {elementName} elemental indicator for safe {safeDoId}")
 
-    def __removeFireElementalIndicator(self, safeDoId):
-        """Remove the fire elemental indicator from a safe"""
+    def __removeElementalIndicator(self, safeDoId):
+        """Remove any elemental indicator from a safe"""
         if safeDoId in self.fireElementalIndicators:
             indicator = self.fireElementalIndicators[safeDoId]
             indicator.removeNode()
             del self.fireElementalIndicators[safeDoId]
-            self.notify.info(f"Removed fire elemental indicator for safe {safeDoId}")
+            self.notify.info(f"Removed elemental indicator for safe {safeDoId}")
 
     def __nextRound(self, task=None):
         """Transition to the next round"""
