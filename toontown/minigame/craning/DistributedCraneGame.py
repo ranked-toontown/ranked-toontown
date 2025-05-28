@@ -14,7 +14,7 @@ from direct.showbase.MessengerGlobal import messenger
 from direct.showbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
-    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube
+    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube, TextNode, Vec4
 from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator, PhysicsManager
 
 from libotp import CFSpeech
@@ -31,6 +31,11 @@ from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORAN
 from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
+from direct.gui.DirectGui import DGG, DirectFrame
+from direct.gui.DirectScrolledList import DirectScrolledList
+from direct.gui.DirectLabel import DirectLabel
+from direct.gui.DirectButton import DirectButton
+from direct.showbase.ShowBaseGlobal import aspect2d
 
 
 class DistributedCraneGame(DistributedMinigame):
@@ -61,6 +66,11 @@ class DistributedCraneGame(DistributedMinigame):
         self.overlayText.hide()
         self.rulesPanel = None
         self.rulesPanelToggleButton = None
+        self.playButton = None
+        self.participantsButton = None
+        self.participantsPanel = None
+        self.participantsList = None
+        self.participantsPanelVisible = False
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -542,11 +552,287 @@ class DistributedCraneGame(DistributedMinigame):
             command=self.__handlePlayButton
         )
         self.playButton.hide()  # Play button starts hidden
+        
+        # Create participants button next to play button
+        self.participantsButton = DirectButton(
+            relief=None,
+            text='Participants',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(-0.35, 0, 0.85),
+            command=self.__handleParticipantsButton
+        )
+        self.participantsButton.hide()  # Participants button starts hidden
+        
         btnGeom.removeNode()
+        
+        # Initialize participants panel variables
+        self.participantsPanel = None
+        self.participantsPanelVisible = False
+        
         return panel
 
     def __handlePlayButton(self):
         messenger.send(self.rulesDoneEvent)
+
+    def __handleParticipantsButton(self):
+        """Toggle the participants panel visibility"""
+        if self.participantsPanelVisible:
+            self.__hideParticipantsPanel()
+        else:
+            self.__showParticipantsPanel()
+    
+    def __showParticipantsPanel(self):
+        """Create and show the participants panel"""
+        if self.participantsPanel is None:
+            self.__createParticipantsPanel()
+        
+        self.participantsPanel.show()
+        self.participantsPanelVisible = True
+    
+    def __hideParticipantsPanel(self):
+        """Hide the participants panel"""
+        if self.participantsPanel is not None:
+            self.participantsPanel.hide()
+        self.participantsPanelVisible = False
+    
+    def __createParticipantsPanel(self):
+        """Create the participants management panel using proper game UI conventions"""
+        
+        # Create the main panel frame using proper dialog styling
+        self.participantsPanel = DirectFrame(
+            relief=None,
+            image=DGG.getDefaultDialogGeom(),
+            image_color=ToontownGlobals.GlobalDialogColor,
+            image_scale=(1.4, 1, 1.2),
+            pos=(0.8, 0, 0),
+            parent=aspect2d,
+            sortOrder=DGG.NO_FADE_SORT_INDEX
+        )
+        
+        # Title label
+        titleLabel = DirectLabel(
+            parent=self.participantsPanel,
+            relief=None,
+            text="Manage Spawn Order",
+            text_scale=0.08,
+            text_pos=(0, 0.45),
+            text_fg=(0.1, 0.1, 0.4, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Instructions label
+        instructionsLabel = DirectLabel(
+            parent=self.participantsPanel,
+            relief=None,
+            text="Use arrows to change spawn positions",
+            text_scale=0.05,
+            text_pos=(0, 0.35),
+            text_fg=(0.3, 0.3, 0.3, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Load GUI assets for scroll list
+        gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
+        
+        # Create scrolled list for participants using proper game styling
+        self.participantsList = DirectScrolledList(
+            parent=self.participantsPanel,
+            relief=None,
+            pos=(0, 0, 0.05),
+            numItemsVisible=6,
+            forceHeight=0.08,
+            itemFrame_frameSize=(-0.6, 0.6, -0.04, 0.04),
+            itemFrame_pos=(0, 0, 0),
+            itemFrame_relief=DGG.SUNKEN,
+            itemFrame_frameColor=(0.85, 0.95, 1, 1),
+            itemFrame_borderWidth=(0.01, 0.01),
+            # Scroll buttons using proper assets
+            incButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            incButton_relief=None,
+            incButton_scale=(1.0, 1.0, -1.0),
+            incButton_pos=(0.5, 0, -0.35),
+            incButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6),
+            decButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            decButton_relief=None,
+            decButton_scale=(1.0, 1.0, 1.0),
+            decButton_pos=(0.5, 0, 0.25),
+            decButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6)
+        )
+        
+        # Load button assets
+        buttons = loader.loadModel('phase_3/models/gui/dialog_box_buttons_gui')
+        closeButtonImage = (buttons.find('**/CloseBtn_UP'), 
+                          buttons.find('**/CloseBtn_DN'), 
+                          buttons.find('**/CloseBtn_Rllvr'))
+        
+        # Close button using proper styling
+        closeButton = DirectButton(
+            parent=self.participantsPanel,
+            relief=None,
+            image=closeButtonImage,
+            text="Close",
+            text_scale=0.05,
+            text_pos=(0, -0.1),
+            pos=(0, 0, -0.45),
+            command=self.__hideParticipantsPanel
+        )
+        
+        # Clean up loaded models
+        gui.removeNode()
+        buttons.removeNode()
+        
+        # Populate the list with current participants
+        self.__updateParticipantsList()
+        
+        # Initially hide the panel
+        self.participantsPanel.hide()
+    
+    def __updateParticipantsList(self):
+        """Update the participants list display with proper styling"""
+        if self.participantsList is None:
+            return
+            
+        # Clear existing items
+        self.participantsList.removeAllItems()
+        
+        # Load button assets for up/down arrows
+        gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
+        arrowUpImage = (gui.find('**/FndsLst_ScrollUp'),
+                       gui.find('**/FndsLst_ScrollDN'),
+                       gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                       gui.find('**/FndsLst_ScrollUp'))
+        arrowDownImage = (gui.find('**/FndsLst_ScrollUp'),
+                         gui.find('**/FndsLst_ScrollDN'),
+                         gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                         gui.find('**/FndsLst_ScrollUp'))
+        
+        # Get participating toons (not spectating)
+        participatingToons = self.getParticipantsNotSpectating()
+        
+        # Create items for each participating toon in spawn order
+        for i, toon in enumerate(participatingToons):
+            if i >= len(self.toonSpawnpointOrder):
+                break  # Safety check
+                
+            spawnIndex = self.toonSpawnpointOrder[i]
+            toonName = toon.getName() if toon else f"Player {i+1}"
+            
+            # Create item frame
+            itemFrame = DirectFrame(
+                relief=None,
+                frameSize=(-0.6, 0.6, -0.04, 0.04),
+                frameColor=(0.9, 0.9, 0.9, 0.8) if i % 2 == 0 else (0.8, 0.8, 0.8, 0.8)
+            )
+            
+            # Position number label (spawn order)
+            posLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=f"{i+1}.",
+                text_scale=0.035,
+                text_pos=(-0.5, 0, 0),
+                text_fg=(0.2, 0.2, 0.6, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Toon name label
+            nameLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=toonName,
+                text_scale=0.035,
+                text_pos=(-0.2, 0, 0),
+                text_fg=(0.1, 0.1, 0.1, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Spawn point label
+            spawnLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=f"Spot {spawnIndex + 1}",
+                text_scale=0.03,
+                text_pos=(0.15, 0, 0),
+                text_fg=(0.4, 0.4, 0.4, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Up arrow button (only if not first)
+            if i > 0:
+                upButton = DirectButton(
+                    parent=itemFrame,
+                    relief=None,
+                    image=arrowUpImage,
+                    image_scale=(0.4, 1, 0.4),
+                    pos=(0.35, 0, 0),
+                    command=self.__moveParticipantUp,
+                    extraArgs=[i]
+                )
+            
+            # Down arrow button (only if not last)
+            if i < len(participatingToons) - 1:
+                downButton = DirectButton(
+                    parent=itemFrame,
+                    relief=None,
+                    image=arrowDownImage,
+                    image_scale=(0.4, 1, -0.4),  # Negative scale to flip arrow
+                    pos=(0.5, 0, 0),
+                    command=self.__moveParticipantDown,
+                    extraArgs=[i]
+                )
+            
+            # Add to scrolled list
+            self.participantsList.addItem(itemFrame)
+        
+        # Clean up loaded model
+        gui.removeNode()
+
+    def __moveParticipantUp(self, participantIndex):
+        """Move a participant up in the spawn order"""
+        if participantIndex > 0 and participantIndex < len(self.toonSpawnpointOrder):
+            # Swap spawn point indices
+            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex - 1] = \
+                self.toonSpawnpointOrder[participantIndex - 1], self.toonSpawnpointOrder[participantIndex]
+            
+            # Update the display
+            self.__updateParticipantsList()
+            
+            # Send update to server if we're the leader
+            self.__sendSpawnOrderUpdate()
+    
+    def __moveParticipantDown(self, participantIndex):
+        """Move a participant down in the spawn order"""
+        if participantIndex >= 0 and participantIndex < len(self.toonSpawnpointOrder) - 1:
+            # Swap spawn point indices
+            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex + 1] = \
+                self.toonSpawnpointOrder[participantIndex + 1], self.toonSpawnpointOrder[participantIndex]
+            
+            # Update the display
+            self.__updateParticipantsList()
+            
+            # Send update to server if we're the leader
+            self.__sendSpawnOrderUpdate()
+    
+    def __sendSpawnOrderUpdate(self):
+        """Send the updated spawn order to the server"""
+        # Only the leader can send spawn order updates
+        if self.avIdList[0] == base.localAvatar.doId:
+            # Send the updated spawn order to the AI
+            self.sendUpdate('updateSpawnOrder', [self.toonSpawnpointOrder])
 
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
@@ -554,6 +840,14 @@ class DistributedCraneGame(DistributedMinigame):
         if self.playButton is not None:
             self.playButton.destroy()
             self.playButton = None
+        if self.participantsButton is not None:
+            self.participantsButton.destroy()
+            self.participantsButton = None
+        if self.participantsPanel is not None:
+            self.participantsPanel.destroy()
+            self.participantsPanel = None
+            self.participantsList = None
+        self.participantsPanelVisible = False
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -927,9 +1221,10 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default
         self.rulesPanel.hide()
 
-        # Only show the play button for the leader (first player in avIdList)
+        # Only show the play and participants buttons for the leader (first player in avIdList)
         if self.avIdList[0] == base.localAvatar.doId:
             self.playButton.show()
+            self.participantsButton.show()
         else:
             # Non-leader players automatically trigger ready
             messenger.send(self.rulesDoneEvent)
@@ -1180,3 +1475,12 @@ class DistributedCraneGame(DistributedMinigame):
             msg = TTLocalizer.MinigamePleaseWait
         self.waitingStartLabel['text'] = msg
         self.waitingStartLabel.show()
+
+    def setToonSpawnpointOrder(self, order):
+        """Receive updated spawn order from server"""
+        self.toonSpawnpointOrder = order[:]
+        self.notify.info(f"Received spawn order update: {self.toonSpawnpointOrder}")
+        
+        # Update the participants panel if it's visible
+        if self.participantsPanelVisible and self.participantsList is not None:
+            self.__updateParticipantsList()

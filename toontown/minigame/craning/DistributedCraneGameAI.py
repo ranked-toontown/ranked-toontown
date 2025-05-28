@@ -54,6 +54,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
 
         self.customSpawnPositions = {}
+        self.customSpawnOrderSet = False  # Track if spawn order has been manually set by leader
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
@@ -165,6 +166,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.d_setBossCogId()
         self.setupRuleset()
         self.setupSpawnpoints()
+        # Reset custom spawn order flag for new games (not restarts)
+        self.resetCustomSpawnOrder()
 
     def setupRuleset(self):
 
@@ -783,13 +786,38 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         return t1
 
     def setupSpawnpoints(self):
-        self.toonSpawnpointOrder = [i for i in range(16)]
-        if self.ruleset.RANDOM_SPAWN_POSITIONS:
-            random.shuffle(self.toonSpawnpointOrder)
+        # Only reset spawn order if it hasn't been manually customized by the leader
+        if not hasattr(self, 'customSpawnOrderSet') or not self.customSpawnOrderSet:
+            self.toonSpawnpointOrder = [i for i in range(16)]
+            if self.ruleset.RANDOM_SPAWN_POSITIONS:
+                random.shuffle(self.toonSpawnpointOrder)
         self.d_setToonSpawnpointOrder()
 
+    def resetCustomSpawnOrder(self):
+        """Reset the custom spawn order flag, allowing spawn points to be randomized again"""
+        self.customSpawnOrderSet = False
+
     def d_setToonSpawnpointOrder(self):
-        self.sendUpdate('setToonSpawnpoints', [self.toonSpawnpointOrder])
+        self.sendUpdate('setToonSpawnpointOrder', [self.toonSpawnpointOrder])
+
+    def updateSpawnOrder(self, newOrder):
+        """Handle spawn order update from the leader"""
+        # Verify the sender is the leader (first player in avIdList)
+        senderId = self.air.getAvatarIdFromSender()
+        if senderId != self.avIdList[0]:
+            self.notify.warning(f"Non-leader {senderId} tried to update spawn order")
+            return
+            
+        # Validate the new order contains the same avatars
+        if set(newOrder) != set(self.toonSpawnpointOrder):
+            self.notify.warning(f"Invalid spawn order update from {senderId}: {newOrder}")
+            return
+            
+        # Update the spawn order and mark it as customized
+        self.toonSpawnpointOrder = newOrder[:]
+        self.customSpawnOrderSet = True
+        self.d_setToonSpawnpointOrder()
+        self.notify.info(f"Spawn order updated by leader {senderId}: {self.toonSpawnpointOrder}")
 
     def getRawRuleset(self):
         return self.ruleset.asStruct()
