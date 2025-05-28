@@ -1468,7 +1468,7 @@ class ModifierElementalMode(CFORulesetModifierBase):
         return 'Elemental Mastery!'
 
     def getDescription(self):
-        return f'Safes randomly become %(color_start)sfire elemental%(color_end)s, dealing 50%% more damage!'
+        return f'Safes randomly become %(color_start)sfire elemental%(color_end)s, applying %(color_start)sburning damage%(color_end)s over time!'
 
     def getHeat(self):
         return 2

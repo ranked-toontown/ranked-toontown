@@ -98,10 +98,12 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 damage *= crane.getDamageMultiplier()
                 damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
                 
-                # Apply Fire elemental bonus if this safe is Fire elemental
+                # Apply Fire elemental effect if this safe is Fire elemental
                 if self.boss.isSafeFireElemental(self.doId):
-                    damage *= 1.5  # 50% more damage
-                    self.boss.notify.info(f"Fire elemental safe {self.doId} dealt bonus damage!")
+                    # Apply DoT: 5 ticks of 10% original damage over 5 seconds
+                    dotDamage = int(damage * 0.1)  # 10% of original damage per tick
+                    self.boss.applyFireDoT(avId, dotDamage, 5)  # 5 ticks
+                    self.boss.notify.info(f"Fire elemental safe {self.doId} applied DoT: {dotDamage} damage per tick for 5 ticks!")
                 
                 damage = math.ceil(damage)
                 

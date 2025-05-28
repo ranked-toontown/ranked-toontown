@@ -91,8 +91,11 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
                 delta = bossDamage - self.bossDamage
                 self.flashRed()
 
-                # Animate the hit if the CFO should flinch
-                if self.ruleset.CFO_FLINCHES_ON_HIT:
+                # Check if this is DoT damage (special objId = 0xFFFFFFFF)
+                isDoTDamage = (objId == 0xFFFFFFFF)
+
+                # Animate the hit if the CFO should flinch (but not for DoT damage)
+                if self.ruleset.CFO_FLINCHES_ON_HIT and not isDoTDamage:
                     self.doAnimate('hit', now=1)
 
                 self.showHpText(-delta, scale=5)

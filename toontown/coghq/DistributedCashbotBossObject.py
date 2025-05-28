@@ -244,11 +244,9 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         damage *= crane.getDamageMultiplier()
         damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
         
-        # Apply Fire elemental bonus if this safe is Fire elemental
-        # Check if the boss game instance has elemental tracking
-        if hasattr(self.boss, 'fireElementalIndicators') and self.doId in self.boss.fireElementalIndicators:
-            damage *= 1.5  # 50% more damage for fire elemental safes
-            
+        # Note: Fire elemental effects are now DoT (damage over time) and handled server-side
+        # No need to apply instant damage bonus on client
+        
         damage = math.ceil(damage)
 
         if damage <= 0:
