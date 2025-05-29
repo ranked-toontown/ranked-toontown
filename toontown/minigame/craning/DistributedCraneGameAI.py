@@ -821,7 +821,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.toonSpawnpointOrder = [i for i in range(16)]
             if self.ruleset.RANDOM_SPAWN_POSITIONS:
                 random.shuffle(self.toonSpawnpointOrder)
-        self.d_setToonSpawnpointOrder()
+            self.d_setToonSpawnpointOrder()
 
     def resetCustomSpawnOrder(self):
         """Reset the custom spawn order flag, allowing spawn points to be randomized again"""
