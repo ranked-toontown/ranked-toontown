@@ -113,6 +113,12 @@ class ComboChangeEvent(MatchEvent):
             data["chain"]
         )
 
+    def get_chain(self):
+        return self.chain
+
+    def get_player(self):
+        return self.player_id
+
 
 class RoundBeginEvent(MatchEvent):
 
