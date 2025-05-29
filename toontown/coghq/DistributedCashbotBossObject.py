@@ -262,7 +262,42 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         if damage < curHp:
             self.boss.getBoss().myHits.append(self.doId)
             self.boss.getBoss().processingHp = True
-            self.boss.getBoss().flashRed()
+            
+            # Check if this is elemental damage that shouldn't trigger red flash
+            shouldFlashRed = True
+            
+            # Check 1: Is this safe elemental?
+            isElementalSafe = False
+            try:
+                # Get the crane game to check if this safe has elemental status
+                craneGame = None
+                for obj in base.cr.doId2do.values():
+                    if hasattr(obj, 'fireElementalIndicators'):
+                        craneGame = obj
+                        break
+                
+                if craneGame and self.doId in craneGame.fireElementalIndicators:
+                    isElementalSafe = True
+            except:
+                pass  # Continue with default behavior if check fails
+            
+            # Check 2: Does CFO have active elemental effects?
+            hasActiveElementalEffects = False
+            try:
+                # Get the crane game to check for active CFO elemental effects
+                if craneGame and hasattr(craneGame, 'cfoElementalEffects'):
+                    hasActiveElementalEffects = len(craneGame.cfoElementalEffects) > 0
+            except:
+                pass  # Continue with default behavior if check fails
+            
+            # Skip red flash for elemental damage - the elemental effects provide the visual feedback
+            if isElementalSafe or hasActiveElementalEffects:
+                shouldFlashRed = False
+            
+            # Only flash red for non-elemental damage
+            if shouldFlashRed:
+                self.boss.getBoss().flashRed()
+            
             if self.boss.ruleset.CFO_FLINCHES_ON_HIT:
                 self.boss.getBoss().doAnimate('hit', now=1)
             self.boss.getBoss().showHpText(-damage, scale=5)

@@ -3920,6 +3920,7 @@ dclass DistributedCraneGame: DistributedMinigame {
   setElementalMode(bool) airecv clsend broadcast ram;
   setRoundInfo(uint8, uint8[]) broadcast ram;
   setSafeElemental(uint32 safeDoId, uint8 elementType) broadcast;
+  setCFOElementalStatus(uint8 elementType, bool enabled) broadcast;
   nextRound() airecv clsend;
   setCraneSpawn(bool, uint8, uint32) broadcast ram;
   updateCombo(uint32 avId, uint8) broadcast ram;
