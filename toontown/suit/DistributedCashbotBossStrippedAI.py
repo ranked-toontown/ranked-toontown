@@ -143,22 +143,30 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def __doAreaAttack(self):
         self.b_setAttackCode(ToontownGlobals.BossCogAreaAttack)
 
-    def setAttackCode(self, attackCode, avId=0):
+    def setAttackCode(self, attackCode, avId=0, delayTime=None):
         self.attackCode = attackCode
         self.attackAvId = avId
 
-        if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
-            delayTime = self.game.progressValue(20, 5)
-            if self.game.practiceCheatHandler.wantAlwaysStunned:
-                delayTime = 3600
-            self.hitCount = 0
-        elif attackCode in (ToontownGlobals.BossCogSlowDirectedAttack,):
-            delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode)
-            delayTime += self.game.progressValue(10, 0)
-        elif attackCode in (ToontownGlobals.BossCogAreaAttack,):
-            delayTime = self.game.progressValue(20, 9)
+        if delayTime is None:
+            # Calculate default delay time only if none was provided
+            if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
+                delayTime = self.game.progressValue(20, 5)
+                if self.game.practiceCheatHandler.wantAlwaysStunned:
+                    delayTime = 3600
+                self.hitCount = 0
+            elif attackCode in (ToontownGlobals.BossCogSlowDirectedAttack,):
+                delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode)
+                delayTime += self.game.progressValue(10, 0)
+            elif attackCode in (ToontownGlobals.BossCogAreaAttack,):
+                delayTime = self.game.progressValue(20, 9)
+            else:
+                delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode, 5.0)
         else:
-            delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode, 5.0)
+            # Use the provided delayTime, but still handle special cases
+            if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
+                if self.game.practiceCheatHandler.wantAlwaysStunned:
+                    delayTime = 3600
+                self.hitCount = 0
 
         self.waitForNextAttack(delayTime)
         return
@@ -166,9 +174,9 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def d_setAttackCode(self, attackCode, avId=0, delayTime=0):
         self.sendUpdate('setAttackCode', [attackCode, avId, delayTime])
 
-    def b_setAttackCode(self, attackCode, avId=0, delayTime=0):
-        self.d_setAttackCode(attackCode, avId, delayTime=delayTime)
-        self.setAttackCode(attackCode, avId)
+    def b_setAttackCode(self, attackCode, avId=0, delayTime=None):
+        self.d_setAttackCode(attackCode, avId, delayTime=delayTime if delayTime is not None else 0)
+        self.setAttackCode(attackCode, avId, delayTime=delayTime)
 
     def getDamageMultiplier(self, allowFloat=False):
         mult = self.game.progressValue(1, self.ruleset.CFO_ATTACKS_MULTIPLIER + (0 if allowFloat else 1))
