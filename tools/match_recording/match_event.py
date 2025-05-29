@@ -178,6 +178,7 @@ EVENT_REGISTRY = [
     PointEvent,
     RoundBeginEvent,
     RoundEndEvent,
+    ComboChangeEvent,
 ]
 
 EVENT_ID_TO_REGISTERED_EVENT = {e.get_event_type(): e for e in EVENT_REGISTRY}

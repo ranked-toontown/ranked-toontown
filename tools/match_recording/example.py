@@ -1,7 +1,7 @@
 import time
 
 from tools.match_recording import match_serializer
-from tools.match_recording.match_event import PointEvent, RoundBeginEvent, RoundEndEvent
+from tools.match_recording.match_event import PointEvent, RoundBeginEvent, RoundEndEvent, ComboChangeEvent
 from tools.match_recording.match_player import MatchPlayer
 from tools.match_recording.match_replay import MatchReplay, MatchMetadata
 
@@ -24,18 +24,25 @@ match.add_event(PointEvent(
     PointEvent.Reason.DEFAULT,
     5
 ))
+match.add_event(ComboChangeEvent(time.time() + 4.5643540395890, 6789, 1))
+
 match.add_event(PointEvent(
     time.time() + 6.6984606908,
     6789,
     PointEvent.Reason.DEFAULT,
     6
 ))
+match.add_event(ComboChangeEvent(time.time() + 6.6984606908, 6789, 2))
+
 match.add_event(PointEvent(
     time.time() + 8.234222222,
     12345,
     PointEvent.Reason.GOON_STOMP,
     1
 ))
+
+match.add_event(ComboChangeEvent(time.time() + 8.6984606908, 6789, 0))
+
 match.add_event(PointEvent(
     time.time() + 9.9348934899,
     6789,
@@ -55,7 +62,7 @@ match_serializer.save(match)
 
 
 # Reading from a replay file. Use this to read the data from the file.
-match = match_serializer.deserialize_match("./replays/crane_1748550931.replay")
+match = match_serializer.deserialize_match("./replays/crane_1748555997.replay")
 
 # The method will return an exception if something goes wrong. You should check for this.
 if isinstance(match, Exception):
@@ -73,6 +80,8 @@ for event in match.get_events():
         print(f"{player} scored {event.get_points()} points from: {event.reason}")
     elif isinstance(event, RoundBeginEvent):
         print(f"RoundBeginEvent: {event.timestamp}")
+    elif isinstance(event, ComboChangeEvent):
+        print(f"ComboChangeEvent: {event.timestamp} {event.get_player()} is now on a {event.get_chain()} combo")
     elif isinstance(event, RoundEndEvent):
         print(f"RoundEndEvent: {event.timestamp}")
     print()
