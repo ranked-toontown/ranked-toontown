@@ -1,6 +1,9 @@
 import functools
+import json
+import os
 import random
 import math
+import time
 
 from direct.actor.Actor import Actor
 from direct.distributed import DistributedSmoothNode
@@ -20,6 +23,8 @@ from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator,
 from libotp import CFSpeech
 from libotp.nametag import NametagGlobals
 from otp.otpbase import OTPGlobals
+from tools.match_recording import match_serializer
+from tools.match_recording.match_event import PointEvent, RoundEndEvent, RoundBeginEvent
 from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.BossSpeedrunTimer import BossSpeedrunTimedTimer, BossSpeedrunTimer
 from toontown.coghq.CashbotBossScoreboard import CashbotBossScoreboard
@@ -32,6 +37,7 @@ from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
 
+from tools.match_recording.match_replay import MatchReplay
 
 class DistributedCraneGame(DistributedMinigame):
 
@@ -133,6 +139,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.addChildGameFSM(self.gameFSM)
 
         self.overtimeActive = False
+
+        # Event recording for game data/replays.
+        self.eventRecorder = MatchReplay(timestamp=int(time.time()))
 
     def getTitle(self):
         return TTLocalizer.CraneGameTitle
@@ -681,6 +690,7 @@ class DistributedCraneGame(DistributedMinigame):
             base.localAvatar.lerpFov(base.localAvatar.fov, base.localAvatar.fallbackFov + base.localAvatar.currentMovementMode[base.localAvatar.FOV_INCREASE_ENUM])
 
         self.__checkSpectatorState()
+        self.eventRecorder.add_event(RoundBeginEvent(time.time()))
 
     def exitPlay(self):
 
@@ -710,6 +720,9 @@ class DistributedCraneGame(DistributedMinigame):
         for crane in self.cranes.values():
             crane.stopFlicker()
 
+        player = self.eventRecorder.get_metadata().get_or_create_player(self.victor, victor.getName())
+        self.eventRecorder.add_event(RoundEndEvent(time.time(), player.get_id()))
+
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))
         camera.reparentTo(base.localAvatar)
@@ -729,6 +742,11 @@ class DistributedCraneGame(DistributedMinigame):
         self.heatDisplay.cleanup()
         self.heatDisplay = None
         self.boss = None
+
+        self.__saveMatch()
+
+    def __saveMatch(self):
+        match_serializer.save(self.eventRecorder)
 
     def exitCleanup(self):
         pass
@@ -750,6 +768,16 @@ class DistributedCraneGame(DistributedMinigame):
         if convertedReason is None:
             convertedReason = CraneLeagueGlobals.ScoreReason.DEFAULT
         self.scoreboard.addScore(avId, score, convertedReason)
+
+        av = base.cr.getDo(avId)
+        if av:
+            player = self.eventRecorder.get_metadata().get_or_create_player(av.getDoId(), name=av.getName())
+            self.eventRecorder.add_event(PointEvent(
+                time.time(),
+                player.get_id(),
+                PointEvent.Reason.from_value(convertedReason.value),
+                score
+            ))
 
     def updateCombo(self, avId, comboLength):
         self.scoreboard.setCombo(avId, comboLength)
