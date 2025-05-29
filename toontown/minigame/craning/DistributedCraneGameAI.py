@@ -24,6 +24,16 @@ from toontown.toon.DistributedToonAI import DistributedToonAI
 from toontown.toonbase import ToontownGlobals
 
 
+# Element type constants for expandable elemental system
+class ElementType:
+    NONE = 0
+    FIRE = 1
+    VOLT = 2
+    # Future elements can be added here:
+    # ICE = 3
+    # POISON = 4
+
+
 class DistributedCraneGameAI(DistributedMinigameAI):
     DESPERATION_MODE_ACTIVATE_THRESHOLD = 1800
 
@@ -54,8 +64,22 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
 
         self.customSpawnPositions = {}
+        self.customSpawnOrderSet = False  # Track if spawn order has been manually set by leader
+        self.bestOfValue = 1  # Default to Best of 1
+        self.currentRound = 1
+        self.roundWins = {}  # Maps avId -> number of rounds won
+        self.originalSpawnOrder = []  # Store original spawn order for rotation
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
+
+        # Elemental mode system - refactored for multiple element types
+        self.elementalSafes = {}  # Maps safeDoId -> elementType
+        self.previousCycleElementalSafes = set()  # Track which safes were elemental in the previous cycle
+        self.elementalDoTTasks = {}  # Maps dotId -> dotInfo for tracking DoT effects
+        self.cfoElementalStatus = {}  # Maps elementType -> enabled for tracking CFO elemental effects
+        self.nextDoTId = 1  # Unique ID counter for DoT effects
+        self.elementalTaskName = None  # Track the elemental system task
+        self.elementalCycleCounter = 0  # Track elemental cycle count
 
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
 
@@ -165,6 +189,18 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.d_setBossCogId()
         self.setupRuleset()
         self.setupSpawnpoints()
+        # Reset custom spawn order flag for new games (not restarts)
+        self.resetCustomSpawnOrder()
+        # Reset round information for new games
+        self.currentRound = 1
+        self.roundWins = {}
+        self.originalSpawnOrder = []
+        self._inMultiRoundMatch = False
+        # Initialize best-of settings
+        self.d_setBestOf()
+        self.d_setRoundInfo()
+        # Initialize elemental mode setting
+        self.d_setElementalMode()
 
     def setupRuleset(self):
 
@@ -783,13 +819,261 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         return t1
 
     def setupSpawnpoints(self):
-        self.toonSpawnpointOrder = [i for i in range(16)]
-        if self.ruleset.RANDOM_SPAWN_POSITIONS:
-            random.shuffle(self.toonSpawnpointOrder)
-        self.d_setToonSpawnpointOrder()
+        # Only reset spawn order if it hasn't been manually customized by the leader
+        if not hasattr(self, 'customSpawnOrderSet') or not self.customSpawnOrderSet:
+            self.toonSpawnpointOrder = [i for i in range(16)]
+            if self.ruleset.RANDOM_SPAWN_POSITIONS:
+                random.shuffle(self.toonSpawnpointOrder)
+            self.d_setToonSpawnpointOrder()
+
+    def resetCustomSpawnOrder(self):
+        """Reset the custom spawn order flag, allowing spawn points to be randomized again"""
+        self.customSpawnOrderSet = False
 
     def d_setToonSpawnpointOrder(self):
-        self.sendUpdate('setToonSpawnpoints', [self.toonSpawnpointOrder])
+        self.sendUpdate('setToonSpawnpointOrder', [self.toonSpawnpointOrder])
+
+    def updateSpawnOrder(self, newOrder):
+        """Handle spawn order update from the leader"""
+        # Verify the sender is the leader (first player in avIdList)
+        senderId = self.air.getAvatarIdFromSender()
+        if senderId != self.avIdList[0]:
+            self.notify.warning(f"Non-leader {senderId} tried to update spawn order")
+            return
+            
+        # Validate the new order contains the same avatars
+        if set(newOrder) != set(self.toonSpawnpointOrder):
+            self.notify.warning(f"Invalid spawn order update from {senderId}: {newOrder}")
+            return
+            
+        # Update the spawn order and mark it as customized
+        self.toonSpawnpointOrder = newOrder[:]
+        self.customSpawnOrderSet = True
+        self.d_setToonSpawnpointOrder()
+        self.notify.info(f"Spawn order updated by leader {senderId}: {self.toonSpawnpointOrder}")
+
+    def setBestOf(self, value):
+        """Handle best-of setting from the leader"""
+        # Verify the sender is the leader (first player in avIdList)
+        senderId = self.air.getAvatarIdFromSender()
+        if senderId != self.avIdList[0]:
+            self.notify.warning(f"Non-leader {senderId} tried to set best-of value")
+            return
+            
+        # Validate the value
+        if value not in [1, 3, 5, 7]:
+            self.notify.warning(f"Invalid best-of value from {senderId}: {value}")
+            return
+            
+        self.bestOfValue = value
+        self.d_setBestOf()
+        self.notify.info(f"Best-of value set to {value} by leader {senderId}")
+
+    def d_setBestOf(self):
+        """Send best-of value to all clients"""
+        self.sendUpdate('setBestOf', [self.bestOfValue])
+
+    def d_setRoundInfo(self):
+        """Send round information to all clients"""
+        # Convert roundWins dict to list format for transmission
+        roundWinsList = []
+        for avId in self.avIdList:
+            roundWinsList.append(self.roundWins.get(avId, 0))
+        self.sendUpdate('setRoundInfo', [self.currentRound, roundWinsList])
+
+    def d_setElementalMode(self):
+        """Send elemental mode setting to all clients"""
+        self.sendUpdate('setElementalMode', [self.ruleset.ELEMENTAL_MODE])
+
+    def d_setSafeElemental(self, safeDoId, elementType):
+        """Send elemental status update to all clients"""
+        self.sendUpdate('setSafeElemental', [safeDoId, elementType])
+
+    def startElementalSystem(self):
+        """Start the elemental system if elemental mode is enabled"""
+        self.notify.info(f"startElementalSystem called - elementalMode: {self.ruleset.ELEMENTAL_MODE}")
+        if not self.ruleset.ELEMENTAL_MODE:
+            self.notify.info("Elemental mode is disabled, not starting elemental system")
+            return
+            
+        self.stopElementalSystem()  # Stop any existing task
+        self.elementalTaskName = self.uniqueName('elementalSystem')
+        taskMgr.doMethodLater(5.0, self.__elementalSystemTask, self.elementalTaskName)
+        self.notify.info(f"Elemental system started with task name: {self.elementalTaskName}")
+
+    def stopElementalSystem(self):
+        """Stop the elemental system"""
+        if self.elementalTaskName:
+            taskMgr.remove(self.elementalTaskName)
+            self.elementalTaskName = None
+        
+        # Clear all elemental safes and notify clients
+        for safeDoId in list(self.elementalSafes):
+            self.d_setSafeElemental(safeDoId, ElementType.NONE)
+        self.elementalSafes.clear()
+        
+        # Reset the previous cycle tracker for a clean restart
+        self.previousCycleElementalSafes.clear()
+        
+        self.notify.info("Elemental system stopped and previous cycle tracker reset")
+
+    def __elementalSystemTask(self, task):
+        """Task that runs every 5 seconds to potentially assign fire elements to safes"""
+        self.notify.info(f"Elemental system task running - elementalMode: {self.ruleset.ELEMENTAL_MODE}")
+        if not self.ruleset.ELEMENTAL_MODE:
+            self.notify.info("Elemental mode disabled during task, stopping")
+            return task.done
+            
+        # Check all available safes for fire elemental chance
+        self.__checkAllSafesForElemental()
+        
+        # Schedule next check in 5 seconds
+        return task.again
+
+    def __checkAllSafesForElemental(self):
+        """Check all available safes for elemental assignment"""
+        self.notify.info(f"Checking all safes for elemental - total safes: {len(self.safes)}")
+        
+        # Track which safes currently have elements before we start the new cycle
+        currentElementalSafeIds = set(self.elementalSafes.keys())
+        
+        # Get all safes that are available (not grabbed, not already fire elemental)
+        availableSafes = []
+        for safe in self.safes:
+            # Include more states: Initial, Free, Dropped, SlidingFloor, WaitFree
+            # Exclude safes that had elements in the previous cycle
+            if (safe.doId not in self.elementalSafes and 
+                safe.doId not in self.previousCycleElementalSafes and
+                safe.state in ['Initial', 'Free', 'Dropped', 'SlidingFloor', 'WaitFree']):
+                availableSafes.append(safe)
+        
+        self.notify.info(f"Available safes for element: {len(availableSafes)} (excluded {len(self.previousCycleElementalSafes)} from previous cycle)")
+        if not availableSafes:
+            self.notify.info("No available safes for element")
+            # Update previous cycle tracker before returning
+            self.previousCycleElementalSafes = currentElementalSafeIds
+            return
+        
+        # Check each safe individually for elemental chance
+        safesAssigned = 0
+        for safe in availableSafes:
+            # Each safe has a 10% chance to become elemental (adjust as needed)
+            roll = random.random()
+            if roll < 0.1:  # 10% chance per safe
+                # Randomly choose between FIRE and VOLT elements
+                elementType = random.choice([ElementType.FIRE, ElementType.VOLT])
+                self.__assignElementalToSafe(safe, elementType)
+                safesAssigned += 1
+        
+        # Update the previous cycle tracker with safes that had elements this cycle
+        # This ensures they won't be eligible for elements in the next cycle
+        self.previousCycleElementalSafes = currentElementalSafeIds
+        
+        self.notify.info(f"Assigned elemental effects to {safesAssigned} safes this cycle. Previous cycle had {len(self.previousCycleElementalSafes)} elemental safes.")
+
+    def __assignElementalToSafe(self, safe, elementType):
+        """Assign an elemental type to a specific safe"""
+        self.elementalSafes[safe.doId] = elementType
+        
+        # Notify clients about the elemental status
+        self.d_setSafeElemental(safe.doId, elementType)
+        
+        # Schedule removal of elemental status after 10 seconds
+        taskName = self.uniqueName(f'removeElemental-{safe.doId}')
+        taskMgr.doMethodLater(10.0, self.__removeElemental, taskName, extraArgs=[safe.doId])
+        
+        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"Safe {safe.doId} became {elementName} elemental")
+
+    def __assignFireElementalToSafe(self, safe):
+        """Legacy method for compatibility - assigns Fire element"""
+        self.__assignElementalToSafe(safe, ElementType.FIRE)
+
+    def __removeElemental(self, safeDoId, task=None):
+        """Remove elemental status from a safe"""
+        if safeDoId in self.elementalSafes:
+            # Get element type before removing for proper logging
+            elementType = self.elementalSafes[safeDoId]
+            del self.elementalSafes[safeDoId]
+            
+            # Notify clients about the elemental status removal
+            self.d_setSafeElemental(safeDoId, ElementType.NONE)
+            
+            elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+            self.notify.info(f"Safe {safeDoId} lost {elementName} elemental status")
+        return task.done if task else None
+
+    def isSafeFireElemental(self, safeDoId):
+        """Legacy method for checking Fire elemental status"""
+        return self.isSafeElemental(safeDoId, ElementType.FIRE)
+
+    def getSafeElementType(self, safeDoId):
+        """Get the element type of a safe"""
+        return self.elementalSafes.get(safeDoId, ElementType.NONE)
+
+    def isSafeElemental(self, safeDoId, elementType=None):
+        """Check if a safe has any elemental effect, or a specific element type"""
+        if elementType is None:
+            return safeDoId in self.elementalSafes
+        return self.elementalSafes.get(safeDoId) == elementType
+
+    def nextRound(self):
+        """Handle transition to next round in best-of matches"""
+        if self.bestOfValue <= 1:
+            return  # Not a best-of match
+        
+        self.currentRound += 1
+        self._inMultiRoundMatch = True  # Flag to indicate we're in a multi-round match
+        
+        # Start the next round after a brief delay
+        taskMgr.doMethodLater(0.5, self.__startNextRound, self.uniqueName("startNextRound"))
+
+    def __startNextRound(self, task=None):
+        """Start the next round in a best-of match"""
+        # Reset scores for the new round
+        for avId in self.scoreDict:
+            self.scoreDict[avId] = 0
+        
+        # Rotate spawn positions for variety
+        self.__rotateSpawnPositions()
+        
+        # Use proper FSM transitions like the RestartCraneRound magic word
+        self.gameFSM.request("cleanup")
+        self.gameFSM.request('prepare')
+        
+        # Send round info to clients immediately after restart
+        self.d_setRoundInfo()
+
+    def __rotateSpawnPositions(self):
+        """Rotate spawn positions for the next round"""
+        # Get participating toons (not spectating)
+        participatingToons = self.getParticipantIdsNotSpectating()
+        numParticipants = len(participatingToons)
+        
+        if numParticipants <= 1:
+            return  # No rotation needed for single player
+        
+        # Store the original spawn positions if this is the first rotation
+        if not hasattr(self, 'originalSpawnOrder') or not self.originalSpawnOrder:
+            self.originalSpawnOrder = self.toonSpawnpointOrder[:numParticipants]
+        
+        # Get the current spawn positions for participating players
+        currentPositions = self.toonSpawnpointOrder[:numParticipants]
+        
+        # Rotate positions: each player moves to the next position
+        # Player at position 0 -> position 1, position 1 -> position 2, etc.
+        # Last player wraps around to position 0
+        rotatedPositions = [currentPositions[(i + 1) % numParticipants] for i in range(numParticipants)]
+        
+        # Update the spawn order with rotated positions
+        for i in range(numParticipants):
+            self.toonSpawnpointOrder[i] = rotatedPositions[i]
+        
+        # Mark spawn order as customized so setupSpawnpoints() doesn't override it
+        self.customSpawnOrderSet = True
+        
+        self.d_setToonSpawnpointOrder()
+        self.notify.info(f"Rotated spawn positions for round {self.currentRound}: {self.toonSpawnpointOrder[:numParticipants]}")
 
     def getRawRuleset(self):
         return self.ruleset.asStruct()
@@ -960,8 +1244,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def enterPrepare(self):
         self.notify.debug("enterPrepare")
-
-        # Start up the big boy.
         if not self.__bossExists():
             self.__makeBoss()
         self.boss.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
@@ -969,6 +1251,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.__resetCraningObjects()
         self.setupRuleset()
         self.setupSpawnpoints()
+
+        # Send round info to clients if this is a best-of match
+        if self.bestOfValue > 1:
+            self.d_setRoundInfo()
 
         # Calculate how long we should wait to actually start the game.
         # If more than 1 player is present, we want to have a delay present for a cutscene to play.
@@ -1042,6 +1328,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.practiceCheatHandler.cheatIsEnabled():
             taskMgr.remove(self.uniqueName('times-up-task'))
             self.d_updateTimer()
+
+        # Start elemental system if enabled
+        self.startElementalSystem()
 
     # Called when we actually run out of time, simply tell the clients we ran out of time then handle it later
     def __timesUp(self, task=None):
@@ -1164,6 +1453,12 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.overtimeWillHappen = False
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
 
+        # Stop elemental system
+        self.stopElementalSystem()
+
+        # Clean up all active fire DoTs
+        self.__cleanupAllElementalDoTs()
+
         # Ignore death messages.
         self.ignoreToonDeaths()
         self.__cancelReviveTasks()
@@ -1203,11 +1498,33 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def enterVictory(self):
         victorId = max(self.scoreDict.items(), key=itemgetter(1))[0]
-        self.sendUpdate("declareVictor", [victorId])
-        taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        
+        # Handle best-of matches
+        if self.bestOfValue > 1:
+            # Track round wins
+            self.roundWins[victorId] = self.roundWins.get(victorId, 0) + 1
+            winsNeeded = (self.bestOfValue + 1) // 2
+            
+            # Send round info to clients
+            self.d_setRoundInfo()
+            
+            # Check if match is complete
+            if self.roundWins[victorId] >= winsNeeded:
+                # Match is complete
+                self.sendUpdate("declareVictor", [victorId])
+                taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+            else:
+                # Round is complete, but match continues
+                self.sendUpdate("declareVictor", [victorId])
+                taskMgr.doMethodLater(5, self.__startNextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+        else:
+            # Single round match
+            self.sendUpdate("declareVictor", [victorId])
+            taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
 
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))
+        taskMgr.remove(self.uniqueName("craneGameNextRound"))
 
     def enterCleanup(self):
         self.notify.debug("enterCleanup")
@@ -1236,3 +1553,197 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.b_setSpectators(currentSpectators)
         # Broadcast the spot status change to all clients
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
+
+    def applyElementalDoT(self, avId, elementType, baseDamage):
+        """Apply an elemental damage-over-time effect to the CFO based on element type"""
+        # Define element-specific DoT properties
+        elementProperties = {
+            ElementType.FIRE: {
+                'damagePerTick': 2,                      # 2 damage per tick
+                'ticks': 10,                             # 15 ticks total
+                'tickInterval': 0.3,                     # 1 second between ticks
+                'startDelay': 0.5                        # 1 second delay before starting
+            },
+            ElementType.VOLT: {
+                'damagePerTick': 0,                      # No DoT damage for VOLT
+                'ticks': 0,                              # No ticks
+                'tickInterval': 0,                       # No intervals
+                'startDelay': 0                          # No delay needed
+            },
+            # Future elements can have different properties:
+            # ElementType.ICE: {
+            #     'damagePerTick': int(baseDamage * 0.05),  # 5% per tick but more ticks
+            #     'ticks': 8,                               # 8 ticks total
+            #     'tickInterval': 0.75,                     # Faster ticks
+            #     'startDelay': 0.5                         # Faster start
+            # },
+            # ElementType.POISON: {
+            #     'damagePerTick': int(baseDamage * 0.08),  # 8% per tick
+            #     'ticks': 6,                               # 6 ticks total
+            #     'tickInterval': 1.5,                      # Slower ticks
+            #     'startDelay': 2.0                         # Longer delay
+            # }
+        }
+        
+        if elementType not in elementProperties:
+            self.notify.warning(f"Unknown element type for DoT: {elementType}")
+            return
+            
+        props = elementProperties[elementType]
+        dotDamage = props['damagePerTick']
+        ticks = props['ticks']
+        
+        if dotDamage <= 0 or ticks <= 0:
+            return
+            
+        dotId = self.nextDoTId
+        self.nextDoTId += 1
+        
+        # Store DoT information
+        dotInfo = {
+            'avId': avId,
+            'elementType': elementType,
+            'damage': dotDamage,
+            'remainingTicks': ticks,
+            'originalTicks': ticks,
+            'tickInterval': props['tickInterval']
+        }
+        
+        self.elementalDoTTasks[dotId] = dotInfo
+        
+        # Apply visual effects to the CFO for Fire DoT
+        if elementType == ElementType.FIRE:
+            self.d_setCFOElementalStatus(ElementType.FIRE, True)
+        
+        # Start the DoT ticking after the element-specific delay
+        taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
+        taskMgr.doMethodLater(props['startDelay'], self.__doElementalDoTTick, taskName, extraArgs=[dotId])
+        
+        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"Applied {elementName} DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks")
+
+    def d_setCFOElementalStatus(self, elementType, enabled):
+        """Send CFO elemental status update to all clients and track server-side"""
+        # Track the status server-side for synergy calculations
+        if enabled:
+            self.cfoElementalStatus[elementType] = True
+        else:
+            self.cfoElementalStatus.pop(elementType, None)
+            
+        self.sendUpdate('setCFOElementalStatus', [elementType, enabled])
+        
+        elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
+        statusText = "enabled" if enabled else "disabled"
+        self.notify.info(f"CFO {elementName} elemental status {statusText}")
+
+    def applyFireDoT(self, avId, dotDamage, ticks):
+        """Apply a fire damage-over-time effect to the CFO - legacy method for compatibility"""
+        # Calculate base damage from the old parameters
+        baseDamage = dotDamage * 10  # Reverse the 10% calculation
+        self.applyElementalDoT(avId, ElementType.FIRE, baseDamage)
+
+    def __doElementalDoTTick(self, dotId):
+        """Execute one tick of elemental DoT damage"""
+        dotInfo = self.elementalDoTTasks.get(dotId)
+        if not dotInfo:
+            return  # DoT was cleaned up
+            
+        # Apply the DoT damage (without flinching)
+        damage = dotInfo['damage']
+        avId = dotInfo['avId']
+        elementType = dotInfo['elementType']
+        
+        # Record the DoT damage without causing flinch or combo increment
+        self.__recordElementalDoTHit(damage, avId, elementType, dotId)
+        
+        # Decrement remaining ticks
+        dotInfo['remainingTicks'] -= 1
+        
+        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"{elementName} DoT {dotId} tick: {damage} damage, {dotInfo['remainingTicks']} ticks remaining")
+        
+        # Schedule next tick or cleanup
+        if dotInfo['remainingTicks'] > 0:
+            # Schedule next tick using element-specific interval
+            taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
+            tickInterval = dotInfo['tickInterval']
+            taskMgr.doMethodLater(tickInterval, self.__doElementalDoTTick, taskName, extraArgs=[dotId])
+        else:
+            # DoT is finished, clean up
+            self.__cleanupElementalDoT(dotId)
+
+    def __recordElementalDoTHit(self, damage, avId, elementType, dotId):
+        """Record an elemental DoT hit without causing flinch effects or combo increment"""
+        # Don't process a hit if we aren't in the play state
+        if self.gameFSM.getCurrentState().getName() != 'play':
+            return
+        
+        finalDamage = damage
+            
+        # Check for VOLT synergy - DOT effects do 25% more damage when VOLT is active
+        synergyBonus = 1.0
+        if elementType == ElementType.FIRE and self.__isCFOElementalStatusActive(ElementType.VOLT): 
+            finalDamage += 1
+            
+        # Apply damage directly to boss without triggering any flinch/stun logic
+        # Use the boss's internal damage tracking, bypassing recordHit method
+        self.boss.bossDamage += finalDamage
+        
+        # Send damage update to clients with special objId (-1) to indicate DoT damage
+        # This allows the client to recognize this as DoT and skip flinching
+        self.boss.sendUpdate('setBossDamage', [self.boss.bossDamage, avId, 0xFFFFFFFF, False])  # objId = -1 (max uint32)
+        
+        # Award points for DoT damage (but no combo increment)
+        self.addScore(avId, finalDamage)
+        
+        # Check if CFO is defeated
+        if self.boss.bossDamage >= self.ruleset.CFO_MAX_HP:
+            self.addScore(avId, self.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
+            self.toonsWon = True
+            self.gameFSM.request('victory')
+            
+        elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
+        synergyText = f" (with VOLT synergy: {damage} -> {finalDamage})" if synergyBonus > 1.0 else ""
+        self.notify.info(f"{elementName} DoT {dotId} dealt {finalDamage} damage{synergyText} (no flinch, no combo)")
+
+    def __cleanupElementalDoT(self, dotId):
+        """Clean up a finished elemental DoT effect"""
+        if dotId in self.elementalDoTTasks:
+            dotInfo = self.elementalDoTTasks[dotId]
+            elementType = dotInfo['elementType']
+            
+            # Remove visual effects from CFO when DoT ends
+            if elementType == ElementType.FIRE:
+                # Check if there are any other active Fire DoTs before removing effects
+                hasOtherFireDoTs = False
+                for otherId, otherInfo in self.elementalDoTTasks.items():
+                    if otherId != dotId and otherInfo['elementType'] == ElementType.FIRE:
+                        hasOtherFireDoTs = True
+                        break
+                        
+                if not hasOtherFireDoTs:
+                    self.d_setCFOElementalStatus(ElementType.FIRE, False)
+            
+            del self.elementalDoTTasks[dotId]
+            
+        # Remove any pending task
+        taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
+        taskMgr.remove(taskName)
+        
+        self.notify.info(f"Cleaned up elemental DoT {dotId}")
+
+    def __cleanupAllElementalDoTs(self):
+        """Clean up all active elemental DoT effects"""
+        # Check if we need to remove CFO fire effects
+        hasFireDoTs = any(dotInfo['elementType'] == ElementType.FIRE for dotInfo in self.elementalDoTTasks.values())
+        
+        for dotId in list(self.elementalDoTTasks.keys()):
+            self.__cleanupElementalDoT(dotId)
+            
+        # Make sure CFO effects are removed if there were any fire DoTs
+        if hasFireDoTs:
+            self.d_setCFOElementalStatus(ElementType.FIRE, False)
+
+    def __isCFOElementalStatusActive(self, elementType):
+        """Check if the CFO has an active elemental status"""
+        return elementType in self.cfoElementalStatus and self.cfoElementalStatus[elementType]

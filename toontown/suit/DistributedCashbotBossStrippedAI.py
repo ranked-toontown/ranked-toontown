@@ -82,20 +82,30 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.ruleset = ruleset
 
     def doNextAttack(self, task):
+        # Check if we're transitioning out of a stun state - if so, clean up any VOLT effects
+        wasStunned = self.attackCode == ToontownGlobals.BossCogDizzy
+        
         # Choose an attack and do it.
 
         # Make sure we're waiting for a helmet.
-        if self.heldObject is None and not self.waitingForHelmet:
+        if self.heldObject == None and not self.waitingForHelmet:
             self.waitForNextHelmet()
 
         # Rare chance to do a jump attack if we want it
         if self.ruleset.WANT_CFO_JUMP_ATTACK:
             if random.randint(0, 99) < self.ruleset.CFO_JUMP_ATTACK_CHANCE:
                 self.__doAreaAttack()
+                # Clean up VOLT effects if we were stunned and are now attacking
+                if wasStunned:
+                    self.__cleanupVoltEffects()
                 return
 
         # Do a directed attack.
         self.__doDirectedAttack()
+        
+        # Clean up VOLT effects if we were stunned and are now attacking
+        if wasStunned:
+            self.__cleanupVoltEffects()
 
     def __findEligibleTargets(self):
         """
@@ -143,22 +153,30 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def __doAreaAttack(self):
         self.b_setAttackCode(ToontownGlobals.BossCogAreaAttack)
 
-    def setAttackCode(self, attackCode, avId=0):
+    def setAttackCode(self, attackCode, avId=0, delayTime=None):
         self.attackCode = attackCode
         self.attackAvId = avId
 
-        if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
-            delayTime = self.game.progressValue(20, 5)
-            if self.game.practiceCheatHandler.wantAlwaysStunned:
-                delayTime = 3600
-            self.hitCount = 0
-        elif attackCode in (ToontownGlobals.BossCogSlowDirectedAttack,):
-            delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode)
-            delayTime += self.game.progressValue(10, 0)
-        elif attackCode in (ToontownGlobals.BossCogAreaAttack,):
-            delayTime = self.game.progressValue(20, 9)
+        if delayTime is None:
+            # Calculate default delay time only if none was provided
+            if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
+                delayTime = self.game.progressValue(20, 5)
+                if self.game.practiceCheatHandler.wantAlwaysStunned:
+                    delayTime = 3600
+                self.hitCount = 0
+            elif attackCode in (ToontownGlobals.BossCogSlowDirectedAttack,):
+                delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode)
+                delayTime += self.game.progressValue(10, 0)
+            elif attackCode in (ToontownGlobals.BossCogAreaAttack,):
+                delayTime = self.game.progressValue(20, 9)
+            else:
+                delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode, 5.0)
         else:
-            delayTime = ToontownGlobals.BossCogAttackTimes.get(attackCode, 5.0)
+            # Use the provided delayTime, but still handle special cases
+            if attackCode in (ToontownGlobals.BossCogDizzy, ToontownGlobals.BossCogDizzyNow):
+                if self.game.practiceCheatHandler.wantAlwaysStunned:
+                    delayTime = 3600
+                self.hitCount = 0
 
         self.waitForNextAttack(delayTime)
         return
@@ -166,9 +184,9 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def d_setAttackCode(self, attackCode, avId=0, delayTime=0):
         self.sendUpdate('setAttackCode', [attackCode, avId, delayTime])
 
-    def b_setAttackCode(self, attackCode, avId=0, delayTime=0):
-        self.d_setAttackCode(attackCode, avId, delayTime=delayTime)
-        self.setAttackCode(attackCode, avId)
+    def b_setAttackCode(self, attackCode, avId=0, delayTime=None):
+        self.d_setAttackCode(attackCode, avId, delayTime=delayTime if delayTime is not None else 0)
+        self.setAttackCode(attackCode, avId, delayTime=delayTime)
 
     def getDamageMultiplier(self, allowFloat=False):
         mult = self.game.progressValue(1, self.ruleset.CFO_ATTACKS_MULTIPLIER + (0 if allowFloat else 1))
@@ -320,3 +338,11 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
     def setObjectID(self, objId):
         self.objectId = objId
+
+    def __cleanupVoltEffects(self):
+        """Clean up any active VOLT visual effects when stun ends naturally"""
+        # Cancel any scheduled VOLT effect removal tasks
+        taskMgr.remove(self.uniqueName('removeVoltEffect'))
+        
+        # Remove VOLT visual effect from CFO
+        self.game.d_setCFOElementalStatus(2, False)  # ElementType.VOLT = 2, enabled = False

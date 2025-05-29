@@ -17,7 +17,7 @@ from direct.showbase.MessengerGlobal import messenger
 from direct.showbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
-    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube
+    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube, TextNode, Vec4
 from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator, PhysicsManager
 
 from libotp import CFSpeech
@@ -36,6 +36,26 @@ from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORAN
 from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
+from direct.gui.DirectGui import DGG, DirectFrame
+from direct.gui.DirectScrolledList import DirectScrolledList
+from direct.gui.DirectLabel import DirectLabel
+from direct.gui.DirectButton import DirectButton
+from direct.showbase.ShowBaseGlobal import aspect2d
+from direct.task import Task
+from direct.interval.IntervalGlobal import Sequence, Parallel, LerpColorScaleInterval, LerpScaleInterval, Func
+from direct.gui.DirectButton import DirectButton
+from toontown.toonbase import TTLocalizer
+from toontown.battle import BattleParticles
+from direct.interval.IntervalGlobal import Sequence, Parallel, LerpColorScaleInterval, LerpScaleInterval, Func
+
+# Element type constants for expandable elemental system (client-side)
+class ElementType:
+    NONE = 0
+    FIRE = 1
+    VOLT = 2
+    # Future elements can be added here:
+    # ICE = 3
+    # POISON = 4
 
 from tools.match_recording.match_replay import MatchReplay
 
@@ -67,6 +87,18 @@ class DistributedCraneGame(DistributedMinigame):
         self.overlayText.hide()
         self.rulesPanel = None
         self.rulesPanelToggleButton = None
+        self.playButton = None
+        self.participantsButton = None
+        self.bestOfButton = None
+        self.participantsPanel = None
+        self.participantsList = None
+        self.participantsPanelVisible = False
+        self.bestOfValue = 1  # Default to Best of 1
+        self.elementalMode = False  # Default to vanilla mode
+        self.currentRound = 1
+        self.roundWins = {}  # Maps avId -> number of rounds won
+        self.fireElementalIndicators = {}  # Maps safeDoId -> text indicator NodePath
+        self.cfoElementalEffects = {}  # Maps elementType -> effect NodePath for CFO effects
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -139,6 +171,11 @@ class DistributedCraneGame(DistributedMinigame):
         self.addChildGameFSM(self.gameFSM)
 
         self.overtimeActive = False
+
+        # Additive color effect system for proper blending of multiple effects
+        self.cfoColorEffects = {}  # Maps effectName -> color contribution (r, g, b, a)
+        self.cfoBaseColor = (1.0, 1.0, 1.0, 1.0)  # Base normal color
+        self.cfoColorLerpTask = None  # Current color lerp task
 
         # Event recording for game data/replays.
         self.eventRecorder = MatchReplay(timestamp=int(time.time()))
@@ -532,8 +569,6 @@ class DistributedCraneGame(DistributedMinigame):
     def __generateRulesPanel(self):
         panel = CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
         # Create toggle button
-        from direct.gui.DirectButton import DirectButton
-        from toontown.toonbase import TTLocalizer
         btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
         
 
@@ -551,11 +586,302 @@ class DistributedCraneGame(DistributedMinigame):
             command=self.__handlePlayButton
         )
         self.playButton.hide()  # Play button starts hidden
+        
+        # Create participants button next to play button
+        self.participantsButton = DirectButton(
+            relief=None,
+            text='Participants',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(-0.75, 0, 0.85),
+            command=self.__handleParticipantsButton
+        )
+        self.participantsButton.hide()  # Participants button starts hidden
+        
+        # Create best of button next to participants button
+        self.bestOfButton = DirectButton(
+            relief=None,
+            text=f'Best of {self.bestOfValue}',
+            text_scale=0.055,
+            text_pos=(0, -0.02),
+            geom=(btnGeom.find('**/QuitBtn_UP'),
+                  btnGeom.find('**/QuitBtn_DN'),
+                  btnGeom.find('**/QuitBtn_RLVR')),
+            geom_scale=(0.7, 1, 1),
+            pos=(-0.35, 0, 0.85),
+            command=self.__handleBestOfButton
+        )
+        self.bestOfButton.hide()  # Best of button starts hidden
+        
         btnGeom.removeNode()
+        
+        # Initialize participants panel variables
+        self.participantsPanel = None
+        self.participantsPanelVisible = False
+        
         return panel
 
     def __handlePlayButton(self):
         messenger.send(self.rulesDoneEvent)
+
+    def __handleParticipantsButton(self):
+        """Toggle the participants panel visibility"""
+        if self.participantsPanelVisible:
+            self.__hideParticipantsPanel()
+        else:
+            self.__showParticipantsPanel()
+    
+    def __showParticipantsPanel(self):
+        """Create and show the participants panel"""
+        if self.participantsPanel is None:
+            self.__createParticipantsPanel()
+        
+        self.participantsPanel.show()
+        self.participantsPanelVisible = True
+    
+    def __hideParticipantsPanel(self):
+        """Hide the participants panel"""
+        if self.participantsPanel is not None:
+            self.participantsPanel.hide()
+        self.participantsPanelVisible = False
+    
+    def __createParticipantsPanel(self):
+        """Create the participants management panel using proper game UI conventions"""
+        
+        # Create the main panel frame using proper dialog styling
+        self.participantsPanel = DirectFrame(
+            relief=None,
+            image=DGG.getDefaultDialogGeom(),
+            image_color=ToontownGlobals.GlobalDialogColor,
+            image_scale=(1.4, 1, 1.2),
+            pos=(0.8, 0, 0),
+            parent=aspect2d,
+            sortOrder=DGG.NO_FADE_SORT_INDEX
+        )
+        
+        # Title label
+        titleLabel = DirectLabel(
+            parent=self.participantsPanel,
+            relief=None,
+            text="Manage Spawn Order",
+            text_scale=0.08,
+            text_pos=(0, 0.45),
+            text_fg=(0.1, 0.1, 0.4, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Instructions label
+        instructionsLabel = DirectLabel(
+            parent=self.participantsPanel,
+            relief=None,
+            text="Use arrows to change spawn positions",
+            text_scale=0.05,
+            text_pos=(0, 0.35),
+            text_fg=(0.3, 0.3, 0.3, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Load GUI assets for scroll list
+        gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
+        
+        # Create scrolled list for participants using proper game styling
+        self.participantsList = DirectScrolledList(
+            parent=self.participantsPanel,
+            relief=None,
+            pos=(0, 0, 0.05),
+            numItemsVisible=6,
+            forceHeight=0.08,
+            itemFrame_frameSize=(-0.6, 0.6, -0.04, 0.04),
+            itemFrame_pos=(0, 0, 0),
+            itemFrame_relief=DGG.SUNKEN,
+            itemFrame_frameColor=(0.85, 0.95, 1, 1),
+            itemFrame_borderWidth=(0.01, 0.01),
+            # Scroll buttons using proper assets
+            incButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            incButton_relief=None,
+            incButton_scale=(1.0, 1.0, -1.0),
+            incButton_pos=(0.5, 0, -0.35),
+            incButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6),
+            decButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            decButton_relief=None,
+            decButton_scale=(1.0, 1.0, 1.0),
+            decButton_pos=(0.5, 0, 0.25),
+            decButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6)
+        )
+        
+        # Load button assets
+        buttons = loader.loadModel('phase_3/models/gui/dialog_box_buttons_gui')
+        closeButtonImage = (buttons.find('**/CloseBtn_UP'), 
+                          buttons.find('**/CloseBtn_DN'), 
+                          buttons.find('**/CloseBtn_Rllvr'))
+        
+        # Close button using proper styling
+        closeButton = DirectButton(
+            parent=self.participantsPanel,
+            relief=None,
+            image=closeButtonImage,
+            text="Close",
+            text_scale=0.05,
+            text_pos=(0, -0.1),
+            pos=(0, 0, -0.45),
+            command=self.__hideParticipantsPanel
+        )
+        
+        # Clean up loaded models
+        gui.removeNode()
+        buttons.removeNode()
+        
+        # Populate the list with current participants
+        self.__updateParticipantsList()
+        
+        # Initially hide the panel
+        self.participantsPanel.hide()
+    
+    def __updateParticipantsList(self):
+        """Update the participants list display with proper styling"""
+        if self.participantsList is None:
+            return
+            
+        # Clear existing items
+        self.participantsList.removeAllItems()
+        
+        # Load button assets for up/down arrows
+        gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
+        arrowUpImage = (gui.find('**/FndsLst_ScrollUp'),
+                       gui.find('**/FndsLst_ScrollDN'),
+                       gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                       gui.find('**/FndsLst_ScrollUp'))
+        arrowDownImage = (gui.find('**/FndsLst_ScrollUp'),
+                         gui.find('**/FndsLst_ScrollDN'),
+                         gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                         gui.find('**/FndsLst_ScrollUp'))
+        
+        # Get participating toons (not spectating)
+        participatingToons = self.getParticipantsNotSpectating()
+        
+        # Create items for each participating toon in spawn order
+        for i, toon in enumerate(participatingToons):
+            if i >= len(self.toonSpawnpointOrder):
+                break  # Safety check
+                
+            spawnIndex = self.toonSpawnpointOrder[i]
+            toonName = toon.getName() if toon else f"Player {i+1}"
+            
+            # Create item frame
+            itemFrame = DirectFrame(
+                relief=None,
+                frameSize=(-0.6, 0.6, -0.04, 0.04),
+                frameColor=(0.9, 0.9, 0.9, 0.8) if i % 2 == 0 else (0.8, 0.8, 0.8, 0.8)
+            )
+            
+            # Position number label (spawn order)
+            posLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=f"{i+1}.",
+                text_scale=0.035,
+                text_pos=(-0.5, 0, 0),
+                text_fg=(0.2, 0.2, 0.6, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Toon name label
+            nameLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=toonName,
+                text_scale=0.035,
+                text_pos=(-0.2, 0, 0),
+                text_fg=(0.1, 0.1, 0.1, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Spawn point label
+            spawnLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=f"Spot {spawnIndex + 1}",
+                text_scale=0.03,
+                text_pos=(0.15, 0, 0),
+                text_fg=(0.4, 0.4, 0.4, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Up arrow button (only if not first)
+            if i > 0:
+                upButton = DirectButton(
+                    parent=itemFrame,
+                    relief=None,
+                    image=arrowUpImage,
+                    image_scale=(0.4, 1, 0.4),
+                    pos=(0.35, 0, 0),
+                    command=self.__moveParticipantUp,
+                    extraArgs=[i]
+                )
+            
+            # Down arrow button (only if not last)
+            if i < len(participatingToons) - 1:
+                downButton = DirectButton(
+                    parent=itemFrame,
+                    relief=None,
+                    image=arrowDownImage,
+                    image_scale=(0.4, 1, -0.4),  # Negative scale to flip arrow
+                    pos=(0.5, 0, 0),
+                    command=self.__moveParticipantDown,
+                    extraArgs=[i]
+                )
+            
+            # Add to scrolled list
+            self.participantsList.addItem(itemFrame)
+        
+        # Clean up loaded model
+        gui.removeNode()
+
+    def __moveParticipantUp(self, participantIndex):
+        """Move a participant up in the spawn order"""
+        if participantIndex > 0 and participantIndex < len(self.toonSpawnpointOrder):
+            # Swap spawn point indices
+            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex - 1] = \
+                self.toonSpawnpointOrder[participantIndex - 1], self.toonSpawnpointOrder[participantIndex]
+            
+            # Update the display
+            self.__updateParticipantsList()
+            
+            # Send update to server if we're the leader
+            self.__sendSpawnOrderUpdate()
+    
+    def __moveParticipantDown(self, participantIndex):
+        """Move a participant down in the spawn order"""
+        if participantIndex >= 0 and participantIndex < len(self.toonSpawnpointOrder) - 1:
+            # Swap spawn point indices
+            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex + 1] = \
+                self.toonSpawnpointOrder[participantIndex + 1], self.toonSpawnpointOrder[participantIndex]
+            
+            # Update the display
+            self.__updateParticipantsList()
+            
+            # Send update to server if we're the leader
+            self.__sendSpawnOrderUpdate()
+    
+    def __sendSpawnOrderUpdate(self):
+        """Send the updated spawn order to the server"""
+        # Only the leader can send spawn order updates
+        if self.avIdList[0] == base.localAvatar.doId:
+            # Send the updated spawn order to the AI
+            self.sendUpdate('updateSpawnOrder', [self.toonSpawnpointOrder])
 
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
@@ -563,6 +889,17 @@ class DistributedCraneGame(DistributedMinigame):
         if self.playButton is not None:
             self.playButton.destroy()
             self.playButton = None
+        if self.participantsButton is not None:
+            self.participantsButton.destroy()
+            self.participantsButton = None
+        if self.bestOfButton is not None:
+            self.bestOfButton.destroy()
+            self.bestOfButton = None
+        if self.participantsPanel is not None:
+            self.participantsPanel.destroy()
+            self.participantsPanel = None
+            self.participantsList = None
+        self.participantsPanelVisible = False
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -693,14 +1030,36 @@ class DistributedCraneGame(DistributedMinigame):
         self.eventRecorder.add_event(RoundBeginEvent(time.time()))
 
     def exitPlay(self):
-
         if self.boss is not None:
             self.boss.cleanupBossBattle()
-
+        
         self.scoreboard.disableSpectating()
         self.scoreboard.finish()
 
         self.walkStateData.exit()
+
+        # Clean up any elemental indicators
+        for safeDoId in list(self.fireElementalIndicators.keys()):
+            self.__removeElementalIndicator(safeDoId)
+        self.fireElementalIndicators.clear()
+        
+        # Clean up CFO elemental effects
+        for elementType in list(self.cfoElementalEffects.keys()):
+            self.__removeCFOElementalEffect(elementType)
+        self.cfoElementalEffects.clear()
+        
+        # Clean up all CFO color effects
+        self.clearAllCFOColorEffects()
+        
+        # Reset CFO color scale to normal if boss exists
+        if self.boss:
+            try:
+                self.boss.setColorScale(1.0, 1.0, 1.0, 1.0)
+            except:
+                pass
+        
+        # We just need to clean up the victory state
+        return Task.done
 
     def enterVictory(self):
         if self.victor == 0:
@@ -716,7 +1075,21 @@ class DistributedCraneGame(DistributedMinigame):
 
         victor.setAnimState("victory")
 
-        taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        # Check if this is a multi-round match
+        if self.bestOfValue > 1:
+            # Check round wins
+            roundWins = self.roundWins.get(self.victor, 0)
+            winsNeeded = (self.bestOfValue + 1) // 2
+            if roundWins >= winsNeeded:
+                # Match is over - use normal victory flow
+                taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+            else:
+                # Round is over, but match continues - shorter victory time
+                taskMgr.doMethodLater(5, self.__nextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+        else:
+            # Single round match
+            taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+        
         for crane in self.cranes.values():
             crane.stopFlicker()
 
@@ -725,11 +1098,17 @@ class DistributedCraneGame(DistributedMinigame):
 
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))
+        taskMgr.remove(self.uniqueName("craneGameNextRound"))
         camera.reparentTo(base.localAvatar)
 
     def enterCleanup(self):
         self.notify.debug("enterCleanup")
         self.__cleanupRulesPanel()
+        
+        # Clean up fire elemental indicators
+        for safeDoId in list(self.fireElementalIndicators.keys()):
+            self.__removeElementalIndicator(safeDoId)
+        
         for toon in self.getParticipants():
             toon.setGhostMode(False)
             toon.show()
@@ -955,9 +1334,11 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default
         self.rulesPanel.hide()
 
-        # Only show the play button for the leader (first player in avIdList)
+        # Only show the play and participants buttons for the leader (first player in avIdList)
         if self.avIdList[0] == base.localAvatar.doId:
             self.playButton.show()
+            self.participantsButton.show()
+            self.bestOfButton.show()
         else:
             # Non-leader players automatically trigger ready
             messenger.send(self.rulesDoneEvent)
@@ -1208,3 +1589,869 @@ class DistributedCraneGame(DistributedMinigame):
             msg = TTLocalizer.MinigamePleaseWait
         self.waitingStartLabel['text'] = msg
         self.waitingStartLabel.show()
+
+    def setToonSpawnpointOrder(self, order):
+        """Receive updated spawn order from server"""
+        self.toonSpawnpointOrder = order[:]
+        self.notify.info(f"Received spawn order update: {self.toonSpawnpointOrder}")
+        
+        # Update the participants panel if it's visible
+        if self.participantsPanelVisible and self.participantsList is not None:
+            self.__updateParticipantsList()
+
+    def __handleBestOfButton(self):
+        """Handle the "Best of" button click"""
+        # Cycle through Best of 1, 3, 5, 7
+        if self.bestOfValue == 1:
+            self.bestOfValue = 3
+        elif self.bestOfValue == 3:
+            self.bestOfValue = 5
+        elif self.bestOfValue == 5:
+            self.bestOfValue = 7
+        else:
+            self.bestOfValue = 1
+        
+        # Update button text
+        self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
+        
+        # Send update to server if we're the leader
+        if self.avIdList[0] == base.localAvatar.doId:
+            self.sendUpdate('setBestOf', [self.bestOfValue])
+
+    def setBestOf(self, value):
+        """Receive best-of setting from server"""
+        self.bestOfValue = value
+        if self.bestOfButton:
+            self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
+        self.notify.info(f"Best of value set to: {self.bestOfValue}")
+
+    def setRoundInfo(self, currentRound, roundWins):
+        """Receive round information from server"""
+        self.currentRound = currentRound
+        
+        # Convert roundWins list back to dict using avIdList
+        self.roundWins = {}
+        for i, avId in enumerate(self.avIdList):
+            if i < len(roundWins):
+                self.roundWins[avId] = roundWins[i]
+        
+        # Update scoreboard with round information
+        if self.scoreboard:
+            self.scoreboard.setRoundInfo(currentRound, roundWins, self.bestOfValue)
+
+    def setElementalMode(self, enabled):
+        """Receive elemental mode setting from server"""
+        self.elementalMode = enabled
+        self.notify.info(f"Elemental mode set to: {'On' if self.elementalMode else 'Off'}")
+
+    def setSafeElemental(self, safeDoId, elementType):
+        """Handle elemental status updates from server - generic method for all element types"""
+        if elementType == ElementType.NONE:
+            self.__removeElementalIndicator(safeDoId)
+        else:
+            self.__createElementalIndicator(safeDoId, elementType)
+
+    def __createFireElementalIndicator(self, safeDoId):
+        """Create a 'Fire' text indicator above a safe - legacy method for compatibility"""
+        self.__createElementalIndicator(safeDoId, ElementType.FIRE)
+
+    def __removeFireElementalIndicator(self, safeDoId):
+        """Remove the fire elemental indicator from a safe - legacy method for compatibility"""
+        self.__removeElementalIndicator(safeDoId)
+
+    def __createElementalIndicator(self, safeDoId, elementType):
+        """Create an elemental text indicator above a safe based on element type"""
+        # Define element-specific visual properties
+        elementProperties = {
+            ElementType.FIRE: {
+                'useParticles': True,  # Use particle effects instead of text
+                'text': 'FIRE',
+                'color': (1.0, 0.4, 0.0, 1.0),  # Orange-red
+                'scale': 1.5,
+                'height': 10
+            },
+            ElementType.VOLT: {
+                'useParticles': True,  # Use particle effects for VOLT too
+                'text': 'VOLT',
+                'color': (1.0, 0.98, 0.0, 1.0),  # Electric yellow
+                'scale': 1.5,
+                'height': 10
+            },
+            # Future elements can have different visual styles:
+            # ElementType.ICE: {
+            #     'text': 'Ice',
+            #     'color': (0.3, 0.7, 1, 1),  # Light blue
+            #     'scale': 1.4,
+            #     'height': 18
+            # },
+            # ElementType.POISON: {
+            #     'text': 'Poison',
+            #     'color': (0.5, 1, 0.2, 1),  # Bright green
+            #     'scale': 1.3,
+            #     'height': 22
+            # }
+        }
+        
+        if elementType not in elementProperties:
+            self.notify.warning(f"Unknown element type for indicator: {elementType}")
+            return
+            
+        props = elementProperties[elementType]
+        
+        # Find the safe object
+        safe = None
+        if self.boss and hasattr(self.boss, 'safes'):
+            for safeIndex, safeObj in self.boss.safes.items():
+                if safeObj.doId == safeDoId:
+                    safe = safeObj
+                    break
+        
+        # Fallback: search through distributed objects by doId
+        if not safe:
+            safe = base.cr.doId2do.get(safeDoId)
+        
+        if not safe:
+            self.notify.warning(f"Could not find safe {safeDoId} for elemental indicator")
+            return
+        
+        # Remove existing indicator if present
+        self.__removeElementalIndicator(safeDoId)
+        
+        if props.get('useParticles', False):
+            # Create particle effects based on element type
+            if elementType == ElementType.FIRE:
+                elementalEffect = self.__createFireParticleEffect(safe, props)
+            elif elementType == ElementType.VOLT:
+                elementalEffect = self.__createVoltParticleEffect(safe, props)
+            else:
+                # Fallback to text for unknown particle types
+                elementalEffect = self.__createTextIndicator(safe, props)
+        else:
+            # Create text indicator for other elements
+            elementalEffect = self.__createTextIndicator(safe, props)
+        
+        # Store the indicator (using the old dict for compatibility)
+        self.fireElementalIndicators[safeDoId] = elementalEffect
+        
+        elementName = props['text']
+        self.notify.info(f"Created {elementName} elemental indicator for safe {safeDoId}")
+
+    def __createFireParticleEffect(self, safe, props):
+        """Create fire particle effects for Fire elemental safes"""
+        
+        # Load the battle particles system
+        BattleParticles.loadParticles()
+        
+        # Create a container node for the fire effects - position at center of safe
+        fireContainer = safe.attachNewNode('fireElementalEffect')
+        fireContainer.setPos(0, 0, 5)  # Just above ground level
+        fireContainer.setScale(0.01, 0.01, 0.01)  # Start very small instead of 0 to avoid transform issues
+        
+        # Create one large central fire effect that extends well beyond the safe
+        baseFlameEffect = BattleParticles.createParticleEffect(file='firedBaseFlame')
+        BattleParticles.setEffectTexture(baseFlameEffect, 'fire')
+        baseFlameEffect.reparentTo(fireContainer)
+        baseFlameEffect.setPos(0, 0, 0)
+        baseFlameEffect.setScale(12.0, 12.0, 15.0)  # Very large central fire effect
+        
+        # Store reference to the effect for cleanup using PythonTag
+        fireContainer.setPythonTag('baseFlameEffect', baseFlameEffect)
+        
+        # Start the fire effect first
+        baseFlameEffect.start(fireContainer, fireContainer)
+        
+        # Make individual particles bigger and smooth the animation
+        # Use the same method as BattleParticles.setEffectTexture()
+        try:
+            particles = baseFlameEffect.getParticlesNamed('particles-1')
+            if particles:
+                renderer = particles.getRenderer()
+                
+                # Particles grow from very small to final size for smooth appearance
+                renderer.setInitialXScale(0.01)   # Start very small instead of 0
+                renderer.setInitialYScale(0.01)   # Start very small instead of 0
+                renderer.setFinalXScale(0.25)     # Grow to desired size
+                renderer.setFinalYScale(0.75)     # Grow to desired size
+                
+                # Enable smooth scaling interpolation
+                renderer.setXScaleFlag(1)  # Enable X scale interpolation
+                renderer.setYScaleFlag(1)  # Enable Y scale interpolation
+                
+                # Smooth the animation by adjusting particle properties
+                # Increase birth rate for smoother spawning
+                particles.setBirthRate(0.01)  # More frequent spawning (was 0.02)
+                
+                # Increase lifespan for smoother transitions
+                particles.factory.setLifespanBase(0.4)     # Longer life for growing animation
+                particles.factory.setLifespanSpread(0.1)   # Add some randomness
+                
+                # Adjust litter size for more consistent spawning
+                particles.setLitterSize(6)     # Fewer per spawn but more frequent
+                particles.setLitterSpread(2)   # Add some variation
+                
+                # Improve alpha blending for smoother transitions
+                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)  # Smooth fade out
+                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)  # Linear blending
+                
+                self.notify.info("Successfully modified fire particle sizes and smoothed animation")
+        except Exception as e:
+            self.notify.warning(f"Could not modify particle properties: {e}")
+        
+        # Create smooth appearance animation with safety checks
+        try:
+            # Safe gets a fiery orange glow
+            safeGlowInterval = LerpColorScaleInterval(
+                safe, 1.0,  # 1 second duration
+                colorScale=(1.3, 0.7, 0.4, 1.0),  # Fiery orange tint
+                startColorScale=(1.0, 1.0, 1.0, 1.0)  # Start from normal
+            )
+            
+            # Fire particles scale up smoothly from very small to normal
+            particleScaleInterval = LerpScaleInterval(
+                fireContainer, 1.0,  # 1 second duration
+                scale=(1.0, 1.0, 1.0),  # Scale to normal size
+                startScale=(0.01, 0.01, 0.01)  # Start very small
+            )
+            
+            # Play both animations in parallel for smooth appearance
+            appearanceInterval = Parallel(safeGlowInterval, particleScaleInterval)
+            appearanceInterval.start()
+            
+            # Store the appearance interval for potential cleanup
+            fireContainer.setPythonTag('appearanceInterval', appearanceInterval)
+            
+        except Exception as e:
+            self.notify.warning(f"Could not create appearance animation: {e}")
+            # Fallback: set to normal scale immediately
+            fireContainer.setScale(1.0, 1.0, 1.0)
+            safe.setColorScale(1.3, 0.7, 0.4, 1.0)
+        
+        return fireContainer
+
+    def __createVoltParticleEffect(self, safe, props):
+        """Create electric/lightning particle effects for VOLT elemental safes"""
+        
+        # Load the battle particles system
+        BattleParticles.loadParticles()
+        
+        # Create a container node for the electric effects - position at center of safe
+        voltContainer = safe.attachNewNode('voltElementalEffect')
+        voltContainer.setPos(0, 0, 5)  # Just above ground level
+        voltContainer.setScale(0.01, 0.01, 0.01)  # Start very small instead of 0 to avoid transform issues
+        
+        # Create the main electric spark effect using existing spark particles
+        sparkEffect = BattleParticles.createParticleEffect(file='tnt')  # Use the TNT spark effect as base
+        BattleParticles.setEffectTexture(sparkEffect, 'spark')  # Use spark texture
+        sparkEffect.reparentTo(voltContainer)
+        sparkEffect.setPos(0, 0, 0)
+        sparkEffect.setScale(24.0, 24.0, 28.0)  # Large electric effect around the safe
+        
+        # Store reference to the effect for cleanup using PythonTag
+        voltContainer.setPythonTag('sparkEffect', sparkEffect)
+        
+        # Start the electric effect first
+        sparkEffect.start(voltContainer, voltContainer)
+        
+        # Customize the spark particles for electric effect
+        try:
+            particles = sparkEffect.getParticlesNamed('particles-1')
+            if particles:
+                renderer = particles.getRenderer()
+                
+                # Electric sparks should be quick and jagged
+                renderer.setInitialXScale(0.1)   # Start medium size
+                renderer.setInitialYScale(0.1)   
+                renderer.setFinalXScale(0.5)     # Grow slightly  
+                renderer.setFinalYScale(0.8)    # But become very thin (lightning-like)
+                
+                # Enable smooth scaling interpolation
+                renderer.setXScaleFlag(1)  # Enable X scale interpolation
+                renderer.setYScaleFlag(1)  # Enable Y scale interpolation
+                
+                # Set electric yellow color
+                renderer.setColor(Vec4(1.0, 0.85, 0.6, 1.0))  # Darker electric yellow-white
+                
+                # Quick, crackling electric animation
+                particles.setBirthRate(0.005)  # Very frequent spawning for electric crackle
+                
+                # Short, sharp electric bursts
+                particles.factory.setLifespanBase(0.2)     # Very short life for quick zaps
+                particles.factory.setLifespanSpread(0.1)   # Some randomness
+                
+                # More litter for electric crackling effect
+                particles.setLitterSize(3)     # More sparks per spawn
+                particles.setLitterSpread(1)   # Some variation
+                
+                # Electric alpha blending for bright sparks
+                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)  # Fade out
+                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)  # Linear blending
+                
+                self.notify.info("Successfully modified electric particle properties")
+        except Exception as e:
+            self.notify.warning(f"Could not modify electric particle properties: {e}")
+        
+        # Create smooth appearance animation with electric blue-white glow
+        try:
+            # Safe gets an electric yellow-white glow
+            safeGlowInterval = LerpColorScaleInterval(
+                safe, 0.8,  # 0.8 second duration for quick electric response
+                colorScale=(1.15, 1.15, 0.5, 1.0),  # Darker electric yellow-white tint
+                startColorScale=(1.0, 1.0, 1.0, 1.0)  # Start from normal
+            )
+            
+            # Electric particles scale up quickly
+            particleScaleInterval = LerpScaleInterval(
+                voltContainer, 0.8,  # 0.8 second duration for quick response
+                scale=(1.0, 1.0, 1.0),  # Scale to normal size
+                startScale=(0.01, 0.01, 0.01)  # Start very small
+            )
+            
+            # Play both animations in parallel for electric appearance
+            appearanceInterval = Parallel(safeGlowInterval, particleScaleInterval)
+            appearanceInterval.start()
+            
+            # Store the appearance interval for potential cleanup
+            voltContainer.setPythonTag('appearanceInterval', appearanceInterval)
+            
+        except Exception as e:
+            self.notify.warning(f"Could not create electric appearance animation: {e}")
+            # Fallback: set to normal scale immediately
+            voltContainer.setScale(1.0, 1.0, 1.0)
+            safe.setColorScale(1.2, 1.2, 0.6, 1.0)
+        
+        return voltContainer
+
+    def __createTextIndicator(self, safe, props):
+        """Create text indicator for non-Fire elemental safes"""
+        # Create elemental text indicator using TextNode for proper 3D positioning
+        textNode = TextNode(f'{props["text"].lower()}ElementalText')
+        textNode.setText(props['text'])
+        textNode.setTextColor(*props['color'])
+        textNode.setAlign(TextNode.ACenter)
+        textNode.setShadow(0.05, 0.05)
+        textNode.setShadowColor(0, 0, 0, 1)  # Black shadow
+        
+        # Create NodePath and set properties
+        elementalText = safe.attachNewNode(textNode)
+        elementalText.setScale(props['scale'])
+        elementalText.setPos(0, 0, props['height'])  # Position above the safe
+        elementalText.setBillboardPointEye()  # Always face the camera
+        
+        return elementalText
+
+    def __removeElementalIndicator(self, safeDoId):
+        """Remove any elemental indicator from a safe"""
+        if safeDoId in self.fireElementalIndicators:
+            indicator = self.fireElementalIndicators[safeDoId]
+            
+            # Check if this is a particle effect container by checking for PythonTags
+            baseFlameEffect = indicator.getPythonTag('baseFlameEffect')
+            sparkEffect = indicator.getPythonTag('sparkEffect')
+            
+            if baseFlameEffect is not None or sparkEffect is not None:
+                # Find the safe object
+                safe = None
+                if self.boss and hasattr(self.boss, 'safes'):
+                    for safeIndex, safeObj in self.boss.safes.items():
+                        if safeObj.doId == safeDoId:
+                            safe = safeObj
+                            break
+                
+                # Fallback: search through distributed objects by doId
+                if not safe:
+                    safe = base.cr.doId2do.get(safeDoId)
+                
+                if safe:
+                    # Create smooth disappearance animation
+                    if baseFlameEffect is not None:
+                        # Fire effect cleanup
+                        safeGlowFadeInterval = LerpColorScaleInterval(
+                            safe, 0.8,  # 0.8 second duration
+                            colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
+                            startColorScale=(1.3, 0.7, 0.4, 1.0)  # From fiery orange
+                        )
+                    elif sparkEffect is not None:
+                        # VOLT effect cleanup
+                        safeGlowFadeInterval = LerpColorScaleInterval(
+                            safe, 0.6,  # 0.6 second duration for quick electric fade
+                            colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
+                            startColorScale=(1.2, 1.2, 0.6, 1.0)  # From electric yellow-white
+                        )
+                    
+                    # Particles scale down to very small instead of 0
+                    particleScaleDownInterval = LerpScaleInterval(
+                        indicator, 0.6 if sparkEffect else 0.8,  # Faster fade for electric
+                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                        startScale=(1.0, 1.0, 1.0)  # From normal size
+                    )
+                    
+                    # Clean up after animation completes
+                    def cleanupParticleEffect():
+                        try:
+                            if baseFlameEffect:
+                                baseFlameEffect.cleanup()
+                            if sparkEffect:
+                                sparkEffect.cleanup()
+                        except:
+                            pass  # Ignore cleanup errors
+                        
+                        # Remove the node
+                        if not indicator.isEmpty():
+                            indicator.removeNode()
+                    
+                    # Play both animations in parallel, then cleanup
+                    disappearanceInterval = Sequence(
+                        Parallel(safeGlowFadeInterval, particleScaleDownInterval),
+                        Func(cleanupParticleEffect)
+                    )
+                    disappearanceInterval.start()
+                else:
+                    # Fallback: immediate cleanup if safe not found
+                    try:
+                        if baseFlameEffect:
+                            baseFlameEffect.cleanup()
+                        if sparkEffect:
+                            sparkEffect.cleanup()
+                    except:
+                        pass
+                    if not indicator.isEmpty():
+                        indicator.removeNode()
+            else:
+                # This is a text indicator - remove immediately
+                if not indicator.isEmpty():
+                    indicator.removeNode()
+            
+            # Remove from dictionary
+            del self.fireElementalIndicators[safeDoId]
+            self.notify.info(f"Removed elemental indicator for safe {safeDoId}")
+
+    def __nextRound(self, task=None):
+        """Transition to the next round"""
+        # The server will handle the transition to the next round automatically
+        # We just need to clean up the victory state
+        return Task.done
+
+    def setCFOElementalStatus(self, elementType, enabled):
+        """Handle CFO elemental status updates from server"""
+        if enabled:
+            self.__createCFOElementalEffect(elementType)
+        else:
+            self.__removeCFOElementalEffect(elementType)
+
+    def __createCFOElementalEffect(self, elementType):
+        """Create elemental effects on the CFO"""
+        if elementType == ElementType.FIRE:
+            self.__createCFOFireEffect()
+        elif elementType == ElementType.VOLT:
+            self.__createCFOVoltEffect()
+        # Future element types can be handled here:
+        # elif elementType == ElementType.ICE:
+        #     self.__createCFOIceEffect()
+
+    def __createCFOFireEffect(self):
+        """Create fire effects on the CFO when he's taking Fire DoT"""
+        if not self.boss:
+            self.notify.warning("Cannot create CFO fire effect - no boss found")
+            return
+            
+        # Remove existing fire effect if present
+        self.__removeCFOElementalEffect(ElementType.FIRE)
+        
+        # Load the battle particles system
+        BattleParticles.loadParticles()
+        
+        # Create a container node for the fire effects on the CFO
+        fireContainer = self.boss.attachNewNode('cfoFireElementalEffect')
+        fireContainer.setPos(0, 0, 8)  # Position above CFO's center
+        fireContainer.setScale(0.01, 0.01, 0.01)  # Start very small for smooth appearance
+        
+        # Create large fire effect that engulfs the CFO
+        fireEffect = BattleParticles.createParticleEffect(file='firedBaseFlame')
+        BattleParticles.setEffectTexture(fireEffect, 'fire')
+        fireEffect.reparentTo(fireContainer)
+        fireEffect.setPos(0, 0, 0)
+        fireEffect.setScale(25.0, 25.0, 30.0)  # Very large to engulf the CFO
+        
+        # Store reference to the effect for cleanup
+        fireContainer.setPythonTag('fireEffect', fireEffect)
+        
+        # Start the fire effect
+        fireEffect.start(fireContainer, fireContainer)
+        
+        # Make individual particles bigger for dramatic effect
+        try:
+            particles = fireEffect.getParticlesNamed('particles-1')
+            if particles:
+                renderer = particles.getRenderer()
+                
+                # Large particles that grow over time
+                renderer.setInitialXScale(0.1)   # Start larger than safe fire
+                renderer.setInitialYScale(0.1)   
+                renderer.setFinalXScale(0.5)     # Grow to very large size
+                renderer.setFinalYScale(1.0)     # Extra tall flames
+                
+                # Enable smooth scaling interpolation
+                renderer.setXScaleFlag(1)
+                renderer.setYScaleFlag(1)
+                
+                # Dramatic fire animation settings
+                particles.setBirthRate(0.005)     # More frequent spawning for intensity
+                particles.factory.setLifespanBase(0.6)    # Longer life for sustained effect
+                particles.factory.setLifespanSpread(0.2)  
+                particles.setLitterSize(8)        # More particles per spawn
+                particles.setLitterSpread(3)      
+                
+                # Improved blending for dramatic effect
+                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)
+                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)
+                
+                self.notify.info("CFO fire effect particles configured successfully")
+        except Exception as e:
+            self.notify.warning(f"Could not modify CFO fire particle properties: {e}")
+        
+        # Create smooth appearance animation
+        try:
+            # Add fire color effect using the additive system
+            fireColorContribution = (1.4, 0.6, 0.3, 1.0)  # Fiery orange tint
+            self.addCFOColorEffect('fire', fireColorContribution, duration=0.6)
+            
+            # Fire particles scale up smoothly
+            particleScaleInterval = LerpScaleInterval(
+                fireContainer, 0.6,  # 0.6 second duration for snappy response
+                scale=(1.0, 1.0, 1.0),  # Scale to normal size
+                startScale=(0.01, 0.01, 0.01)
+            )
+            
+            # Start particle animation
+            particleScaleInterval.start()
+            
+            # Store the appearance interval for cleanup
+            fireContainer.setPythonTag('appearanceInterval', particleScaleInterval)
+            
+        except Exception as e:
+            self.notify.warning(f"Could not create CFO fire appearance animation: {e}")
+            # Fallback: set effects immediately
+            fireContainer.setScale(1.0, 1.0, 1.0)
+            fireColorContribution = (1.4, 0.6, 0.3, 1.0)
+            self.addCFOColorEffect('fire', fireColorContribution, duration=0.0)
+        
+        # Store the fire effect
+        self.cfoElementalEffects[ElementType.FIRE] = fireContainer
+        self.notify.info("Created fire effect on CFO")
+
+    def __createCFOVoltEffect(self):
+        """Create electric effects on the CFO when he's taking VOLT DoT"""
+        if not self.boss:
+            self.notify.warning("Cannot create CFO volt effect - no boss found")
+            return
+            
+        # Remove existing volt effect if present
+        self.__removeCFOElementalEffect(ElementType.VOLT)
+        
+        # Load the battle particles system
+        BattleParticles.loadParticles()
+        
+        # Create a container node for the electric effects on the CFO
+        voltContainer = self.boss.attachNewNode('cfoVoltElementalEffect')
+        voltContainer.setPos(0, 0, 8)  # Position above CFO's center
+        voltContainer.setScale(0.01, 0.01, 0.01)  # Start very small for smooth appearance
+        
+        # Create multiple electric spark effects for dramatic CFO electrocution
+        sparkEffect = BattleParticles.createParticleEffect(file='tnt')
+        BattleParticles.setEffectTexture(sparkEffect, 'spark')
+        sparkEffect.reparentTo(voltContainer)
+        sparkEffect.setPos(0, 0, 0)  # Center
+        sparkEffect.setScale(45.0, 45.0, 50.0)  # Very large to engulf the CFO
+        
+        # Store references to all effects for cleanup
+        voltContainer.setPythonTag('sparkEffect1', sparkEffect)
+        
+        # Start all electric effects
+        sparkEffect.start(voltContainer, voltContainer)
+        
+        # Customize all spark effects for intense electric CFO effect
+        for i, effect in enumerate([sparkEffect], 1):
+            try:
+                particles = effect.getParticlesNamed('particles-1')
+                if particles:
+                    renderer = particles.getRenderer()
+                    
+                    # Intense electric sparks for CFO electrocution
+                    renderer.setInitialXScale(0.2)   # Start larger for dramatic effect
+                    renderer.setInitialYScale(0.2)   
+                    renderer.setFinalXScale(0.8)     # Grow to very large electric bolts
+                    renderer.setFinalYScale(1.4)     # Very thin like lightning
+                    
+                    # Enable smooth scaling interpolation
+                    renderer.setXScaleFlag(1)
+                    renderer.setYScaleFlag(1)
+                    
+                    # Bright electric yellow-white color
+                    renderer.setColor(Vec4(1.0, 0.85, 0.6, 1.0))  # Darker electric yellow-white
+                    
+                    # Intense electric crackling animation
+                    particles.setBirthRate(0.002)     # Very frequent for intense effect
+                    
+                    # Quick electric bursts for CFO effect
+                    particles.factory.setLifespanBase(0.3)     # Slightly longer for visibility
+                    particles.factory.setLifespanSpread(0.15)   
+                    
+                    # More intense electric crackling
+                    particles.setLitterSize(5 + i)     # Increasing intensity per effect
+                    particles.setLitterSpread(2)       
+                    
+                    # Bright electric blending
+                    renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)
+                    renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)
+                    
+                    self.notify.info(f"CFO electric effect {i} particles configured successfully")
+            except Exception as e:
+                self.notify.warning(f"Could not modify CFO electric effect {i} particle properties: {e}")
+        
+        # Create smooth appearance animation with intense electric effect
+        try:
+            # Add electric color effect using the additive system
+            voltColorContribution = (1.2, 1.2, 0.6, 1.0)  # Darker electric yellow-white tint
+            self.addCFOColorEffect('volt', voltColorContribution, duration=0.5)
+            
+            # Electric particles scale up dramatically and quickly
+            particleScaleInterval = LerpScaleInterval(
+                voltContainer, 0.5,  # 0.5 second duration for quick electric response
+                scale=(1.0, 1.0, 1.0),  # Scale to normal size
+                startScale=(0.01, 0.01, 0.01)
+            )
+            
+            # Start particle animation
+            particleScaleInterval.start()
+            
+            # Store the appearance interval for cleanup
+            voltContainer.setPythonTag('appearanceInterval', particleScaleInterval)
+            
+        except Exception as e:
+            self.notify.warning(f"Could not create CFO electric appearance animation: {e}")
+            # Fallback: set effects immediately
+            voltContainer.setScale(1.0, 1.0, 1.0)
+            voltColorContribution = (1.2, 1.2, 0.6, 1.0)
+            self.addCFOColorEffect('volt', voltColorContribution, duration=0.0)
+        
+        # Store the volt effect
+        self.cfoElementalEffects[ElementType.VOLT] = voltContainer
+        self.notify.info("Created electric effect on CFO")
+
+    def __removeCFOElementalEffect(self, elementType):
+        """Remove elemental effects from the CFO"""
+        if elementType not in self.cfoElementalEffects:
+            return
+            
+        effect = self.cfoElementalEffects[elementType]
+        
+        if elementType == ElementType.FIRE:
+            # Create smooth disappearance animation for fire effect
+            try:
+                # Remove fire color effect using the additive system
+                self.removeCFOColorEffect('fire', duration=1.0)
+                
+                # Fire particles scale down
+                particleScaleDownInterval = LerpScaleInterval(
+                    effect, 1.0,  # 1 second duration
+                    scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                    startScale=(1.0, 1.0, 1.0)
+                )
+                
+                # Clean up after animation
+                def cleanupCFOFireEffect():
+                    try:
+                        fireEffect = effect.getPythonTag('fireEffect')
+                        if fireEffect:
+                            fireEffect.cleanup()
+                    except:
+                        pass
+                    
+                    if not effect.isEmpty():
+                        effect.removeNode()
+                
+                # Play disappearance animation then cleanup
+                disappearanceInterval = Sequence(
+                    particleScaleDownInterval,
+                    Func(cleanupCFOFireEffect)
+                )
+                disappearanceInterval.start()
+            except Exception as e:
+                self.notify.warning(f"Error during CFO fire effect removal: {e}")
+                # Fallback: immediate cleanup
+                self.removeCFOColorEffect('fire', duration=0.0)
+                if not effect.isEmpty():
+                    effect.removeNode()
+        elif elementType == ElementType.VOLT:
+            # Create smooth disappearance animation for electric effect
+            try:
+                # Remove volt color effect using the additive system
+                self.removeCFOColorEffect('volt', duration=0.7)
+                
+                # Electric particles scale down quickly
+                particleScaleDownInterval = LerpScaleInterval(
+                    effect, 0.7,  # 0.7 second duration for quick electric fade
+                    scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                    startScale=(1.0, 1.0, 1.0)
+                )
+                
+                # Clean up after animation
+                def cleanupCFOVoltEffect():
+                    try:
+                        # Cleanup spark effect
+                        sparkEffect = effect.getPythonTag('sparkEffect1')
+                        if sparkEffect:
+                            sparkEffect.cleanup()
+                    except:
+                        pass
+                    
+                    if not effect.isEmpty():
+                        effect.removeNode()
+                
+                # Play disappearance animation then cleanup
+                disappearanceInterval = Sequence(
+                    particleScaleDownInterval,
+                    Func(cleanupCFOVoltEffect)
+                )
+                disappearanceInterval.start()
+            except Exception as e:
+                self.notify.warning(f"Error during CFO electric effect removal: {e}")
+                # Fallback: immediate cleanup
+                self.removeCFOColorEffect('volt', duration=0.0)
+                if not effect.isEmpty():
+                    effect.removeNode()
+        else:
+            # For other element types, just remove immediately
+            if not effect.isEmpty():
+                effect.removeNode()
+        
+        # Remove from dictionary
+        del self.cfoElementalEffects[elementType]
+        
+        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"Removed {elementName} effect from CFO")
+
+    def disable(self):
+        # Clean up any elemental indicators
+        for safeDoId in list(self.fireElementalIndicators.keys()):
+            self.__removeElementalIndicator(safeDoId)
+        self.fireElementalIndicators.clear()
+        
+        # Clean up CFO elemental effects
+        for elementType in list(self.cfoElementalEffects.keys()):
+            self.__removeCFOElementalEffect(elementType)
+        self.cfoElementalEffects.clear()
+        
+        # Clean up all CFO color effects
+        self.clearAllCFOColorEffects()
+        
+        if self.boss:
+            # Reset CFO color scale to normal
+            try:
+                self.boss.setColorScale(1.0, 1.0, 1.0, 1.0)
+            except:
+                pass
+        
+        DistributedMinigame.disable(self)
+
+    def addCFOColorEffect(self, effectName, colorContribution, duration=0.5):
+        """Add a color effect to the CFO using additive blending"""
+        if not self.boss:
+            return
+            
+        # Store the color contribution for this effect
+        self.cfoColorEffects[effectName] = colorContribution
+        
+        # Calculate the new target color by combining all active effects
+        targetColor = self.__calculateCombinedCFOColor()
+        
+        # Smoothly transition to the new color
+        self.__lerpCFOColorTo(targetColor, duration)
+        
+        activeEffects = list(self.cfoColorEffects.keys())
+        self.notify.info(f"Added CFO color effect '{effectName}': {colorContribution}")
+        self.notify.info(f"Active effects: {activeEffects} -> Combined target: {targetColor}")
+
+    def removeCFOColorEffect(self, effectName, duration=0.5):
+        """Remove a color effect from the CFO using additive blending"""
+        if effectName not in self.cfoColorEffects:
+            self.notify.info(f"CFO color effect '{effectName}' not found to remove")
+            return
+            
+        if not self.boss:
+            return
+            
+        # Remove the color contribution
+        del self.cfoColorEffects[effectName]
+        
+        # Calculate the new target color without this effect
+        targetColor = self.__calculateCombinedCFOColor()
+        
+        # Smoothly transition to the new color
+        self.__lerpCFOColorTo(targetColor, duration)
+        
+        activeEffects = list(self.cfoColorEffects.keys())
+        self.notify.info(f"Removed CFO color effect '{effectName}'")
+        self.notify.info(f"Remaining effects: {activeEffects} -> Combined target: {targetColor}")
+
+    def __calculateCombinedCFOColor(self):
+        """Calculate the combined color from all active effects"""
+        if not self.cfoColorEffects:
+            return self.cfoBaseColor
+            
+        # Start with base color
+        r, g, b, a = self.cfoBaseColor
+        
+        # Add contributions from all active effects
+        for effectName, (dr, dg, db, da) in self.cfoColorEffects.items():
+            r += dr - 1.0  # Convert from color scale to additive offset
+            g += dg - 1.0
+            b += db - 1.0
+            a += da - 1.0
+            
+        # Clamp values to reasonable ranges
+        r = max(0.1, min(3.0, r))  # Prevent too dark or too bright
+        g = max(0.1, min(3.0, g))
+        b = max(0.1, min(3.0, b))
+        a = max(0.1, min(2.0, a))
+        
+        combinedColor = (r, g, b, a)
+        self.notify.debug(f"Combined CFO color calculation: Base {self.cfoBaseColor} + Effects {self.cfoColorEffects} = {combinedColor}")
+        
+        return combinedColor
+
+    def __lerpCFOColorTo(self, targetColor, duration):
+        """Smoothly lerp the CFO color to a target color"""
+        if not self.boss:
+            return
+            
+        # Stop any existing color lerp
+        if self.cfoColorLerpTask:
+            self.cfoColorLerpTask.pause()
+            self.cfoColorLerpTask = None
+            
+        # Get current color
+        currentColor = self.boss.getColorScale()
+        
+        # Create smooth color transition
+        self.cfoColorLerpTask = LerpColorScaleInterval(
+            self.boss, duration,
+            colorScale=targetColor,
+            startColorScale=currentColor,
+            blendType='easeInOut'
+        )
+        
+        # Start the transition
+        self.cfoColorLerpTask.start()
+        
+        self.notify.info(f"Lerping CFO color from {currentColor} to {targetColor} over {duration}s")
+
+    def clearAllCFOColorEffects(self):
+        """Clear all color effects and return to base color"""
+        if not self.boss:
+            return
+            
+        self.cfoColorEffects.clear()
+        
+        # Return to base color
+        self.__lerpCFOColorTo(self.cfoBaseColor, 1.0)
