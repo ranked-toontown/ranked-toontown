@@ -24,7 +24,7 @@ from libotp import CFSpeech
 from libotp.nametag import NametagGlobals
 from otp.otpbase import OTPGlobals
 from tools.match_recording import match_serializer
-from tools.match_recording.match_event import PointEvent, RoundEndEvent, RoundBeginEvent
+from tools.match_recording.match_event import PointEvent, RoundEndEvent, RoundBeginEvent, ComboChangeEvent
 from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.BossSpeedrunTimer import BossSpeedrunTimedTimer, BossSpeedrunTimer
 from toontown.coghq.CashbotBossScoreboard import CashbotBossScoreboard
@@ -1160,6 +1160,11 @@ class DistributedCraneGame(DistributedMinigame):
 
     def updateCombo(self, avId, comboLength):
         self.scoreboard.setCombo(avId, comboLength)
+
+        av = base.cr.getDo(avId)
+        if av is not None:
+            player = self.eventRecorder.get_metadata().get_or_create_player(av.getDoId(), name=av.getName())
+            self.eventRecorder.add_event(ComboChangeEvent(time.time(), player.get_id(), comboLength))
 
     def updateTimer(self, secs):
         self.bossSpeedrunTimer.override_time(secs)

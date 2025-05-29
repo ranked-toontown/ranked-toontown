@@ -81,7 +81,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.elementalTaskName = None  # Track the elemental system task
         self.elementalCycleCounter = 0  # Track elemental cycle count
 
-        self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
+        self.comboTrackers: dict[int, CashbotBossComboTracker] = {}  # Maps avId -> CashbotBossComboTracker instance
 
         self.gameFSM = ClassicFSM.ClassicFSM('DistributedMinigameTemplateAI',
                                [

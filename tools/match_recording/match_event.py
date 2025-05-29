@@ -86,6 +86,33 @@ class PointEvent(MatchEvent):
             data["points"]
         )
 
+class ComboChangeEvent(MatchEvent):
+
+    def __init__(self, timestamp: float, player_id: int, chain: int):
+        super().__init__(timestamp)
+        self.player_id: int = player_id
+        self.chain: int = chain
+
+    @classmethod
+    def get_event_type(cls) -> int:
+        return 4
+
+    def serialize(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "event": self.get_event_type(),
+            "player": self.player_id,
+            "chain": self.chain
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any]):
+        return ComboChangeEvent(
+            data['timestamp'],
+            data['player'],
+            data["chain"]
+        )
+
 
 class RoundBeginEvent(MatchEvent):
 
