@@ -37,7 +37,11 @@ from direct.gui.DirectLabel import DirectLabel
 from direct.gui.DirectButton import DirectButton
 from direct.showbase.ShowBaseGlobal import aspect2d
 from direct.task import Task
-
+from direct.interval.IntervalGlobal import Sequence, Parallel, LerpColorScaleInterval, LerpScaleInterval, Func
+from direct.gui.DirectButton import DirectButton
+from toontown.toonbase import TTLocalizer
+from toontown.battle import BattleParticles
+from direct.interval.IntervalGlobal import Sequence, Parallel, LerpColorScaleInterval, LerpScaleInterval, Func
 
 # Element type constants for expandable elemental system (client-side)
 class ElementType:
@@ -550,8 +554,6 @@ class DistributedCraneGame(DistributedMinigame):
     def __generateRulesPanel(self):
         panel = CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
         # Create toggle button
-        from direct.gui.DirectButton import DirectButton
-        from toontown.toonbase import TTLocalizer
         btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
         
 
@@ -1674,7 +1676,6 @@ class DistributedCraneGame(DistributedMinigame):
 
     def __createFireParticleEffect(self, safe, props):
         """Create fire particle effects for Fire elemental safes"""
-        from toontown.battle import BattleParticles
         
         # Load the battle particles system
         BattleParticles.loadParticles()
@@ -1682,6 +1683,7 @@ class DistributedCraneGame(DistributedMinigame):
         # Create a container node for the fire effects - position at center of safe
         fireContainer = safe.attachNewNode('fireElementalEffect')
         fireContainer.setPos(0, 0, 5)  # Just above ground level
+        fireContainer.setScale(0.01, 0.01, 0.01)  # Start very small instead of 0 to avoid transform issues
         
         # Create one large central fire effect that extends well beyond the safe
         baseFlameEffect = BattleParticles.createParticleEffect(file='firedBaseFlame')
@@ -1690,6 +1692,12 @@ class DistributedCraneGame(DistributedMinigame):
         baseFlameEffect.setPos(0, 0, 0)
         baseFlameEffect.setScale(12.0, 12.0, 15.0)  # Very large central fire effect
         
+        # Store reference to the effect for cleanup using PythonTag
+        fireContainer.setPythonTag('baseFlameEffect', baseFlameEffect)
+        
+        # Start the fire effect first
+        baseFlameEffect.start(fireContainer, fireContainer)
+        
         # Make individual particles bigger and smooth the animation
         # Use the same method as BattleParticles.setEffectTexture()
         try:
@@ -1697,11 +1705,11 @@ class DistributedCraneGame(DistributedMinigame):
             if particles:
                 renderer = particles.getRenderer()
                 
-                # Increase the size of individual particles significantly
-                renderer.setInitialXScale(0.25)  # Start 2x bigger than default
-                renderer.setInitialYScale(0.75)  # Start 4x bigger in Y (taller flames)
-                renderer.setFinalXScale(0.25)    # End up 4x bigger in X
-                renderer.setFinalYScale(0.75)    # End up 6x bigger in Y (much taller)
+                # Particles grow from very small to final size for smooth appearance
+                renderer.setInitialXScale(0.01)   # Start very small instead of 0
+                renderer.setInitialYScale(0.01)   # Start very small instead of 0
+                renderer.setFinalXScale(0.25)     # Grow to desired size
+                renderer.setFinalYScale(0.75)     # Grow to desired size
                 
                 # Enable smooth scaling interpolation
                 renderer.setXScaleFlag(1)  # Enable X scale interpolation
@@ -1712,7 +1720,7 @@ class DistributedCraneGame(DistributedMinigame):
                 particles.setBirthRate(0.01)  # More frequent spawning (was 0.02)
                 
                 # Increase lifespan for smoother transitions
-                particles.factory.setLifespanBase(0.3)     # Longer life (was 0.1)
+                particles.factory.setLifespanBase(0.4)     # Longer life for growing animation
                 particles.factory.setLifespanSpread(0.1)   # Add some randomness
                 
                 # Adjust litter size for more consistent spawning
@@ -1727,11 +1735,34 @@ class DistributedCraneGame(DistributedMinigame):
         except Exception as e:
             self.notify.warning(f"Could not modify particle properties: {e}")
         
-        # Start the fire effect
-        baseFlameEffect.start(fireContainer, fireContainer)
-        
-        # Store reference to the effect for cleanup using PythonTag
-        fireContainer.setPythonTag('baseFlameEffect', baseFlameEffect)
+        # Create smooth appearance animation with safety checks
+        try:
+            # Safe gets a fiery orange glow
+            safeGlowInterval = LerpColorScaleInterval(
+                safe, 1.0,  # 1 second duration
+                colorScale=(1.3, 0.7, 0.4, 1.0),  # Fiery orange tint
+                startColorScale=(1.0, 1.0, 1.0, 1.0)  # Start from normal
+            )
+            
+            # Fire particles scale up smoothly from very small to normal
+            particleScaleInterval = LerpScaleInterval(
+                fireContainer, 1.0,  # 1 second duration
+                scale=(1.0, 1.0, 1.0),  # Scale to normal size
+                startScale=(0.01, 0.01, 0.01)  # Start very small
+            )
+            
+            # Play both animations in parallel for smooth appearance
+            appearanceInterval = Parallel(safeGlowInterval, particleScaleInterval)
+            appearanceInterval.start()
+            
+            # Store the appearance interval for potential cleanup
+            fireContainer.setPythonTag('appearanceInterval', appearanceInterval)
+            
+        except Exception as e:
+            self.notify.warning(f"Could not create appearance animation: {e}")
+            # Fallback: set to normal scale immediately
+            fireContainer.setScale(1.0, 1.0, 1.0)
+            safe.setColorScale(1.3, 0.7, 0.4, 1.0)
         
         return fireContainer
 
@@ -1761,16 +1792,66 @@ class DistributedCraneGame(DistributedMinigame):
             # Check if this is a fire particle effect container by checking for PythonTags
             baseFlameEffect = indicator.getPythonTag('baseFlameEffect')
             
-            # Clean up the fire effect properly
             if baseFlameEffect is not None:
-                try:
-                    baseFlameEffect.cleanup()
-                except:
-                    pass  # Ignore cleanup errors
+                # Find the safe object
+                safe = None
+                if self.boss and hasattr(self.boss, 'safes'):
+                    for safeIndex, safeObj in self.boss.safes.items():
+                        if safeObj.doId == safeDoId:
+                            safe = safeObj
+                            break
+                
+                # Fallback: search through distributed objects by doId
+                if not safe:
+                    safe = base.cr.doId2do.get(safeDoId)
+                
+                if safe:
+                    # Create smooth disappearance animation
+                    # Safe glow fades back to normal
+                    safeGlowFadeInterval = LerpColorScaleInterval(
+                        safe, 0.8,  # 0.8 second duration
+                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
+                        startColorScale=(1.3, 0.7, 0.4, 1.0)  # From fiery orange
+                    )
+                    
+                    # Fire particles scale down to very small instead of 0
+                    particleScaleDownInterval = LerpScaleInterval(
+                        indicator, 0.8,  # 0.8 second duration
+                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                        startScale=(1.0, 1.0, 1.0)  # From normal size
+                    )
+                    
+                    # Clean up after animation completes
+                    def cleanupFireEffect():
+                        try:
+                            baseFlameEffect.cleanup()
+                        except:
+                            pass  # Ignore cleanup errors
+                        
+                        # Remove the node
+                        if not indicator.isEmpty():
+                            indicator.removeNode()
+                    
+                    # Play both animations in parallel, then cleanup
+                    disappearanceInterval = Sequence(
+                        Parallel(safeGlowFadeInterval, particleScaleDownInterval),
+                        Func(cleanupFireEffect)
+                    )
+                    disappearanceInterval.start()
+                else:
+                    # Fallback: immediate cleanup if safe not found
+                    try:
+                        baseFlameEffect.cleanup()
+                    except:
+                        pass
+                    if not indicator.isEmpty():
+                        indicator.removeNode()
+            else:
+                # This is a text indicator - remove immediately
+                if not indicator.isEmpty():
+                    indicator.removeNode()
             
-            # Remove the node
-            if not indicator.isEmpty():
-                indicator.removeNode()
+            # Remove from dictionary
             del self.fireElementalIndicators[safeDoId]
             self.notify.info(f"Removed elemental indicator for safe {safeDoId}")
 
