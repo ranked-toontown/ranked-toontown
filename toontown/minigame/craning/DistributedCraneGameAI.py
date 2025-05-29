@@ -74,6 +74,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Elemental mode system - refactored for multiple element types
         self.elementalSafes = {}  # Maps safe doId -> ElementType for tracking active elementals
+        self.previousCycleElementalSafes = set()  # Track which safes had elements in the previous cycle
         self.elementalTaskName = None  # Task name for elemental system
         self.elementalDoTTasks = {}  # Maps unique DoT ID -> task info for tracking active DoTs
         self.nextDoTId = 0  # Counter for unique DoT IDs
@@ -909,7 +910,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.d_setSafeElemental(safeDoId, ElementType.NONE)
         self.elementalSafes.clear()
         
-        self.notify.info("Elemental system stopped")
+        # Reset the previous cycle tracker for a clean restart
+        self.previousCycleElementalSafes.clear()
+        
+        self.notify.info("Elemental system stopped and previous cycle tracker reset")
 
     def __elementalSystemTask(self, task):
         """Task that runs every 5 seconds to potentially assign fire elements to safes"""
@@ -928,17 +932,24 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         """Check all available safes for fire elemental assignment"""
         self.notify.info(f"Checking all safes for fire elemental - total safes: {len(self.safes)}")
         
+        # Track which safes currently have elements before we start the new cycle
+        currentElementalSafeIds = set(self.elementalSafes.keys())
+        
         # Get all safes that are available (not grabbed, not already fire elemental)
         availableSafes = []
         for safe in self.safes:
             # Include more states: Initial, Free, Dropped, SlidingFloor, WaitFree
+            # Exclude safes that had elements in the previous cycle
             if (safe.doId not in self.elementalSafes and 
+                safe.doId not in self.previousCycleElementalSafes and
                 safe.state in ['Initial', 'Free', 'Dropped', 'SlidingFloor', 'WaitFree']):
                 availableSafes.append(safe)
         
-        self.notify.info(f"Available safes for fire element: {len(availableSafes)}")
+        self.notify.info(f"Available safes for fire element: {len(availableSafes)} (excluded {len(self.previousCycleElementalSafes)} from previous cycle)")
         if not availableSafes:
             self.notify.info("No available safes for fire element")
+            # Update previous cycle tracker before returning
+            self.previousCycleElementalSafes = currentElementalSafeIds
             return
         
         # Check each safe individually for fire elemental chance
@@ -952,8 +963,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 self.__assignElementalToSafe(safe, elementType)
                 safesAssigned += 1
         
+        # Update the previous cycle tracker with safes that had elements this cycle
+        # This ensures they won't be eligible for elements in the next cycle
+        self.previousCycleElementalSafes = currentElementalSafeIds
         
-        self.notify.info(f"Assigned elemental effects to {safesAssigned} safes this cycle")
+        self.notify.info(f"Assigned elemental effects to {safesAssigned} safes this cycle. Previous cycle had {len(self.previousCycleElementalSafes)} elemental safes.")
 
     def __assignElementalToSafe(self, safe, elementType):
         """Assign an elemental type to a specific safe"""
