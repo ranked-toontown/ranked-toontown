@@ -373,8 +373,6 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
 
         # Update stats and add track combo for points
         self.boss.addScore(avId, self.boss.ruleset.POINTS_GOON_STOMP, reason=CraneLeagueGlobals.ScoreReason.GOON_STOMP)
-        comboTracker = self.boss.comboTrackers[avId]
-        comboTracker.incrementCombo(math.ceil((comboTracker.combo+1.0) / 4.0))
 
         DistributedGoonAI.DistributedGoonAI.requestStunned(self, pauseTime)
 
