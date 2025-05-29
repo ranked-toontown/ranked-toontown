@@ -925,14 +925,14 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             return task.done
             
         # Check all available safes for fire elemental chance
-        self.__checkAllSafesForFireElemental()
+        self.__checkAllSafesForElemental()
         
         # Schedule next check in 5 seconds
         return task.again
 
-    def __checkAllSafesForFireElemental(self):
-        """Check all available safes for fire elemental assignment"""
-        self.notify.info(f"Checking all safes for fire elemental - total safes: {len(self.safes)}")
+    def __checkAllSafesForElemental(self):
+        """Check all available safes for elemental assignment"""
+        self.notify.info(f"Checking all safes for elemental - total safes: {len(self.safes)}")
         
         # Track which safes currently have elements before we start the new cycle
         currentElementalSafeIds = set(self.elementalSafes.keys())
@@ -947,19 +947,19 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 safe.state in ['Initial', 'Free', 'Dropped', 'SlidingFloor', 'WaitFree']):
                 availableSafes.append(safe)
         
-        self.notify.info(f"Available safes for fire element: {len(availableSafes)} (excluded {len(self.previousCycleElementalSafes)} from previous cycle)")
+        self.notify.info(f"Available safes for element: {len(availableSafes)} (excluded {len(self.previousCycleElementalSafes)} from previous cycle)")
         if not availableSafes:
-            self.notify.info("No available safes for fire element")
+            self.notify.info("No available safes for element")
             # Update previous cycle tracker before returning
             self.previousCycleElementalSafes = currentElementalSafeIds
             return
         
-        # Check each safe individually for fire elemental chance
+        # Check each safe individually for elemental chance
         safesAssigned = 0
         for safe in availableSafes:
-            # Each safe has a 50% chance to become fire elemental (adjust as needed)
+            # Each safe has a 10% chance to become elemental (adjust as needed)
             roll = random.random()
-            if roll < 0.5:  # 50% chance per safe
+            if roll < 0.1:  # 10% chance per safe
                 # Randomly choose between FIRE and VOLT elements
                 elementType = random.choice([ElementType.FIRE, ElementType.VOLT])
                 self.__assignElementalToSafe(safe, elementType)
