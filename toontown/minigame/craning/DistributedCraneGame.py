@@ -166,6 +166,11 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.overtimeActive = False
 
+        # Additive color effect system for proper blending of multiple effects
+        self.cfoColorEffects = {}  # Maps effectName -> color contribution (r, g, b, a)
+        self.cfoBaseColor = (1.0, 1.0, 1.0, 1.0)  # Base normal color
+        self.cfoColorLerpTask = None  # Current color lerp task
+
     def getTitle(self):
         return TTLocalizer.CraneGameTitle
 
@@ -1033,6 +1038,9 @@ class DistributedCraneGame(DistributedMinigame):
             self.__removeCFOElementalEffect(elementType)
         self.cfoElementalEffects.clear()
         
+        # Clean up all CFO color effects
+        self.clearAllCFOColorEffects()
+        
         # Reset CFO color scale to normal if boss exists
         if self.boss:
             try:
@@ -1833,7 +1841,7 @@ class DistributedCraneGame(DistributedMinigame):
                 renderer.setYScaleFlag(1)  # Enable Y scale interpolation
                 
                 # Set electric yellow color
-                renderer.setColor(Vec4(1.0, 0.98, 0.0, 1.0))  # Bright electric yellow
+                renderer.setColor(Vec4(1.0, 0.85, 0.6, 1.0))  # Darker electric yellow-white
                 
                 # Quick, crackling electric animation
                 particles.setBirthRate(0.005)  # Very frequent spawning for electric crackle
@@ -1859,7 +1867,7 @@ class DistributedCraneGame(DistributedMinigame):
             # Safe gets an electric yellow-white glow
             safeGlowInterval = LerpColorScaleInterval(
                 safe, 0.8,  # 0.8 second duration for quick electric response
-                colorScale=(1.2, 1.2, 0.6, 1.0),  # Electric yellow-white tint
+                colorScale=(1.15, 1.15, 0.5, 1.0),  # Darker electric yellow-white tint
                 startColorScale=(1.0, 1.0, 1.0, 1.0)  # Start from normal
             )
             
@@ -2075,35 +2083,29 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Create smooth appearance animation
         try:
-            # Get the current color to start from (in case there's a red flash in progress)
-            currentColor = self.boss.getColorScale()
+            # Add fire color effect using the additive system
+            fireColorContribution = (1.4, 0.6, 0.3, 1.0)  # Fiery orange tint
+            self.addCFOColorEffect('fire', fireColorContribution, duration=0.6)
             
-            # CFO gets fiery orange glow - start from current color instead of assuming white
-            cfoGlowInterval = LerpColorScaleInterval(
-                self.boss, 0.6,  # 0.6 second duration for snappy response
-                colorScale=(1.4, 0.6, 0.3, 1.0),  # Intense fiery orange tint
-                startColorScale=currentColor  # Start from whatever color CFO currently has
-            )
-            
-            # Fire particles scale up dramatically
+            # Fire particles scale up smoothly
             particleScaleInterval = LerpScaleInterval(
                 fireContainer, 0.6,  # 0.6 second duration for snappy response
                 scale=(1.0, 1.0, 1.0),  # Scale to normal size
                 startScale=(0.01, 0.01, 0.01)
             )
             
-            # Play both animations in parallel
-            appearanceInterval = Parallel(cfoGlowInterval, particleScaleInterval)
-            appearanceInterval.start()
+            # Start particle animation
+            particleScaleInterval.start()
             
             # Store the appearance interval for cleanup
-            fireContainer.setPythonTag('appearanceInterval', appearanceInterval)
+            fireContainer.setPythonTag('appearanceInterval', particleScaleInterval)
             
         except Exception as e:
             self.notify.warning(f"Could not create CFO fire appearance animation: {e}")
             # Fallback: set effects immediately
             fireContainer.setScale(1.0, 1.0, 1.0)
-            self.boss.setColorScale(1.4, 0.6, 0.3, 1.0)
+            fireColorContribution = (1.4, 0.6, 0.3, 1.0)
+            self.addCFOColorEffect('fire', fireColorContribution, duration=0.0)
         
         # Store the fire effect
         self.cfoElementalEffects[ElementType.FIRE] = fireContainer
@@ -2149,15 +2151,15 @@ class DistributedCraneGame(DistributedMinigame):
                     # Intense electric sparks for CFO electrocution
                     renderer.setInitialXScale(0.2)   # Start larger for dramatic effect
                     renderer.setInitialYScale(0.2)   
-                    renderer.setFinalXScale(0.6)     # Grow to very large electric bolts
-                    renderer.setFinalYScale(0.8)     # Very thin like lightning
+                    renderer.setFinalXScale(0.8)     # Grow to very large electric bolts
+                    renderer.setFinalYScale(1.4)     # Very thin like lightning
                     
                     # Enable smooth scaling interpolation
                     renderer.setXScaleFlag(1)
                     renderer.setYScaleFlag(1)
                     
                     # Bright electric yellow-white color
-                    renderer.setColor(Vec4(1.0, 1.0, 0.8, 1.0))  # Bright electric yellow-white
+                    renderer.setColor(Vec4(1.0, 0.85, 0.6, 1.0))  # Darker electric yellow-white
                     
                     # Intense electric crackling animation
                     particles.setBirthRate(0.002)     # Very frequent for intense effect
@@ -2180,15 +2182,9 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Create smooth appearance animation with intense electric effect
         try:
-            # Get the current color to start from (in case there's another effect in progress)
-            currentColor = self.boss.getColorScale()
-            
-            # CFO gets intense electric yellow-white glow
-            cfoGlowInterval = LerpColorScaleInterval(
-                self.boss, 0.5,  # 0.5 second duration for quick electric response
-                colorScale=(1.3, 1.3, 0.8, 1.0),  # Intense electric yellow-white tint
-                startColorScale=currentColor  # Start from whatever color CFO currently has
-            )
+            # Add electric color effect using the additive system
+            voltColorContribution = (1.2, 1.2, 0.6, 1.0)  # Darker electric yellow-white tint
+            self.addCFOColorEffect('volt', voltColorContribution, duration=0.5)
             
             # Electric particles scale up dramatically and quickly
             particleScaleInterval = LerpScaleInterval(
@@ -2197,18 +2193,18 @@ class DistributedCraneGame(DistributedMinigame):
                 startScale=(0.01, 0.01, 0.01)
             )
             
-            # Play both animations in parallel
-            appearanceInterval = Parallel(cfoGlowInterval, particleScaleInterval)
-            appearanceInterval.start()
+            # Start particle animation
+            particleScaleInterval.start()
             
             # Store the appearance interval for cleanup
-            voltContainer.setPythonTag('appearanceInterval', appearanceInterval)
+            voltContainer.setPythonTag('appearanceInterval', particleScaleInterval)
             
         except Exception as e:
             self.notify.warning(f"Could not create CFO electric appearance animation: {e}")
             # Fallback: set effects immediately
             voltContainer.setScale(1.0, 1.0, 1.0)
-            self.boss.setColorScale(1.3, 1.3, 0.8, 1.0)
+            voltColorContribution = (1.2, 1.2, 0.6, 1.0)
+            self.addCFOColorEffect('volt', voltColorContribution, duration=0.0)
         
         # Store the volt effect
         self.cfoElementalEffects[ElementType.VOLT] = voltContainer
@@ -2224,99 +2220,76 @@ class DistributedCraneGame(DistributedMinigame):
         if elementType == ElementType.FIRE:
             # Create smooth disappearance animation for fire effect
             try:
-                # CFO glow fades back to normal
-                if self.boss:
-                    # Get current color in case there are other effects in progress
-                    currentColor = self.boss.getColorScale()
+                # Remove fire color effect using the additive system
+                self.removeCFOColorEffect('fire', duration=1.0)
+                
+                # Fire particles scale down
+                particleScaleDownInterval = LerpScaleInterval(
+                    effect, 1.0,  # 1 second duration
+                    scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                    startScale=(1.0, 1.0, 1.0)
+                )
+                
+                # Clean up after animation
+                def cleanupCFOFireEffect():
+                    try:
+                        fireEffect = effect.getPythonTag('fireEffect')
+                        if fireEffect:
+                            fireEffect.cleanup()
+                    except:
+                        pass
                     
-                    cfoGlowFadeInterval = LerpColorScaleInterval(
-                        self.boss, 1.0,  # 1 second duration
-                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                        startColorScale=currentColor  # From whatever color CFO currently has
-                    )
-                    
-                    # Fire particles scale down
-                    particleScaleDownInterval = LerpScaleInterval(
-                        effect, 1.0,  # 1 second duration
-                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
-                        startScale=(1.0, 1.0, 1.0)
-                    )
-                    
-                    # Clean up after animation
-                    def cleanupCFOFireEffect():
-                        try:
-                            fireEffect = effect.getPythonTag('fireEffect')
-                            if fireEffect:
-                                fireEffect.cleanup()
-                        except:
-                            pass
-                        
-                        if not effect.isEmpty():
-                            effect.removeNode()
-                    
-                    # Play disappearance animation then cleanup
-                    disappearanceInterval = Sequence(
-                        Parallel(cfoGlowFadeInterval, particleScaleDownInterval),
-                        Func(cleanupCFOFireEffect)
-                    )
-                    disappearanceInterval.start()
-                else:
-                    # No boss available, immediate cleanup
                     if not effect.isEmpty():
                         effect.removeNode()
+                
+                # Play disappearance animation then cleanup
+                disappearanceInterval = Sequence(
+                    particleScaleDownInterval,
+                    Func(cleanupCFOFireEffect)
+                )
+                disappearanceInterval.start()
             except Exception as e:
                 self.notify.warning(f"Error during CFO fire effect removal: {e}")
                 # Fallback: immediate cleanup
+                self.removeCFOColorEffect('fire', duration=0.0)
                 if not effect.isEmpty():
                     effect.removeNode()
         elif elementType == ElementType.VOLT:
             # Create smooth disappearance animation for electric effect
             try:
-                # CFO glow fades back to normal
-                if self.boss:
-                    # Get current color in case there are other effects in progress
-                    currentColor = self.boss.getColorScale()
+                # Remove volt color effect using the additive system
+                self.removeCFOColorEffect('volt', duration=0.7)
+                
+                # Electric particles scale down quickly
+                particleScaleDownInterval = LerpScaleInterval(
+                    effect, 0.7,  # 0.7 second duration for quick electric fade
+                    scale=(0.01, 0.01, 0.01),  # Scale down to very small
+                    startScale=(1.0, 1.0, 1.0)
+                )
+                
+                # Clean up after animation
+                def cleanupCFOVoltEffect():
+                    try:
+                        # Cleanup spark effect
+                        sparkEffect = effect.getPythonTag('sparkEffect1')
+                        if sparkEffect:
+                            sparkEffect.cleanup()
+                    except:
+                        pass
                     
-                    cfoGlowFadeInterval = LerpColorScaleInterval(
-                        self.boss, 0.7,  # 0.7 second duration for quick electric fade
-                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                        startColorScale=currentColor  # From whatever color CFO currently has
-                    )
-                    
-                    # Electric particles scale down quickly
-                    particleScaleDownInterval = LerpScaleInterval(
-                        effect, 0.7,  # 0.7 second duration for quick electric fade
-                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
-                        startScale=(1.0, 1.0, 1.0)
-                    )
-                    
-                    # Clean up after animation
-                    def cleanupCFOVoltEffect():
-                        try:
-                            # Cleanup all spark effects
-                            for i in range(1, 4):
-                                sparkEffect = effect.getPythonTag(f'sparkEffect{i}')
-                                if sparkEffect:
-                                    sparkEffect.cleanup()
-                        except:
-                            pass
-                        
-                        if not effect.isEmpty():
-                            effect.removeNode()
-                    
-                    # Play disappearance animation then cleanup
-                    disappearanceInterval = Sequence(
-                        Parallel(cfoGlowFadeInterval, particleScaleDownInterval),
-                        Func(cleanupCFOVoltEffect)
-                    )
-                    disappearanceInterval.start()
-                else:
-                    # No boss available, immediate cleanup
                     if not effect.isEmpty():
                         effect.removeNode()
+                
+                # Play disappearance animation then cleanup
+                disappearanceInterval = Sequence(
+                    particleScaleDownInterval,
+                    Func(cleanupCFOVoltEffect)
+                )
+                disappearanceInterval.start()
             except Exception as e:
                 self.notify.warning(f"Error during CFO electric effect removal: {e}")
                 # Fallback: immediate cleanup
+                self.removeCFOColorEffect('volt', duration=0.0)
                 if not effect.isEmpty():
                     effect.removeNode()
         else:
@@ -2341,6 +2314,9 @@ class DistributedCraneGame(DistributedMinigame):
             self.__removeCFOElementalEffect(elementType)
         self.cfoElementalEffects.clear()
         
+        # Clean up all CFO color effects
+        self.clearAllCFOColorEffects()
+        
         if self.boss:
             # Reset CFO color scale to normal
             try:
@@ -2349,3 +2325,105 @@ class DistributedCraneGame(DistributedMinigame):
                 pass
         
         DistributedMinigame.disable(self)
+
+    def addCFOColorEffect(self, effectName, colorContribution, duration=0.5):
+        """Add a color effect to the CFO using additive blending"""
+        if not self.boss:
+            return
+            
+        # Store the color contribution for this effect
+        self.cfoColorEffects[effectName] = colorContribution
+        
+        # Calculate the new target color by combining all active effects
+        targetColor = self.__calculateCombinedCFOColor()
+        
+        # Smoothly transition to the new color
+        self.__lerpCFOColorTo(targetColor, duration)
+        
+        activeEffects = list(self.cfoColorEffects.keys())
+        self.notify.info(f"Added CFO color effect '{effectName}': {colorContribution}")
+        self.notify.info(f"Active effects: {activeEffects} -> Combined target: {targetColor}")
+
+    def removeCFOColorEffect(self, effectName, duration=0.5):
+        """Remove a color effect from the CFO using additive blending"""
+        if effectName not in self.cfoColorEffects:
+            self.notify.info(f"CFO color effect '{effectName}' not found to remove")
+            return
+            
+        if not self.boss:
+            return
+            
+        # Remove the color contribution
+        del self.cfoColorEffects[effectName]
+        
+        # Calculate the new target color without this effect
+        targetColor = self.__calculateCombinedCFOColor()
+        
+        # Smoothly transition to the new color
+        self.__lerpCFOColorTo(targetColor, duration)
+        
+        activeEffects = list(self.cfoColorEffects.keys())
+        self.notify.info(f"Removed CFO color effect '{effectName}'")
+        self.notify.info(f"Remaining effects: {activeEffects} -> Combined target: {targetColor}")
+
+    def __calculateCombinedCFOColor(self):
+        """Calculate the combined color from all active effects"""
+        if not self.cfoColorEffects:
+            return self.cfoBaseColor
+            
+        # Start with base color
+        r, g, b, a = self.cfoBaseColor
+        
+        # Add contributions from all active effects
+        for effectName, (dr, dg, db, da) in self.cfoColorEffects.items():
+            r += dr - 1.0  # Convert from color scale to additive offset
+            g += dg - 1.0
+            b += db - 1.0
+            a += da - 1.0
+            
+        # Clamp values to reasonable ranges
+        r = max(0.1, min(3.0, r))  # Prevent too dark or too bright
+        g = max(0.1, min(3.0, g))
+        b = max(0.1, min(3.0, b))
+        a = max(0.1, min(2.0, a))
+        
+        combinedColor = (r, g, b, a)
+        self.notify.debug(f"Combined CFO color calculation: Base {self.cfoBaseColor} + Effects {self.cfoColorEffects} = {combinedColor}")
+        
+        return combinedColor
+
+    def __lerpCFOColorTo(self, targetColor, duration):
+        """Smoothly lerp the CFO color to a target color"""
+        if not self.boss:
+            return
+            
+        # Stop any existing color lerp
+        if self.cfoColorLerpTask:
+            self.cfoColorLerpTask.pause()
+            self.cfoColorLerpTask = None
+            
+        # Get current color
+        currentColor = self.boss.getColorScale()
+        
+        # Create smooth color transition
+        self.cfoColorLerpTask = LerpColorScaleInterval(
+            self.boss, duration,
+            colorScale=targetColor,
+            startColorScale=currentColor,
+            blendType='easeInOut'
+        )
+        
+        # Start the transition
+        self.cfoColorLerpTask.start()
+        
+        self.notify.info(f"Lerping CFO color from {currentColor} to {targetColor} over {duration}s")
+
+    def clearAllCFOColorEffects(self):
+        """Clear all color effects and return to base color"""
+        if not self.boss:
+            return
+            
+        self.cfoColorEffects.clear()
+        
+        # Return to base color
+        self.__lerpCFOColorTo(self.cfoBaseColor, 1.0)

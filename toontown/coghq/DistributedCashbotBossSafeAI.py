@@ -212,11 +212,12 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         
         boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=delayTime)
         
-        # Trigger CFO VOLT visual effect for the duration of the stun
+        # Trigger CFO VOLT visual effect for the duration of the VOLT contribution (not entire stun)
+        voltEffectDuration = self.boss.progressValue(6, 3)  # VOLT effect lasts for VOLT contribution time
         self.boss.d_setCFOElementalStatus(2, True)  # ElementType.VOLT = 2, enabled = True
         
-        # Schedule removal of VOLT effect when stun ends
-        taskMgr.doMethodLater(delayTime, self.__removeVoltEffectFromCFO, 
+        # Schedule removal of VOLT effect when VOLT contribution ends (not when stun ends)
+        taskMgr.doMethodLater(voltEffectDuration, self.__removeVoltEffectFromCFO, 
                              self.boss.getBoss().uniqueName('removeVoltEffect'))
         
         # Apply the damage from the VOLT stun
@@ -266,8 +267,9 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         # Cancel any existing VOLT effect removal task
         taskMgr.remove(boss.uniqueName('removeVoltEffect'))
         
-        # Schedule new removal of VOLT effect when extended stun ends
-        taskMgr.doMethodLater(totalStunTime, self.__removeVoltEffectFromCFO, 
+        # Schedule new removal of VOLT effect when VOLT extension contribution ends (not total stun)
+        voltEffectDuration = extensionTime  # VOLT effect lasts for VOLT extension contribution time
+        taskMgr.doMethodLater(voltEffectDuration, self.__removeVoltEffectFromCFO, 
                              boss.uniqueName('removeVoltEffect'))
         
         # Give points for the re-stun
