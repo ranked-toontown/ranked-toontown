@@ -82,20 +82,30 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.ruleset = ruleset
 
     def doNextAttack(self, task):
+        # Check if we're transitioning out of a stun state - if so, clean up any VOLT effects
+        wasStunned = self.attackCode == ToontownGlobals.BossCogDizzy
+        
         # Choose an attack and do it.
 
         # Make sure we're waiting for a helmet.
-        if self.heldObject is None and not self.waitingForHelmet:
+        if self.heldObject == None and not self.waitingForHelmet:
             self.waitForNextHelmet()
 
         # Rare chance to do a jump attack if we want it
         if self.ruleset.WANT_CFO_JUMP_ATTACK:
             if random.randint(0, 99) < self.ruleset.CFO_JUMP_ATTACK_CHANCE:
                 self.__doAreaAttack()
+                # Clean up VOLT effects if we were stunned and are now attacking
+                if wasStunned:
+                    self.__cleanupVoltEffects()
                 return
 
         # Do a directed attack.
         self.__doDirectedAttack()
+        
+        # Clean up VOLT effects if we were stunned and are now attacking
+        if wasStunned:
+            self.__cleanupVoltEffects()
 
     def __findEligibleTargets(self):
         """
@@ -328,3 +338,11 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
     def setObjectID(self, objId):
         self.objectId = objId
+
+    def __cleanupVoltEffects(self):
+        """Clean up any active VOLT visual effects when stun ends naturally"""
+        # Cancel any scheduled VOLT effect removal tasks
+        taskMgr.remove(self.uniqueName('removeVoltEffect'))
+        
+        # Remove VOLT visual effect from CFO
+        self.game.d_setCFOElementalStatus(2, False)  # ElementType.VOLT = 2, enabled = False
