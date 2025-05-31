@@ -158,6 +158,11 @@ class OpenSkillMatch:
         # Now we can apply modifiers for certain things.
         # First, the most important, we need to apply "catchup" SR to equalize. This has nothing to do with the match.
         for player in self.new_player_data.values():
+
+            # If this person drew, don't even bother with this step.
+            if sr_adjustments[player.identifier] == 0:
+                continue
+
             mu_to_sr = mu_to_skill_rating(player.mu)
             # How big is the gap? Rate this from -400-400.
             gap = mu_to_sr - player.skill_rating
