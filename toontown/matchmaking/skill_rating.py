@@ -163,10 +163,10 @@ class OpenSkillMatch:
             gap = mu_to_sr - player.skill_rating
             # If gap is positive, that means they deserve higher SR, so we should apply a bonus.
             if gap > 0:
-                sr_adjustments[player.identifier] += interpolate_number(1, 15, gap/400)
+                sr_adjustments[player.identifier] += interpolate_number(0, 10, gap/500)
             # Gap is negative, we need to slow them down as they are getting inflated/boosted.
             else:
-                sr_adjustments[player.identifier] -= interpolate_number(0, 10, gap/-400)
+                sr_adjustments[player.identifier] -= interpolate_number(0, 10, gap/-500)
 
         # Todo: apply more modifiers, such as match mvp, underdog close game wins, penalize expected wins, etc.
 
