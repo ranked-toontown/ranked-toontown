@@ -32,9 +32,16 @@ class ToontownControlManager(ControlManager):
         right = controls.MOVE_RIGHT
         jump = controls.JUMP
 
+        # Check if user already has arrow keys configured to avoid duplicates
+        user_has_arrow_up = (up == "arrow_up")
+        user_has_arrow_down = (down == "arrow_down")
+        user_has_arrow_left = (left == "arrow_left")
+        user_has_arrow_right = (right == "arrow_right")
+
         self.inputStateTokens.extend((
             inputState.watch("run", 'runningEvent', "running-on", "running-off"),
 
+            # User-configured movement keys
             inputState.watchWithModifiers("forward", up, inputSource=inputState.ArrowKeys),
             inputState.watch("forward", "force-forward", "force-forward-stop"),
 
@@ -51,6 +58,24 @@ class ToontownControlManager(ControlManager):
 
             inputState.watchWithModifiers("jump", jump),
         ))
+
+        # Add default arrow key bindings (only if user doesn't already have them configured)
+        if not user_has_arrow_up:
+            self.inputStateTokens.append(
+                inputState.watchWithModifiers("forward", "arrow_up", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_down:
+            self.inputStateTokens.append(
+                inputState.watchWithModifiers("reverse", "arrow_down", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_left:
+            self.inputStateTokens.append(
+                inputState.watchWithModifiers("turnLeft", "arrow_left", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_right:
+            self.inputStateTokens.append(
+                inputState.watchWithModifiers("turnRight", "arrow_right", inputSource=inputState.ArrowKeys)
+            )
 
         self.setTurn(1)
 
@@ -92,11 +117,27 @@ class ToontownControlManager(ControlManager):
         left = controls.MOVE_LEFT
         right = controls.MOVE_RIGHT
 
+        # Check if user already has arrow keys configured to avoid duplicates
+        user_has_arrow_left = (left == "arrow_left")
+        user_has_arrow_right = (right == "arrow_right")
+
         if turn:
-            self.WASDTurnTokens = (
+            turn_tokens = [
                 inputState.watchWithModifiers("turnLeft", left, inputSource=inputState.ArrowKeys),
                 inputState.watchWithModifiers("turnRight", right, inputSource=inputState.ArrowKeys),
-            )
+            ]
+            
+            # Add default arrow key bindings for turn mode (only if user doesn't already have them)
+            if not user_has_arrow_left:
+                turn_tokens.append(
+                    inputState.watchWithModifiers("turnLeft", "arrow_left", inputSource=inputState.ArrowKeys)
+                )
+            if not user_has_arrow_right:
+                turn_tokens.append(
+                    inputState.watchWithModifiers("turnRight", "arrow_right", inputSource=inputState.ArrowKeys)
+                )
+            
+            self.WASDTurnTokens = tuple(turn_tokens)
 
             inputState.set("turnLeft", slideLeftWASDSet, inputSource=inputState.ArrowKeys)
             inputState.set("turnRight", slideRightWASDSet, inputSource=inputState.ArrowKeys)
@@ -105,10 +146,22 @@ class ToontownControlManager(ControlManager):
             inputState.set("slideRight", False, inputSource=inputState.ArrowKeys)
 
         else:
-            self.WASDTurnTokens = (
+            slide_tokens = [
                 inputState.watchWithModifiers("slideLeft", left, inputSource=inputState.ArrowKeys),
                 inputState.watchWithModifiers("slideRight", right, inputSource=inputState.ArrowKeys),
-            )
+            ]
+            
+            # Add default arrow key bindings for slide mode (only if user doesn't already have them)
+            if not user_has_arrow_left:
+                slide_tokens.append(
+                    inputState.watchWithModifiers("slideLeft", "arrow_left", inputSource=inputState.ArrowKeys)
+                )
+            if not user_has_arrow_right:
+                slide_tokens.append(
+                    inputState.watchWithModifiers("slideRight", "arrow_right", inputSource=inputState.ArrowKeys)
+                )
+            
+            self.WASDTurnTokens = tuple(slide_tokens)
 
             inputState.set("slideLeft", turnLeftWASDSet, inputSource=inputState.ArrowKeys)
             inputState.set("slideRight", turnRightWASDSet, inputSource=inputState.ArrowKeys)
@@ -128,12 +181,39 @@ class ToontownControlManager(ControlManager):
 
         controls = base.controls
 
-        self.inputStateTokens.extend((
+        # Check if user already has arrow keys configured to avoid duplicates
+        user_has_arrow_up = (controls.MOVE_UP == "arrow_up")
+        user_has_arrow_down = (controls.MOVE_DOWN == "arrow_down")
+        user_has_arrow_left = (controls.MOVE_LEFT == "arrow_left")
+        user_has_arrow_right = (controls.MOVE_RIGHT == "arrow_right")
+
+        crane_tokens = [
+            # User-configured movement keys
             inputState.watchWithModifiers("forward", controls.MOVE_UP, inputSource=inputState.ArrowKeys),
             inputState.watchWithModifiers("reverse", controls.MOVE_DOWN, inputSource=inputState.ArrowKeys),
             inputState.watchWithModifiers("turnLeft", controls.MOVE_LEFT, inputSource=inputState.ArrowKeys),
-            inputState.watchWithModifiers("turnRight", controls.MOVE_RIGHT, inputSource=inputState.ArrowKeys)
-        ))
+            inputState.watchWithModifiers("turnRight", controls.MOVE_RIGHT, inputSource=inputState.ArrowKeys),
+        ]
+        
+        # Add default arrow key bindings (only if user doesn't already have them configured)
+        if not user_has_arrow_up:
+            crane_tokens.append(
+                inputState.watchWithModifiers("forward", "arrow_up", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_down:
+            crane_tokens.append(
+                inputState.watchWithModifiers("reverse", "arrow_down", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_left:
+            crane_tokens.append(
+                inputState.watchWithModifiers("turnLeft", "arrow_left", inputSource=inputState.ArrowKeys)
+            )
+        if not user_has_arrow_right:
+            crane_tokens.append(
+                inputState.watchWithModifiers("turnRight", "arrow_right", inputSource=inputState.ArrowKeys)
+            )
+
+        self.inputStateTokens.extend(crane_tokens)
 
     def disableCraneControls(self):
         """
