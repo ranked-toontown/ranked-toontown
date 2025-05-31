@@ -42,6 +42,8 @@ from toontown.catalog import CatalogAccessoryItem
 from . import ModuleListAI
 
 from ..archipelago.definitions.death_reason import DeathReason
+from ..matchmaking import skill_rating
+from ..matchmaking.player_skill_profile import PlayerSkillProfile
 from ..shtiker import CogPageGlobals
 from ..util.astron.AstronDict import AstronDict
 
@@ -214,6 +216,8 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
         self.instantDelivery = False
         self.alwaysHitSuits = False
         self.hasPaidTaxes = False
+
+        self._skillProfiles: dict[str, PlayerSkillProfile] = {}
 
         # Archipelago Stuff
         self.__uuid = None # UUID used to ensure we don't reply to our own packets.
@@ -4406,6 +4410,48 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
 
     def getDeathReason(self) -> DeathReason:
         return self.deathReason
+
+    def getSkillProfile(self, key: str) -> PlayerSkillProfile | None:
+        return self._skillProfiles.get(key, None)
+
+    def getOrCreateSkillProfile(self, key: str) -> PlayerSkillProfile:
+
+        # Attempt to return an existing profile.
+        profile = self._skillProfiles.get(key, None)
+        if profile is not None:
+            return profile
+
+        # Create a new default profile.
+        primitive = skill_rating.MODEL.rating(mu=20, name=str(self.doId))
+        profile = PlayerSkillProfile(self.getDoId(), key, primitive.mu, primitive.sigma, 600)
+        self.addSkillProfile(profile)
+        return profile
+
+    def addSkillProfile(self, profile: PlayerSkillProfile):
+        self._skillProfiles[profile.key] = profile
+
+    def removeSkillProfile(self, key: str):
+        if key in self._skillProfiles:
+            del self._skillProfiles[key]
+
+    def getSkillProfiles(self) -> list[PlayerSkillProfile]:
+        return list(self._skillProfiles.values())
+
+    def setSkillProfiles(self, profiles: list[tuple | list]):
+        self._skillProfiles.clear()
+        for profile in profiles:
+            formatted = PlayerSkillProfile.from_astron(profile)
+            self._skillProfiles[formatted.key] = formatted
+
+    def d_setSkillProfiles(self, profiles: list[PlayerSkillProfile]):
+        self.sendUpdate('setSkillProfiles', [[profile.to_astron() for profile in profiles]])
+
+    def d_syncSkillProfiles(self):
+        self.sendUpdate('setSkillProfiles', [[profile.to_astron() for profile in self.getSkillProfiles()]])
+
+    def b_setSkillProfiles(self, profiles: list[PlayerSkillProfile]):
+        self.setSkillProfiles([p.to_astron() for p in profiles])
+        self.d_setSkillProfiles(profiles)
 
     # Magic word stuff
     def setMagicDNA(self, dnaString):

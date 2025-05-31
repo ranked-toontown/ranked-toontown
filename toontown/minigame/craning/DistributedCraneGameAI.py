@@ -15,6 +15,7 @@ from toontown.coghq.DistributedCashbotBossHeavyCraneAI import DistributedCashbot
 from toontown.coghq.DistributedCashbotBossSafeAI import DistributedCashbotBossSafeAI
 from toontown.coghq.DistributedCashbotBossSideCraneAI import DistributedCashbotBossSideCraneAI
 from toontown.coghq.DistributedCashbotBossTreasureAI import DistributedCashbotBossTreasureAI
+from toontown.matchmaking.skill_profile_keys import CRANING_SOLOS, CRANING_CHAOS
 from toontown.minigame.DistributedMinigameAI import DistributedMinigameAI
 from toontown.minigame.craning import CraneGameGlobals
 from toontown.minigame.craning.CraneGamePracticeCheatAI import CraneGamePracticeCheatAI
@@ -123,6 +124,20 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
 
+    def isRanked(self) -> bool:
+
+        # Todo: setting for this. We don't want EVERY game to be ranked.
+        return len(self.getParticipantsNotSpectating()) > 1
+
+    def getSkillProfileKey(self) -> str:
+
+        # Is this a 1v1?
+        if len(self.getParticipantsNotSpectating()) == 2:
+            return CRANING_SOLOS
+
+        # Otherwise, craning misc.
+        return CRANING_CHAOS
+
     def generate(self):
         self.notify.debug("generate")
         self.__makeBoss()
@@ -192,7 +207,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Reset custom spawn order flag for new games (not restarts)
         self.resetCustomSpawnOrder()
         # Reset round information for new games
-        self.currentRound = 1
         self.roundWins = {}
         self.originalSpawnOrder = []
         self._inMultiRoundMatch = False
@@ -438,14 +452,16 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         If the last has multiple people, they are tied for 1st place.
         """
 
+        all_scores = self.getScoringContext().get_round(self.currentRound).get_all_scores()
+
         # Are there no players?
-        if len(self.scoreDict) <= 0:
+        if len(all_scores) <= 0:
             return []
 
         # Create a reversed dict where we map score to the players who have that score.
         results = {}
         highestScore = -999_999
-        for player, score in self.scoreDict.items():
+        for player, score in all_scores.items():
             toonsWithScore = results.get(score, [])
             toonsWithScore.append(player)
             results[score] = toonsWithScore
@@ -1030,10 +1046,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __startNextRound(self, task=None):
         """Start the next round in a best-of match"""
-        # Reset scores for the new round
-        for avId in self.scoreDict:
-            self.scoreDict[avId] = 0
-        
         # Rotate spawn positions for variety
         self.__rotateSpawnPositions()
         
@@ -1168,10 +1180,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         if amount == 0:
             return
-        if avId not in self.scoreDict:
-            return
 
-        self.scoreDict[avId] += amount
+        self.getScoringContext().get_round(self.currentRound).add_score(avId, amount)
         self.d_addScore(avId, amount, reason)
 
         # Update current winners so we can check for position overtakes (where we should enable overtime)
@@ -1311,8 +1321,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.ruleset.TIMER_MODE:
             taskMgr.doMethodLater(self.ruleset.TIMER_MODE_TIME_LIMIT, self.__timesUp, self.uniqueName('times-up-task'))
 
-        for toon, score in self.scoreDict.items():
-            self.scoreDict[toon] = 0
+        r = self.getScoringContext().get_round(self.currentRound).reset_scores()
+
         self.currentWinners = self.getHighestScorers()
 
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
@@ -1497,12 +1507,25 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.sendUpdate('setOvertime', [flag])
 
     def enterVictory(self):
-        victorId = max(self.scoreDict.items(), key=itemgetter(1))[0]
-        
+
+
+        highest_scorers = self.getHighestScorers()
+
+        # If nobody is in the lead (?) then go next round.
+        if len(highest_scorers) == 0:
+            self.sendUpdate("declareVictor", [0])
+            taskMgr.doMethodLater(5, self.__startNextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+            return
+
+        # If multiple people are in the lead (?) then just pick the first person. Otherwise, it will be THE winner.
+        victorId = highest_scorers[0]
+        self.getScoringContext().get_round(self.currentRound).set_winners(highest_scorers)
+
         # Handle best-of matches
         if self.bestOfValue > 1:
             # Track round wins
             self.roundWins[victorId] = self.roundWins.get(victorId, 0) + 1
+
             winsNeeded = (self.bestOfValue + 1) // 2
             
             # Send round info to clients
@@ -1521,6 +1544,23 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             # Single round match
             self.sendUpdate("declareVictor", [victorId])
             taskMgr.doMethodLater(5, self.gameOver, self.uniqueName("craneGameVictory"), extraArgs=[])
+
+    def getWinners(self):
+
+        # Find who has most round wins.
+        most = -1
+        for avId, wins in self.roundWins.items():
+            if wins > most:
+                most = wins
+
+        # Filter who has most round wins
+        winners = []
+        for avId, wins in self.roundWins.items():
+            if wins == most:
+                winners.append(avId)
+
+        return winners
+
 
     def exitVictory(self):
         taskMgr.remove(self.uniqueName("craneGameVictory"))

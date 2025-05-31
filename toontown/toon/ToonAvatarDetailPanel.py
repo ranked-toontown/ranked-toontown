@@ -13,6 +13,8 @@ from toontown.hood import ZoneUtil
 from toontown.toonbase.ToontownBattleGlobals import Tracks, Levels
 from .Experience import Experience
 from ..battle.GagTrackBarGUI import GagTrackBarGUI
+from ..matchmaking.rank import Rank
+from ..matchmaking.skill_profile_keys import CRANING_SOLOS, CRANING_CHAOS
 
 globalAvatarDetail = None
 
@@ -181,8 +183,19 @@ class ToonAvatarDetailPanel(DirectFrame):
                  'location': hoodName,
                  'player': self.playerInfo.playerName}
             else:
-                text = TTLocalizer.AvatarDetailPanelOnline % {'district': shardName,
-                 'location': hoodName}
+                text = TTLocalizer.AvatarDetailPanelOnline % {
+                    'district': shardName,
+                    'location': hoodName,
+                }
+
+                # If we are in the same area, add their rank. This is temporary.
+                if self.avatar is not None:
+                    solos_profile = self.avatar.getSkillProfile(CRANING_SOLOS)
+                    if solos_profile is not None:
+                        text += f"\nSolos Rank: {Rank.get_from_skill_rating(solos_profile.skill_rating)} ({solos_profile.skill_rating})"
+                    ffa_profile = self.avatar.getSkillProfile(CRANING_CHAOS)
+                    if ffa_profile is not None:
+                        text += f"\nFFA Rank: {Rank.get_from_skill_rating(ffa_profile.skill_rating)} ({ffa_profile.skill_rating})"
         else:
             text = TTLocalizer.AvatarDetailPanelOffline
         self.dataText['text'] = text

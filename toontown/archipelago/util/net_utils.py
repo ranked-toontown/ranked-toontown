@@ -211,6 +211,7 @@ def item_flag_to_string(flag: int | IC):
 class JSONPartFormatter:
 
     COLOR_BLACK = (0, 0, 0, 1)
+    COLOR_GRAY = (.5, .5, .5, 1)
     COLOR_RED = (.93, 0, 0, 1)
     COLOR_GREEN = (0, 1, .5, 1)
     COLOR_YELLOW = (.98, .98, .82, 1)
@@ -225,6 +226,7 @@ class JSONPartFormatter:
 
     COLOR_MAP = {
         'black': COLOR_BLACK,
+        'gray': COLOR_GRAY,
         'red': COLOR_RED,
         'green': COLOR_GREEN,
         'yellow': COLOR_YELLOW,

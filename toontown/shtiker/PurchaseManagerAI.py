@@ -13,13 +13,17 @@ from toontown.minigame import MinigameGlobals
 class PurchaseManagerAI(DistributedObjectAI.DistributedObjectAI):
     notify = DirectNotifyGlobal.directNotify.newCategory('PurchaseManagerAI')
 
-    def __init__(self, air, playerArray, mpArray, previousMinigameId, trolleyZone, newbieIdList = [], votesArray = None, metagameRound = -1, desiredNextGame = None, spectators=None):
+    def __init__(self, air, playerArray, mpArray, previousMinigameId, trolleyZone, newbieIdList = [], votesArray = None, metagameRound = -1, desiredNextGame = None, spectators=None, profileDeltas=None):
         DistributedObjectAI.DistributedObjectAI.__init__(self, air)
         self.playerIds = copy.deepcopy(playerArray)
         self.minigamePoints = copy.deepcopy(mpArray)
         self.previousMinigameId = previousMinigameId
         self.trolleyZone = trolleyZone
         self.newbieIds = copy.deepcopy(newbieIdList)
+        if profileDeltas is not None:
+            self.skillProfileDeltas = [profile.to_astron() for profile in profileDeltas]
+        else:
+            self.skillProfileDeltas = []
         self.isShutdown = 0
         if votesArray:
             self.votesArray = copy.deepcopy(votesArray)
@@ -121,6 +125,9 @@ class PurchaseManagerAI(DistributedObjectAI.DistributedObjectAI):
 
     def getPlayerStates(self):
         return self.playerStates
+
+    def getSkillProfileDeltas(self):
+        return self.skillProfileDeltas
 
     def getCountdown(self):
         self.startCountdown()

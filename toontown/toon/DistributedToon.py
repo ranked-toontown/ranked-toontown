@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Any
 
 from panda3d.core import *
 from libotp import *
@@ -66,6 +66,7 @@ import copy
 from ..archipelago.definitions import color_profile
 from ..archipelago.definitions.color_profile import ColorProfile
 from ..archipelago.definitions.death_reason import DeathReason
+from ..matchmaking.player_skill_profile import PlayerSkillProfile
 from ..util.astron.AstronDict import AstronDict
 
 
@@ -215,6 +216,8 @@ class DistributedToon(DistributedPlayer.DistributedPlayer, Toon.Toon, Distribute
         self.checkedLocations: List[int] = []
         self.hintPoints = 0
         self.hintCost = 0
+
+        self._skillProfiles: dict[str, PlayerSkillProfile] = {}
 
         self.slotData = {}
         self.rewardHistory = []
@@ -2842,6 +2845,17 @@ class DistributedToon(DistributedPlayer.DistributedPlayer, Toon.Toon, Distribute
     def d_setDeathReason(self, reason: DeathReason):
         pass
 
+    def getSkillProfile(self, key: str) -> PlayerSkillProfile | None:
+        return self._skillProfiles.get(key, None)
+
+    def setSkillProfiles(self, profiles: list[Any]):
+        self._skillProfiles.clear()
+        for raw_profile in profiles:
+            profile = PlayerSkillProfile.from_astron(raw_profile)
+            self._skillProfiles[profile.key] = profile
+
+    def getSkillProfiles(self) -> list[PlayerSkillProfile]:
+        return list(self._skillProfiles.values())
     ###
     ### Methods for managing Color Profiles and Nametags.
     ###

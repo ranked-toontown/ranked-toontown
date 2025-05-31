@@ -1850,6 +1850,26 @@ class LeaveRace(MagicWord):
         messenger.send('leaveRace')
 
 
+class ListRanks(MagicWord):
+    aliases = ['ranks', 'rank', 'mmr', 'elo']
+    desc = "List out the thresholds for all the ranks."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'NO_ACCESS'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.matchmaking.rank import Rank, RankTier, DIVISIONS_PER_TIER, SKILL_RATING_PER_DIVISION
+        message = ""
+        mmr = 0
+        for rank in RankTier.__members__.values():
+            upper = DIVISIONS_PER_TIER * SKILL_RATING_PER_DIVISION
+            if rank == RankTier.PRESIDENT:
+                break
+            message += f"{rank.value}: {mmr}\n"
+            mmr += upper
+        message += f"{RankTier.PRESIDENT.value}: {mmr}+"
+        return message
+
+
 class RestartPieRound(MagicWord):
     aliases = ['rsp', 'restartpie']
     desc = "Restarts the pie round"
@@ -1898,31 +1918,15 @@ class EndCFO(MagicWord):
 
     def handleWord(self, invoker, avId, toon, *args):
         from ..minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
-        craneGame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        craneGame: DistributedCraneGameAI = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
         if craneGame is None:
             return "You aren't in a crane round!"
 
         # Forfeit: Set the invoker's score to ensure they come in last place
-        if invoker.doId in craneGame.scoreDict:
-            # Get the current score before modifying it
-            currentScore = craneGame.scoreDict[invoker.doId]
-            
-            # Find the lowest score among all players
-            lowestScore = min(craneGame.scoreDict.values()) if craneGame.scoreDict else 0
-            
-            # Set invoker's score to be lower than the lowest score
-            forfeitScore = lowestScore - 100
-            
-            # Calculate the score difference and update the scoreboard
-            scoreDifference = forfeitScore - currentScore
-            craneGame.scoreDict[invoker.doId] = forfeitScore
-            craneGame.d_addScore(invoker.doId, scoreDifference)
-        else:
-            # Player not in scoreDict yet, just set them to a very low score
-            forfeitScore = -100
-            craneGame.scoreDict[invoker.doId] = forfeitScore
-            craneGame.d_addScore(invoker.doId, forfeitScore)
-
+        context = craneGame.getScoringContext()
+        _round = context.get_round(craneGame.currentRound)
+        score = _round.get_score(invoker.doId)
+        craneGame.addScore(invoker.doId, -score, reason=CraneLeagueGlobals.ScoreReason.FORFEIT)
         craneGame.gameFSM.request('victory')
         return f"Forfeiting crane round - {toon.getName()} will be placed in last place."
 

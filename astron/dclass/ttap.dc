@@ -989,6 +989,14 @@ struct APItem {
   uint64 id;
 }
 
+struct SkillProfile {
+  uint32 avId;
+  string key;
+  int32/1000 mu;
+  int32/1000 sigma;
+  int32 sr;
+}
+
 
 dclass DistributedToon : DistributedPlayer {
   setDNAString(blob) required broadcast ownrecv db;
@@ -1183,6 +1191,8 @@ dclass DistributedToon : DistributedPlayer {
   setMagicDNA(blob) airecv clsend;
   setMagicBodyAccessories(uint16, uint16, uint16, uint16) airecv clsend;
   setMagicHeadAccessories(uint16, uint16, uint16, uint16) airecv clsend;
+
+  setSkillProfiles(SkillProfile[]) required broadcast ownrecv db;
 
   setBaseGagSkillMultiplier(uint16=1) required ownrecv broadcast db;
   setDamageMultiplier(uint16=100) required ownrecv broadcast db;
@@ -2223,6 +2233,7 @@ dclass PurchaseManager : DistributedObject {
   setCountdown(int16) required broadcast ram;
   setMetagameRound(int8) required broadcast ram;
   setVotesArray(int16[]) required broadcast ram;
+  setSkillProfileDeltas(SkillProfile[]) required broadcast ram;
   requestExit() airecv clsend;
   requestPlayAgain() airecv clsend;
   setInventory(blob, int16, uint8, int8) airecv clsend;

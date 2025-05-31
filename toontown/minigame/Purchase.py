@@ -1,3 +1,5 @@
+from direct.interval.MetaInterval import Sequence
+
 from libotp import *
 from .PurchaseBase import *
 from direct.task.Task import Task
@@ -10,6 +12,10 @@ from toontown.minigame import TravelGameGlobals
 from toontown.distributed import DelayDelete
 from toontown.toonbase import ToontownGlobals
 from . import MinigameGlobals
+from ..archipelago.util.global_text_properties import get_raw_formatted_string
+from ..archipelago.util.global_text_properties import MinimalJsonMessagePart as Component
+from ..matchmaking.rank import Rank
+
 COUNT_UP_RATE = 0.15
 COUNT_UP_DURATION = 0.5
 DELAY_BEFORE_COUNT_UP = 1.0
@@ -17,7 +23,7 @@ DELAY_AFTER_COUNT_UP = 1.0
 COUNT_DOWN_RATE = 0.075
 COUNT_DOWN_DURATION = 0.5
 DELAY_AFTER_COUNT_DOWN = 0.0
-DELAY_AFTER_CELEBRATE = 2.6
+DELAY_AFTER_CELEBRATE = 20
 COUNT_SFX_MIN_DELAY = 0.034
 COUNT_SFX_START_T = 0.079
 OVERMAX_SFX_MIN_DELAY = 0.067
@@ -26,7 +32,7 @@ OVERMAX_SFX_START_T = 0.021
 class Purchase(PurchaseBase):
     notify = DirectNotifyGlobal.directNotify.newCategory('Purchase')
 
-    def __init__(self, toon, pointsArray, playerMoney, ids, states, remain, doneEvent, metagameRound = -1, votesArray = None):
+    def __init__(self, toon, pointsArray, playerMoney, ids, states, remain, doneEvent, metagameRound = -1, votesArray = None, skillProfileDeltas = None):
         PurchaseBase.__init__(self, toon, doneEvent)
         self.ids = ids
         self.pointsArray = pointsArray
@@ -43,6 +49,8 @@ class Purchase(PurchaseBase):
         self.unexpectedEventNames = []
         self.unexpectedExits = []
         self.setupUnexpectedExitHooks()
+        self.skillProfileDeltas = skillProfileDeltas
+        self.skipHint = None
 
     def load(self):
         purchaseModels = loader.loadModel('phase_4/models/gui/purchase_gui')
@@ -152,6 +160,10 @@ class Purchase(PurchaseBase):
             counter.destroy()
             del counter
 
+        for rankAdjustments in self.rankAdjustments:
+            rankAdjustments.destroy()
+            del rankAdjustments
+
         del self.counters
         for total in self.totalCounters:
             total.destroy()
@@ -241,6 +253,8 @@ class Purchase(PurchaseBase):
         self.toonsKeep = []
         self.counters = []
         self.totalCounters = []
+        self.rankAdjustments = []
+        self.skipHint = DirectLabel(parent=aspect2d, relief=None, text='Press SPACE to continue', pos=(0, 0, .75),text_shadow=(0, 0, 0, 1), text_fg=(1, 1, 1, 1), text_scale=.14, text_font=ToontownGlobals.getCompetitionFont())
         self.title.hide()
         self.bg.reparentTo(render)
         camera.reparentTo(render)
@@ -265,6 +279,7 @@ class Purchase(PurchaseBase):
                 toon.stopSmooth()
                 self.toons.append(toon)
                 self.toonsKeep.append(DelayDelete.DelayDelete(toon, 'Purchase.enterReward'))
+
                 counter = DirectLabel(parent=hidden, relief=None, pos=(0.0, 0.0, 0.0), text=str(0), text_scale=0.2, text_fg=(0.95, 0.95, 0, 1), text_pos=(0, -0.1, 0), text_font=ToontownGlobals.getSignFont())
                 counter['image'] = DGG.getDefaultDialogGeom()
                 counter['image_scale'] = (0.33, 1, 0.33)
@@ -272,6 +287,15 @@ class Purchase(PurchaseBase):
                 counter.count = 0
                 counter.max = self.pointsArray[index]
                 self.counters.append(counter)
+
+                rankAdjustment = DirectLabel(parent=hidden, relief=None, pos=(0, 0, 0), text=str(0), text_scale=0.05, text_fg=(.85, .85, .85, 1), text_pos=(0, 0.07, 0), text_font=ToontownGlobals.getCompetitionFont())
+                rankAdjustmentWip = DirectLabel(parent=rankAdjustment, relief=None, text='PLACEHOLDER', text_fg=(1, .15, .15, 1), text_shadow=(0, 0, 0, 1), text_scale=.08, pos=(0, 0, 0.2), text_font=ToontownGlobals.getCompetitionFont())
+                rankAdjustment.setScale(0.45)
+                rankAdjustment['image'] = DGG.getDefaultDialogGeom()
+                rankAdjustment['image_color'] = (.2, .2, .2, 1)
+                rankAdjustment['image_scale'] = (0.66, 1, 0.33)
+                self.rankAdjustments.append(rankAdjustment)
+
                 money = self.playerMoney[index]
                 totalCounter = DirectLabel(parent=hidden, relief=None, pos=(0.0, 0.0, 0.0), text=str(money), text_scale=0.2, text_fg=(0.95, 0.95, 0, 1), text_pos=(0, -0.1, 0), text_font=ToontownGlobals.getSignFont(), image=self.jarImage)
                 totalCounter.setScale(0.5)
@@ -293,10 +317,23 @@ class Purchase(PurchaseBase):
             toon.setShadowHeight(0)
             if not toon.isDisabled():
                 toon.reparentTo(render)
-            self.counters[pos].setPos(thisPos * -0.1, 0, toon.getHeight() / 10 + 0.25)
+            self.counters[pos].setPos(thisPos * -0.15, 0, toon.getHeight() / 10 + 0.25)
             self.counters[pos].reparentTo(aspect2d)
-            self.totalCounters[pos].setPos(thisPos * -0.1, 0, -0.825)
-            self.totalCounters[pos].reparentTo(aspect2d)
+            self.rankAdjustments[pos].setPos(thisPos * -0.1, 0, -0.825)
+            if toon.getDoId() in self.skillProfileDeltas:
+                deltas = self.skillProfileDeltas[toon.getDoId()]
+                self.rankAdjustments[pos].reparentTo(aspect2d)
+                profile = toon.getSkillProfile(deltas.key)
+                rank = Rank.get_from_skill_rating(profile.skill_rating)
+                self.rankAdjustments[pos]['text'] = get_raw_formatted_string([
+                    Component(message=str(rank), color='white'),
+                    Component(message=f" ({profile.skill_rating} SR)", color='gray'),
+                    Component(message=f"({'+' if deltas.skill_rating > 0 else ''}{deltas.skill_rating})\n\n", color='green' if deltas.skill_rating > 0 else 'red'),
+                    Component(message=f"mu: {profile.mu} ({'+' if deltas.mu > 0 else ''}{deltas.mu})\nsigma: {profile.sigma} ({'+' if deltas.sigma > 0 else ''}{deltas.sigma})", color='gray'),
+                ])
+            else:
+                self.totalCounters[pos].setPos(thisPos * -0.15, 0, -0.825)
+                self.totalCounters[pos].reparentTo(aspect2d)
             pos += 1
 
         self.maxPoints = max(self.pointsArray)
@@ -361,15 +398,16 @@ class Purchase(PurchaseBase):
             taskMgr.doMethodLater(countVotesDownDelay, reqCountVotesDown, 'countVotesDownTask')
             celebrateDelay += countVotesUpTime + self.maxVotes * COUNT_DOWN_RATE + DELAY_AFTER_COUNT_DOWN
 
-        def reqPurchase(state):
+        def reqPurchase(_=None):
             self.fsm.request('purchase')
             return Task.done
 
         purchaseDelay = celebrateDelay + DELAY_AFTER_CELEBRATE
+
+        self.acceptOnce('space', reqPurchase)
+        self.acceptOnce('escape', reqPurchase)
+
         taskMgr.doMethodLater(purchaseDelay, reqPurchase, 'purchase-trans')
-        if base.skipMinigameReward:
-            self.fsm.request('purchase')
-        return
 
     def _changeCounterUp(self, task, counter, newCount, toonId):
         counter.count = newCount
@@ -530,6 +568,7 @@ class Purchase(PurchaseBase):
         taskMgr.remove('purchase-trans')
         taskMgr.remove('delayAdd')
         taskMgr.remove('delaySubtract')
+        self.skipHint.destroy()
         for toon in self.toons:
             toon.detachNode()
 
@@ -541,6 +580,9 @@ class Purchase(PurchaseBase):
             del self.toonsKeep
         for counter in self.counters:
             counter.reparentTo(hidden)
+
+        for adjust in self.rankAdjustments:
+            adjust.reparentTo(hidden)
 
         for total in self.totalCounters:
             total.reparentTo(hidden)
@@ -560,6 +602,8 @@ class Purchase(PurchaseBase):
 
     def enterPurchase(self):
         PurchaseBase.enterPurchase(self)
+        self.ignore('space')
+        self.ignore('escape')
         self.toon.inventory.hide()
         self.convertingVotesToBeansLabel.hide()
         self.rewardDoubledJellybeanLabel.hide()
