@@ -54,6 +54,13 @@ __TEXT_PROPERTIES_BLACK.setTextColor(*JSONPartFormatter.COLOR_BLACK)
 __register_property('black', TEXT_PROPERTIES_CODE_BLACK, __TEXT_PROPERTIES_BLACK)
 
 
+# Gray text
+TEXT_PROPERTIES_CODE_GRAY = "json_gray"
+__TEXT_PROPERTIES_GRAY = TextProperties()
+__TEXT_PROPERTIES_GRAY.setTextColor(*JSONPartFormatter.COLOR_GRAY)
+__register_property('gray', TEXT_PROPERTIES_CODE_GRAY, __TEXT_PROPERTIES_GRAY)
+
+
 # Red text
 TEXT_PROPERTIES_CODE_RED = "json_red"
 __TEXT_PROPERTIES_RED = TextProperties()

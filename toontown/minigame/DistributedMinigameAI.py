@@ -15,6 +15,9 @@ from . import MinigameGlobals
 from direct.showbase import PythonUtil
 from . import TravelGameGlobals
 from toontown.toonbase import ToontownGlobals
+from .utils.scoring_context import ScoringContext
+from ..matchmaking.skill_profile_keys import MINIGAMES_GENERAL
+from ..matchmaking.skill_rating import OpenSkillMatch, OpenSkillMatchDeltaResults
 from ..toon.DistributedToonAI import DistributedToonAI
 
 EXITED = 0
@@ -49,11 +52,25 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         self._spectators = []
         self.toonsSkipped = []
         self.stateDict = {}
-        self.scoreDict = {}
         self.difficultyOverride = None
         self.trolleyZoneOverride = None
         self.metagameRound = -1
         self.startingVotes = {}
+        self.context = ScoringContext()
+
+    def isRanked(self) -> bool:
+        """
+        Is this minigame going to affect ELO/SR ratings upon completion?
+        Override and set to True if you would like to automatically apply ranked calculations.
+        """
+        return False
+
+    def getSkillProfileKey(self) -> str:
+        """
+        What is the minigame going to store ELO/SR ratings under on the toons?
+        This key CAN be dynamic, but it needs to be consistent with how you want to store skill.
+        """
+        return MINIGAMES_GENERAL
 
     def addChildGameFSM(self, gameFSM):
         self.frameworkFSM.getStateNamed('frameworkGame').addChild(gameFSM)
@@ -135,6 +152,9 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
             return 1
         else:
             return 0
+
+    def getScoringContext(self) -> ScoringContext:
+        return self.context
 
     def getParticipants(self) -> list[int]:
         """
@@ -251,7 +271,6 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         self.notify.debug('BASE: enterFrameworkWaitClientsJoin')
         for avId in self.avIdList:
             self.stateDict[avId] = EXPECTED
-            self.scoreDict[avId] = DEFAULT_POINTS
             self.acceptOnce(self.air.getAvatarExitEvent(avId), self.handleExitedAvatar, extraArgs=[avId])
 
         def allAvatarsJoined(self = self):
@@ -355,100 +374,54 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
 
     def enterFrameworkCleanup(self):
         self.notify.debug('BASE: enterFrameworkCleanup: normalExit=%s' % self.normalExit)
-        scoreMult = MinigameGlobals.getScoreMult(self.getSafezoneId())
-        self.notify.debug('score multiplier: %s' % scoreMult)
-        scoreList = []
-        if not self.normalExit:
-            randReward = random.randrange(DEFAULT_POINTS, MAX_POINTS + 1)
-        for avId in self.avIdList:
-            if self.normalExit and avId in self.scoreDict:
-                score = int(self.scoreDict[avId] + 0.5)
-            else:
-                score = randReward
-            if ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY in simbase.air.holidayManager.currentHolidays or ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY_MONTH in simbase.air.holidayManager.currentHolidays:
-                score *= MinigameGlobals.JellybeanTrolleyHolidayScoreMultiplier
-            logEvent = False
-            if score > 2**31-1:
-                score = 2**31-1
-                logEvent = True
-            elif score < 0:
-                score = 0
-                logEvent = True
-            if logEvent:
-                self.air.writeServerEvent('suspicious', avId, 'got %s jellybeans playing minigame %s in zone %s' % (score, self.minigameId, self.getSafezoneId()))
-            scoreList.append(score)
-
         self.requestDelete()
-        if self.metagameRound > -1:
-            self.handleMetagamePurchaseManager(scoreList)
-        else:
-            self.handleRegularPurchaseManager(scoreList)
+        self.handleRegularPurchaseManager()
         self.frameworkFSM.request('frameworkOff')
 
-    def handleMetagamePurchaseManager(self, scoreList):
-        self.notify.debug('self.newbieIdList = %s' % self.newbieIdList)
-        votesToUse = self.startingVotes
-        if hasattr(self, 'currentVotes'):
-            votesToUse = self.currentVotes
-        votesArray = []
-        for avId in self.avIdList:
-            if avId in votesToUse:
-                votesArray.append(votesToUse[avId])
-            else:
-                self.notify.warning('votesToUse=%s does not have avId=%d' % (votesToUse, avId))
-                votesArray.append(0)
+    def adjustSkillRatings(self) -> OpenSkillMatchDeltaResults:
 
-        if self.metagameRound < TravelGameGlobals.FinalMetagameRoundIndex:
-            newRound = self.metagameRound
-            if not self.minigameId == ToontownGlobals.TravelGameId:
-                for index in range(len(scoreList)):
-                    votesArray[index] += scoreList[index]
+        # Query all profiles for this context.
+        profiles = {}
+        for av in self.getParticipantsNotSpectating():
+            profiles[av.getDoId()] = av.getOrCreateSkillProfile(self.getSkillProfileKey())
 
-            self.notify.debug('votesArray = %s' % votesArray)
-            desiredNextGame = None
-            if hasattr(self, 'desiredNextGame'):
-                desiredNextGame = self.desiredNextGame
-            numToons = 0
-            lastAvId = 0
-            for avId in self.avIdList:
-                av = simbase.air.doId2do.get(avId)
-                if av:
-                    numToons += 1
-                    lastAvId = avId
+        # Create a match and add the players.
+        match = OpenSkillMatch()
+        score_rankings = self.context.generate_score_rankings()
 
-            doNewbie = False
-            if numToons == 1 and lastAvId in self.newbieIdList:
-                doNewbie = True
-            if doNewbie:
-                pm = NewbiePurchaseManagerAI.NewbiePurchaseManagerAI(self.air, lastAvId, self.avIdList, scoreList, self.minigameId, self.trolleyZone)
-                self.air.minigameMgr.acquireMinigameZone(self.zoneId)
-                pm.generateWithRequired(self.zoneId)
-            else:
-                pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, votesArray, newRound, desiredNextGame)
-                pm.generateWithRequired(self.zoneId)
-        else:
-            self.notify.debug('last minigame, handling newbies')
-            if ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY in simbase.air.holidayManager.currentHolidays or ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY_MONTH in simbase.air.holidayManager.currentHolidays:
-                votesArray = [MinigameGlobals.JellybeanTrolleyHolidayScoreMultiplier * x for x in votesArray]
-            for id in self.newbieIdList:
-                pm = NewbiePurchaseManagerAI.NewbiePurchaseManagerAI(self.air, id, self.avIdList, scoreList, self.minigameId, self.trolleyZone)
-                self.air.minigameMgr.acquireMinigameZone(self.zoneId)
-                pm.generateWithRequired(self.zoneId)
+        # todo support teams. they are kind of hard to properly support until there is proper team support in trolley games.
 
-            if len(self.avIdList) > len(self.newbieIdList):
-                pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, votesArray=votesArray, metagameRound=self.metagameRound)
-                pm.generateWithRequired(self.zoneId)
-        return
+        # Loop through all the profiles and add the player and their score.
+        for player in profiles.values():
+            match.add_player(player, score_rankings.get(player.identifier, 0))
 
-    def handleRegularPurchaseManager(self, scoreList):
-        for id in self.newbieIdList:
-            pm = NewbiePurchaseManagerAI.NewbiePurchaseManagerAI(self.air, id, self.avIdList, scoreList, self.minigameId, self.trolleyZone)
-            self.air.minigameMgr.acquireMinigameZone(self.zoneId)
-            pm.generateWithRequired(self.zoneId)
+        self.notify.warning(f"pre-openskill adjustment: {[p for p in profiles.values()]}")
 
-        if len(self.avIdList) > len(self.newbieIdList):
-            pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, spectators=self.getSpectators())
-            pm.generateWithRequired(self.zoneId)
+        # Adjust!
+        results = match.adjust_ratings()
+
+        # Save all the data to the toons.
+        for av in self.getParticipantsNotSpectating():
+            profile_update = match.new_player_data.get(av.getDoId(), None)
+            if profile_update is not None:
+                av.addSkillProfile(profile_update)
+            av.d_syncSkillProfiles()
+
+        return results
+
+    def handleRegularPurchaseManager(self):
+
+        # Adjust ratings if desired.
+        deltas = None
+        if self.isRanked():
+            deltas = self.adjustSkillRatings()
+            self.notify.warning(f"post-openskill adjustment deltas: {[p for p in deltas.get_player_results().values()]}")
+
+        points = self.context.get_total_points()
+        scoreList = [points.get(player, 0) for player in self.avIdList]
+
+        pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
+        pm.generateWithRequired(self.zoneId)
 
     def exitFrameworkCleanup(self):
         pass

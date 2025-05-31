@@ -4,6 +4,8 @@ from direct.distributed.ClockDelta import *
 from direct.distributed import DistributedObject
 from direct.directnotify import DirectNotifyGlobal
 from toontown.minigame import TravelGameGlobals
+from ..matchmaking.player_skill_profile import PlayerSkillProfile
+
 
 class PurchaseManager(DistributedObject.DistributedObject):
     notify = DirectNotifyGlobal.directNotify.newCategory('PurchaseManager')
@@ -11,6 +13,7 @@ class PurchaseManager(DistributedObject.DistributedObject):
     def __init__(self, cr):
         DistributedObject.DistributedObject.__init__(self, cr)
         self.playAgain = 0
+        self.skillProfileDeltas: dict[int, PlayerSkillProfile] = {}
 
     def disable(self):
         DistributedObject.DistributedObject.disable(self)
@@ -41,6 +44,15 @@ class PurchaseManager(DistributedObject.DistributedObject):
     def setCountdown(self, timestamp):
         self.countdownTimestamp = timestamp
 
+    def setSkillProfileDeltas(self, deltaArray):
+        self.skillProfileDeltas.clear()
+        for raw in deltaArray:
+            profile = PlayerSkillProfile.from_astron(raw)
+            self.skillProfileDeltas[profile.identifier] = profile
+
+    def hasRankedResultData(self) -> bool:
+        return len(self.skillProfileDeltas) > 0
+
     def announcePlayerStates(self):
         messenger.send('purchaseStateChange', [self.playerStates])
 
@@ -62,7 +74,8 @@ class PurchaseManager(DistributedObject.DistributedObject):
              self.playerStates,
              remain,
              self.metagameRound,
-             self.votesArray])
+             self.votesArray,
+             self.skillProfileDeltas])
 
     def calcHasLocalToon(self):
         retval = base.localAvatar.doId not in self.newbieIds and base.localAvatar.doId in self.playerIds

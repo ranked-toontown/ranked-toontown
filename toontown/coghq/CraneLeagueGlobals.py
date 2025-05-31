@@ -1533,6 +1533,7 @@ class ScoreReason(Enum):
     WENT_SAD = "DIED!"
     LOW_IMPACT = 'SLOPPY!'
     UNSTUN = 'UN-STUN!'
+    FORFEIT = 'FORFEIT!'
 
     # What should be sent over astron?
     def to_astron(self) -> str:
