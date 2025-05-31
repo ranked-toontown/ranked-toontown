@@ -1,3 +1,5 @@
+from direct.interval.MetaInterval import Sequence
+
 from libotp import *
 from .PurchaseBase import *
 from direct.task.Task import Task
@@ -21,7 +23,7 @@ DELAY_AFTER_COUNT_UP = 1.0
 COUNT_DOWN_RATE = 0.075
 COUNT_DOWN_DURATION = 0.5
 DELAY_AFTER_COUNT_DOWN = 0.0
-DELAY_AFTER_CELEBRATE = 10
+DELAY_AFTER_CELEBRATE = 20
 COUNT_SFX_MIN_DELAY = 0.034
 COUNT_SFX_START_T = 0.079
 OVERMAX_SFX_MIN_DELAY = 0.067
@@ -48,6 +50,7 @@ class Purchase(PurchaseBase):
         self.unexpectedExits = []
         self.setupUnexpectedExitHooks()
         self.skillProfileDeltas = skillProfileDeltas
+        self.skipHint = None
 
     def load(self):
         purchaseModels = loader.loadModel('phase_4/models/gui/purchase_gui')
@@ -251,6 +254,7 @@ class Purchase(PurchaseBase):
         self.counters = []
         self.totalCounters = []
         self.rankAdjustments = []
+        self.skipHint = DirectLabel(parent=aspect2d, relief=None, text='Press SPACE to continue', pos=(0, 0, .75),text_shadow=(0, 0, 0, 1), text_fg=(1, 1, 1, 1), text_scale=.14, text_font=ToontownGlobals.getCompetitionFont())
         self.title.hide()
         self.bg.reparentTo(render)
         camera.reparentTo(render)
@@ -564,6 +568,7 @@ class Purchase(PurchaseBase):
         taskMgr.remove('purchase-trans')
         taskMgr.remove('delayAdd')
         taskMgr.remove('delaySubtract')
+        self.skipHint.destroy()
         for toon in self.toons:
             toon.detachNode()
 
