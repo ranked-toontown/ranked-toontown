@@ -1850,6 +1850,26 @@ class LeaveRace(MagicWord):
         messenger.send('leaveRace')
 
 
+class ListRanks(MagicWord):
+    aliases = ['ranks', 'rank', 'mmr', 'elo']
+    desc = "List out the thresholds for all the ranks."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'NO_ACCESS'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.matchmaking.rank import Rank, RankTier, DIVISIONS_PER_TIER, SKILL_RATING_PER_DIVISION
+        message = ""
+        mmr = 0
+        for rank in RankTier.__members__.values():
+            upper = DIVISIONS_PER_TIER * SKILL_RATING_PER_DIVISION
+            if rank == RankTier.PRESIDENT:
+                break
+            message += f"{rank.value}: {mmr}\n"
+            mmr += upper
+        message += f"{RankTier.PRESIDENT.value}: {mmr}+"
+        return message
+
+
 class RestartPieRound(MagicWord):
     aliases = ['rsp', 'restartpie']
     desc = "Restarts the pie round"
