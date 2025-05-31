@@ -1323,7 +1323,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         r = self.getScoringContext().get_round(self.currentRound).reset_scores()
 
-        self.currentWinners = self.getHighestScorers()
+        self.currentWinners = self.getParticipantIdsNotSpectating()
 
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
 
