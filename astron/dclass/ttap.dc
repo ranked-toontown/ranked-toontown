@@ -3927,9 +3927,7 @@ dclass DistributedCraneGame: DistributedMinigame {
   setToonSpawnpointOrder(uint32[]) broadcast ram;
   updateSpawnOrder(uint32[]) airecv clsend;
   setBestOf(uint8) airecv clsend broadcast ram;
-  setElementalMode(bool) airecv clsend broadcast ram;
   setRoundInfo(uint8, uint8[]) broadcast ram;
-  setSafeFireElemental(uint32 safeDoId, bool isFireElemental) broadcast;
   nextRound() airecv clsend;
   setCraneSpawn(bool, uint8, uint32) broadcast ram;
   updateCombo(uint32 avId, uint8) broadcast ram;
