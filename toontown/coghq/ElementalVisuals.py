@@ -136,21 +136,34 @@ class ElementalVisualManager(DirectObject):
         state = self.visual_states[object_id]
         requested_element = ElementType(element_type) if element_type != 0 else ElementType.NONE
         
-        # Always apply the requested element, ignoring reference counting
-        self._cleanup_visual_state(state, obj)
-        
+        # If we're removing effects (ElementType.NONE), do a smooth fade out
         if requested_element == ElementType.NONE:
-            obj.setColorScale(state.base_color_scale)
+            self._smooth_fade_to_base(state, obj)
             state.current_element = ElementType.NONE
             state.reference_count = 0
-        elif requested_element == ElementType.FIRE:
-            self._apply_fire_visual(obj, state)
-            state.current_element = ElementType.FIRE
-            state.reference_count = 1  # Reset to 1
-        elif requested_element == ElementType.WATER:
-            self._apply_water_visual(obj, state)
-            state.current_element = ElementType.WATER
-            state.reference_count = 1  # Reset to 1
+            return
+        
+        # If changing to a different element, clean up current and apply new
+        if state.current_element != requested_element:
+            self._cleanup_visual_state(state, obj)
+            
+            # Wait a bit for fade out to complete before applying new effect
+            task_name = f'delayedElementalApplication-{id(obj)}'
+            def apply_new_element(task):
+                if requested_element == ElementType.FIRE:
+                    self._apply_fire_visual(obj, state)
+                    state.current_element = ElementType.FIRE
+                    state.reference_count = 1
+                elif requested_element == ElementType.WATER:
+                    self._apply_water_visual(obj, state)
+                    state.current_element = ElementType.WATER
+                    state.reference_count = 1
+                return task.done
+            
+            taskMgr.doMethodLater(0.35, apply_new_element, task_name)
+        else:
+            # Same element, just maintain it
+            state.reference_count = 1
     
     def force_remove_elemental_visual(self, object_id: int):
         """Force remove visual effects regardless of reference count."""
@@ -160,10 +173,18 @@ class ElementalVisualManager(DirectObject):
         state = self.visual_states[object_id]
         obj = self._get_object_from_id(object_id)
         if obj:
-            obj.setColorScale(state.base_color_scale)
+            # Use smooth fade out instead of instant removal
+            self._smooth_fade_to_base(state, obj)
         
-        state.cleanup()
-        del self.visual_states[object_id]
+        # Clean up the state after a delay to allow fade out to complete
+        task_name = f'delayedCleanup-{object_id}'
+        def delayed_cleanup(task):
+            state.cleanup()
+            if object_id in self.visual_states:
+                del self.visual_states[object_id]
+            return task.done
+        
+        taskMgr.doMethodLater(0.5, delayed_cleanup, task_name)
     
     def cleanup_all_effects(self):
         """Remove all active visual effects."""
@@ -225,58 +246,104 @@ class ElementalVisualManager(DirectObject):
             taskMgr.remove(state.color_interval)
             state.color_interval = None
         
-        # Reset to base color scale
+        # Reset to base color scale with smooth fade out
         if obj:
-            obj.setColorScale(state.base_color_scale)
+            # Smooth fade out to base color
+            current_color = obj.getColorScale()
+            fade_out_interval = LerpColorScaleInterval(
+                obj, 
+                duration=0.3,  # Slightly faster fade out
+                colorScale=state.base_color_scale,
+                startColorScale=current_color,
+                blendType='easeInOut'
+            )
+            fade_out_interval.start()
+            
             state.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
     
     def _apply_fire_visual(self, obj, state: ElementalVisualState):
-        """Apply fire visual effects - COLOR ONLY."""
-        # Apply strong fire color tint immediately
-        fire_tint = (1.4, 0.6, 0.3, 1.0)  # Strong orange-red tint
-        obj.setColorScale(fire_tint)
+        """Apply fire visual effects - COLOR ONLY with smooth glow."""
+        # More subtle fire glow - warm orange with less intensity
+        fire_tint = (1.15, 0.85, 0.7, 1.0)  # Subtle warm orange glow
+        
+        # Clean up any existing color interval
+        if state.color_interval:
+            taskMgr.remove(state.color_interval)
+            state.color_interval = None
+        
+        # Smooth fade in to fire color
+        current_color = obj.getColorScale()
+        fade_in_interval = LerpColorScaleInterval(
+            obj, 
+            duration=0.5,  # Half second fade in
+            colorScale=fire_tint,
+            startColorScale=current_color,
+            blendType='easeInOut'
+        )
+        fade_in_interval.start()
+        
         state.elemental_color_scale = fire_tint
         
-        # Set up a persistent task to maintain the color
+        # Set up a persistent task to maintain the color after fade in
         task_name = f'maintainFireColor-{id(obj)}'
         def maintain_fire_color(task):
             if obj and not obj.isEmpty():
-                # Reapply fire color if it's been changed
+                # Reapply fire color if it's been changed (but not during transitions)
                 current_color = obj.getColorScale()
-                if (abs(current_color[0] - fire_tint[0]) > 0.1 or 
-                    abs(current_color[1] - fire_tint[1]) > 0.1 or 
-                    abs(current_color[2] - fire_tint[2]) > 0.1):
+                if (abs(current_color[0] - fire_tint[0]) > 0.15 or 
+                    abs(current_color[1] - fire_tint[1]) > 0.15 or 
+                    abs(current_color[2] - fire_tint[2]) > 0.15):
+                    # Only reapply if the difference is significant (avoiding interference with other effects)
                     obj.setColorScale(fire_tint)
                 return task.cont
             return task.done
         
-        taskMgr.add(maintain_fire_color, task_name)
+        # Start maintenance task after fade in completes
+        taskMgr.doMethodLater(0.6, maintain_fire_color, task_name)
         state.color_interval = task_name  # Store task name for cleanup
         
         # TODO: Add fire particle effects here when needed
         self._create_fire_particles_placeholder(obj, state)
     
     def _apply_water_visual(self, obj, state: ElementalVisualState):
-        """Apply water visual effects - COLOR ONLY."""
-        # Apply water color tint immediately
-        water_tint = (0.7, 0.9, 1.2, 1.0)  # Blue tint
-        obj.setColorScale(water_tint)
+        """Apply water visual effects - COLOR ONLY with smooth glow."""
+        # More subtle water glow - cool blue with less intensity
+        water_tint = (0.85, 0.95, 1.1, 1.0)  # Subtle cool blue glow
+        
+        # Clean up any existing color interval
+        if state.color_interval:
+            taskMgr.remove(state.color_interval)
+            state.color_interval = None
+        
+        # Smooth fade in to water color
+        current_color = obj.getColorScale()
+        fade_in_interval = LerpColorScaleInterval(
+            obj, 
+            duration=0.5,  # Half second fade in
+            colorScale=water_tint,
+            startColorScale=current_color,
+            blendType='easeInOut'
+        )
+        fade_in_interval.start()
+        
         state.elemental_color_scale = water_tint
         
-        # Set up a persistent task to maintain the color
+        # Set up a persistent task to maintain the color after fade in
         task_name = f'maintainWaterColor-{id(obj)}'
         def maintain_water_color(task):
             if obj and not obj.isEmpty():
-                # Reapply water color if it's been changed
+                # Reapply water color if it's been changed (but not during transitions)
                 current_color = obj.getColorScale()
-                if (abs(current_color[0] - water_tint[0]) > 0.1 or 
-                    abs(current_color[1] - water_tint[1]) > 0.1 or 
-                    abs(current_color[2] - water_tint[2]) > 0.1):
+                if (abs(current_color[0] - water_tint[0]) > 0.15 or 
+                    abs(current_color[1] - water_tint[1]) > 0.15 or 
+                    abs(current_color[2] - water_tint[2]) > 0.15):
+                    # Only reapply if the difference is significant
                     obj.setColorScale(water_tint)
                 return task.cont
             return task.done
         
-        taskMgr.add(maintain_water_color, task_name)
+        # Start maintenance task after fade in completes
+        taskMgr.doMethodLater(0.6, maintain_water_color, task_name)
         state.color_interval = task_name  # Store task name for cleanup
         
         # TODO: Add water particle effects here when needed
@@ -297,6 +364,25 @@ class ElementalVisualManager(DirectObject):
         # - Attach to object
         # - Store in state for cleanup
         pass
+
+    def _smooth_fade_to_base(self, state: ElementalVisualState, obj):
+        """Smoothly fade the object back to its base color."""
+        if state.color_interval:
+            taskMgr.remove(state.color_interval)
+            state.color_interval = None
+        
+        if obj:
+            current_color = obj.getColorScale()
+            fade_out_interval = LerpColorScaleInterval(
+                obj, 
+                duration=0.4,  # Smooth fade out
+                colorScale=state.base_color_scale,
+                startColorScale=current_color,
+                blendType='easeInOut'
+            )
+            fade_out_interval.start()
+            
+            state.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
 
 
 class ElementalVisualFactory:

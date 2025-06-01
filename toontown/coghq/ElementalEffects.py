@@ -97,7 +97,7 @@ class BurnEffect(StatusEffect):
 class DrenchEffect(StatusEffect):
     """Water elemental effect - slows movement and actions."""
     
-    def __init__(self, target_id: int, speed_reduction: float = 0.25, duration: float = 8.0):
+    def __init__(self, target_id: int, speed_reduction: float = 0.25, duration: float = 5.0):
         super().__init__(target_id, duration, ElementType.WATER)
         self.speed_reduction = speed_reduction  # 0.25 = 25% speed reduction
         self.original_speed = None

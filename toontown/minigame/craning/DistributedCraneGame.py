@@ -1609,6 +1609,9 @@ class DistributedCraneGame(DistributedMinigame):
             if i < len(elementTypes):
                 safeElements[safeIds[i]] = elementTypes[i]
         
+        # Store previously tracked safes before updating
+        previously_tracked = set(self.elementalSafes.keys()) if hasattr(self, 'elementalSafes') else set()
+        
         # Update our local tracking
         self.elementalSafes = safeElements
         
@@ -1619,10 +1622,12 @@ class DistributedCraneGame(DistributedMinigame):
                 self.elementalVisualManager.apply_elemental_visual(safe, elementType, safeId)
         
         # Clear visuals for safes that are no longer elemental
-        all_safe_ids = set(safeElements.keys())
-        for tracked_id in list(self.elementalSafes.keys()):
-            if tracked_id not in all_safe_ids:
-                self.elementalVisualManager.remove_elemental_visual(tracked_id)
+        currently_elemental = set(safeElements.keys())
+        safes_to_clear = previously_tracked - currently_elemental
+        
+        for safe_id in safes_to_clear:
+            print(f"Clearing elemental visual for safe {safe_id} (no longer elemental)")
+            self.elementalVisualManager.set_elemental_visual_to_element(safe_id, 0)  # 0 = ElementType.NONE
 
     def __nextRound(self, task=None):
         """Transition to the next round"""

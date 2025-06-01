@@ -73,7 +73,7 @@ class ElementalSystemConfig:
     """Configuration for the elemental system."""
     
     # Chance for a safe to become elemental each cycle (0.0 to 1.0)
-    ELEMENTAL_CHANCE = 1.0  # 100% for now as requested
+    ELEMENTAL_CHANCE = 0.5  # 50% chance instead of 100%
     
     # How often to check for new elemental applications (seconds)
     CYCLE_INTERVAL = 5.0
@@ -182,19 +182,50 @@ class ElementalSystem:
         
         current_time = globalClock.getFrameTime()
         
+        # Track statistics for this cycle
+        expired_count = 0
+        applied_count = 0
+        skipped_already_elemental = 0
+        skipped_cooldown = 0
+        skipped_chance = 0
+        
         for safe_id, properties in self._elemental_safes.items():
-            # Clear expired elements
+            # Clear expired elements first
             if not properties.is_active(current_time):
+                if properties.element_type != ElementType.NONE:
+                    expired_count += 1
+                    print(f"Safe {safe_id} elemental effect ({properties.element_type.name}) expired")
                 properties.clear_element()
             
-            # Check if safe can become elemental and roll for it
-            if (properties.element_type == ElementType.NONE and 
-                properties.can_become_elemental(current_time) and
-                random.random() < self.config.ELEMENTAL_CHANCE):
-                
-                # Randomly select an element
-                new_element = random.choice(self.config.AVAILABLE_ELEMENTS)
-                properties.apply_element(new_element, current_time)
+            # Only try to apply new elements to safes that are NOT currently elemental
+            # This prevents overriding existing elemental effects
+            if properties.element_type != ElementType.NONE:
+                # Safe is currently elemental, skip this cycle
+                skipped_already_elemental += 1
+                continue
+            
+            if not properties.can_become_elemental(current_time):
+                # Safe is on cooldown
+                skipped_cooldown += 1
+                continue
+            
+            # Roll for elemental chance
+            if random.random() >= self.config.ELEMENTAL_CHANCE:
+                # Failed the random chance
+                skipped_chance += 1
+                continue
+            
+            # Apply new element
+            new_element = random.choice(self.config.AVAILABLE_ELEMENTS)
+            properties.apply_element(new_element, current_time)
+            applied_count += 1
+            print(f"Applied {new_element.name} to safe {safe_id}")
+        
+        # Summary logging
+        if expired_count > 0 or applied_count > 0:
+            print(f"Elemental Cycle Summary: {applied_count} applied, {expired_count} expired, "
+                  f"{skipped_already_elemental} already elemental, {skipped_cooldown} on cooldown, "
+                  f"{skipped_chance} failed chance roll")
     
     def get_all_elemental_safes(self) -> Dict[int, ElementType]:
         """Get all currently elemental safes and their elements."""
@@ -209,4 +240,11 @@ class ElementalSystem:
     
     def check_synergy(self, element1: ElementType, element2: ElementType) -> Optional[ElementalSynergy]:
         """Check for synergy between two elements."""
-        return self.synergy_manager.get_synergy(element1, element2) 
+        return self.synergy_manager.get_synergy(element1, element2)
+    
+    def is_safe_currently_elemental(self, safe_id: int) -> bool:
+        """Check if a safe is currently elemental (has an active element)."""
+        properties = self._elemental_safes.get(safe_id)
+        if properties:
+            return properties.is_active(globalClock.getFrameTime())
+        return False 
