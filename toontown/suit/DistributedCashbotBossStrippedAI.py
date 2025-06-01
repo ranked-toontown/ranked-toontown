@@ -268,16 +268,16 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
         return False
 
-    def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
-        self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon)
+    def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
         self.setBossDamage(bossDamage)
 
     def setBossDamage(self, bossDamage):
         self.reportToonHealth()
         self.bossDamage = bossDamage
 
-    def d_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
-        self.sendUpdate('setBossDamage', [bossDamage, avId, objId, isGoon])
+    def d_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        self.sendUpdate('setBossDamage', [bossDamage, avId, objId, isGoon, isDOT])
 
     def waitForNextAttack(self, delayTime):
         DistributedBossCogStrippedAI.waitForNextAttack(self, delayTime)
@@ -320,3 +320,11 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
     def setObjectID(self, objId):
         self.objectId = objId
+
+    def d_applyElementalVisualEffect(self, elementType):
+        """Send elemental visual effect application to clients."""
+        self.sendUpdate('applyElementalVisualEffect', [elementType])
+    
+    def d_removeElementalVisualEffect(self):
+        """Send elemental visual effect removal to clients."""
+        self.sendUpdate('removeElementalVisualEffect', [])

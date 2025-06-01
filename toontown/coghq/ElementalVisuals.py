@@ -2,178 +2,301 @@
 Elemental Visual Effects System
 
 This module handles all visual effects for elemental objects in the game,
-including particle effects, color changes, and animations.
+focusing on color tinting with placeholder functions for future particle effects.
 """
 
 from typing import Dict, Optional, Any
 from .ElementalSystem import ElementType
 from direct.showbase.DirectObject import DirectObject
+from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import *
-from toontown.battle import BattleParticles
-from direct.interval.IntervalGlobal import LerpColorScaleInterval, LerpScaleInterval, Parallel
+from direct.interval.IntervalGlobal import LerpColorScaleInterval, Sequence, Wait, Func
+
+
+class ElementalVisualState:
+    """Tracks the visual state of an object to prevent conflicts and accumulation."""
+    
+    def __init__(self):
+        self.current_element = ElementType.NONE
+        self.color_interval = None
+        self.last_update_time = 0
+        self.reference_count = 0  # Track how many effects want this visual state
+        self.base_color_scale = (1.0, 1.0, 1.0, 1.0)  # Store base color for additive scaling
+        self.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)  # Store elemental color component
+    
+    def cleanup(self):
+        """Clean up all visual effects and intervals."""
+        if self.color_interval:
+            # Remove the color maintenance task
+            taskMgr.remove(self.color_interval)
+            self.color_interval = None
+        
+        self.current_element = ElementType.NONE
+        self.reference_count = 0
+        self.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
 
 
 class ElementalVisualManager(DirectObject):
     """
-    Manages visual effects for elemental objects.
+    Manages visual effects for elemental objects with simple color tinting.
     
-    Handles particle systems, color scaling, animations, and cleanup
-    for all elemental types (Fire, Water, etc.).
+    Provides reliable color effects and placeholder functions for future particle systems.
     """
     
     def __init__(self):
         DirectObject.__init__(self)
-        self.active_effects: Dict[int, Any] = {}  # objectId -> effect container
+        self.visual_states: Dict[int, ElementalVisualState] = {}
+        self.debounce_delay = 0.05  # Very short debounce for responsiveness
         
     def apply_elemental_visual(self, obj, element_type: int, object_id: int):
         """
-        Apply visual effects to an object based on its element type.
+        Apply visual effects with proper state management.
         
         Args:
-            obj: The object to apply effects to (e.g., safe)
+            obj: The object to apply effects to
             element_type: Integer representing the element (0=None, 1=Fire, 2=Water)
-            object_id: Unique identifier for cleanup tracking
+            object_id: Unique identifier for state tracking
         """
-        # Clean up any existing effects for this object
-        self.remove_elemental_visual(object_id)
+        current_time = globalClock.getFrameTime()
         
-        if element_type == 0:  # NONE
-            # Remove any color scaling
-            obj.clearColorScale()
+        # Get or create visual state for this object
+        if object_id not in self.visual_states:
+            self.visual_states[object_id] = ElementalVisualState()
+        
+        state = self.visual_states[object_id]
+        requested_element = ElementType(element_type) if element_type != 0 else ElementType.NONE
+        
+        # Debounce rapid updates
+        if current_time - state.last_update_time < self.debounce_delay:
+            if requested_element == state.current_element:
+                state.reference_count += 1
             return
         
-        if element_type == ElementType.FIRE.value:
-            effect_container = self._create_fire_effect(obj)
-            self.active_effects[object_id] = effect_container
-        elif element_type == ElementType.WATER.value:
-            self._apply_water_effect(obj)
-            # Water doesn't need container tracking (just color scale)
+        state.last_update_time = current_time
         
+        # Handle element removal (when element_type is 0 or ElementType.NONE)
+        if requested_element == ElementType.NONE:
+            # Force remove all visual effects
+            self._cleanup_visual_state(state, obj)
+            obj.setColorScale(state.base_color_scale)
+            state.current_element = ElementType.NONE
+            state.reference_count = 0
+            return
+        
+        # If already showing the correct element, just increment reference count
+        if state.current_element == requested_element:
+            state.reference_count += 1
+            return
+        
+        # Different element requested - clean up current and apply new
+        self._cleanup_visual_state(state, obj)
+        
+        # Apply new visual effects
+        if requested_element == ElementType.FIRE:
+            self._apply_fire_visual(obj, state)
+            state.current_element = ElementType.FIRE
+            state.reference_count = 1
+        elif requested_element == ElementType.WATER:
+            self._apply_water_visual(obj, state)
+            state.current_element = ElementType.WATER
+            state.reference_count = 1
+    
     def remove_elemental_visual(self, object_id: int):
-        """Remove all visual effects for a specific object."""
-        if object_id in self.active_effects:
-            effect_container = self.active_effects[object_id]
-            if effect_container and not effect_container.isEmpty():
-                # Clean up any stored intervals
-                appearance_interval = effect_container.getPythonTag('appearanceInterval')
-                if appearance_interval:
-                    appearance_interval.finish()
-                
-                # Remove the effect container and all its children
-                effect_container.removeNode()
+        """Remove visual effects with proper reference counting."""
+        if object_id not in self.visual_states:
+            return
+        
+        state = self.visual_states[object_id]
+        
+        # Decrease reference count
+        state.reference_count = max(0, state.reference_count - 1)
+        
+        # Only clean up if no more references
+        if state.reference_count <= 0:
+            # Get the object and clear color scale
+            obj = self._get_object_from_id(object_id)
+            if obj:
+                obj.setColorScale(state.base_color_scale)
             
-            del self.active_effects[object_id]
+            # Always clean up the state even if object not found
+            state.cleanup()
+            del self.visual_states[object_id]
+    
+    def set_elemental_visual_to_element(self, object_id: int, element_type: int, obj=None):
+        """Set the visual effect to a specific element, bypassing reference counting."""
+        if obj is None:
+            obj = self._get_object_from_id(object_id)
+        if not obj:
+            return
+        
+        # Get or create visual state for this object
+        if object_id not in self.visual_states:
+            self.visual_states[object_id] = ElementalVisualState()
+        
+        state = self.visual_states[object_id]
+        requested_element = ElementType(element_type) if element_type != 0 else ElementType.NONE
+        
+        # Always apply the requested element, ignoring reference counting
+        self._cleanup_visual_state(state, obj)
+        
+        if requested_element == ElementType.NONE:
+            obj.setColorScale(state.base_color_scale)
+            state.current_element = ElementType.NONE
+            state.reference_count = 0
+        elif requested_element == ElementType.FIRE:
+            self._apply_fire_visual(obj, state)
+            state.current_element = ElementType.FIRE
+            state.reference_count = 1  # Reset to 1
+        elif requested_element == ElementType.WATER:
+            self._apply_water_visual(obj, state)
+            state.current_element = ElementType.WATER
+            state.reference_count = 1  # Reset to 1
+    
+    def force_remove_elemental_visual(self, object_id: int):
+        """Force remove visual effects regardless of reference count."""
+        if object_id not in self.visual_states:
+            return
+        
+        state = self.visual_states[object_id]
+        obj = self._get_object_from_id(object_id)
+        if obj:
+            obj.setColorScale(state.base_color_scale)
+        
+        state.cleanup()
+        del self.visual_states[object_id]
     
     def cleanup_all_effects(self):
         """Remove all active visual effects."""
-        for object_id in list(self.active_effects.keys()):
-            self.remove_elemental_visual(object_id)
+        for object_id in list(self.visual_states.keys()):
+            state = self.visual_states[object_id]
+            obj = self._get_object_from_id(object_id)
+            if obj:
+                obj.setColorScale(state.base_color_scale)
+            state.cleanup()
+        
+        self.visual_states.clear()
     
-    def _create_fire_effect(self, obj):
-        """Create sophisticated fire particle effects for Fire elemental objects."""
-        # Load the battle particles system
-        BattleParticles.loadParticles()
+    def _get_object_from_id(self, object_id: int):
+        """Get object by ID from the distributed object registry."""
+        # Try multiple ways to find the object
         
-        # Create a container node for the fire effects
-        fire_container = obj.attachNewNode('elementalEffect')
-        fire_container.setPos(0, 0, 5)  # Position above object
-        fire_container.setScale(0.01, 0.01, 0.01)  # Start very small
-        
-        # Create large central fire effect
-        base_flame_effect = BattleParticles.createParticleEffect(file='firedBaseFlame')
-        BattleParticles.setEffectTexture(base_flame_effect, 'fire')
-        base_flame_effect.reparentTo(fire_container)
-        base_flame_effect.setPos(0, 0, 0)
-        base_flame_effect.setScale(12.0, 12.0, 15.0)  # Dramatic large scale
-        
-        # Store reference for cleanup
-        fire_container.setPythonTag('baseFlameEffect', base_flame_effect)
-        
-        # Start the fire effect
-        base_flame_effect.start(fire_container, fire_container)
-        
-        # Customize particle properties for smooth animation
-        self._customize_fire_particles(base_flame_effect)
-        
-        # Create smooth appearance animation
-        self._animate_fire_appearance(obj, fire_container)
-        
-        return fire_container
-    
-    def _customize_fire_particles(self, flame_effect):
-        """Customize fire particle properties for smooth, dramatic appearance."""
+        # Method 1: Try client side first
         try:
-            particles = flame_effect.getParticlesNamed('particles-1')
-            if particles:
-                renderer = particles.getRenderer()
-                
-                # Particles grow from very small to final size
-                renderer.setInitialXScale(0.01)
-                renderer.setInitialYScale(0.01)
-                renderer.setFinalXScale(0.25)
-                renderer.setFinalYScale(0.75)
-                
-                # Enable smooth scaling interpolation
-                renderer.setXScaleFlag(1)
-                renderer.setYScaleFlag(1)
-                
-                # Adjust timing for smoother animation
-                particles.setBirthRate(0.01)  # More frequent spawning
-                particles.factory.setLifespanBase(0.4)  # Longer particle life
-                particles.factory.setLifespanSpread(0.1)  # Add randomness
-                
-                # Improve spawning consistency
-                particles.setLitterSize(6)  # Fewer per spawn but more frequent
-                particles.setLitterSpread(2)  # Add variation
-                
-                # Enhance alpha blending (BaseParticleRenderer is available globally)
-                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)
-                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)
-                
-        except Exception as e:
-            print(f"ElementalVisuals: Could not customize fire particles: {e}")
-    
-    def _animate_fire_appearance(self, obj, fire_container):
-        """Create smooth appearance animation for fire effects."""
-        try:
-            # Object gets fiery orange glow
-            glow_interval = LerpColorScaleInterval(
-                obj, 1.0,  # 1 second duration
-                colorScale=(1.3, 0.7, 0.4, 1.0),  # Fiery orange tint
-                startColorScale=(1.0, 1.0, 1.0, 1.0)
-            )
-            
-            # Fire particles scale up smoothly
-            scale_interval = LerpScaleInterval(
-                fire_container, 1.0,  # 1 second duration
-                scale=(1.0, 1.0, 1.0),  # Scale to normal size
-                startScale=(0.01, 0.01, 0.01)
-            )
-            
-            # Play animations in parallel
-            appearance_interval = Parallel(glow_interval, scale_interval)
-            appearance_interval.start()
-            
-            # Store for cleanup
-            fire_container.setPythonTag('appearanceInterval', appearance_interval)
-            
-        except Exception as e:
-            print(f"ElementalVisuals: Could not create fire appearance animation: {e}")
-            # Fallback: set to normal immediately
-            fire_container.setScale(1.0, 1.0, 1.0)
-            obj.setColorScale(1.3, 0.7, 0.4, 1.0)
-    
-    def _apply_water_effect(self, obj):
-        """Apply water elemental visual effects (currently just color tint)."""
-        # Soft blue tint for water elements
-        obj.setColorScale(0.85, 0.95, 1.0, 1.0)
+            if hasattr(base, 'cr') and base.cr:
+                obj = base.cr.getDo(object_id)
+                if obj:
+                    return obj
+        except:
+            pass
         
-        # TODO: Add water particle effects (bubbles, mist, etc.)
-        # Could include:
-        # - Bubble particle system
-        # - Mist/steam effects  
-        # - Water droplet animations
-        # - Gentle blue glow animation
+        # Method 2: Try AI side
+        try:
+            if hasattr(simbase, 'air') and simbase.air:
+                obj = simbase.air.getDo(object_id)
+                if obj:
+                    return obj
+        except:
+            pass
+        
+        # Method 3: Try looking in base.cr.doId2do directly
+        try:
+            if hasattr(base, 'cr') and hasattr(base.cr, 'doId2do'):
+                obj = base.cr.doId2do.get(object_id)
+                if obj:
+                    return obj
+        except:
+            pass
+        
+        # Method 4: Try global doId2do if it exists
+        try:
+            if 'doId2do' in globals():
+                obj = doId2do.get(object_id)
+                if obj:
+                    return obj
+        except:
+            pass
+        
+        return None
+    
+    def _cleanup_visual_state(self, state: ElementalVisualState, obj):
+        """Clean up current visual state before applying new effects."""
+        if state.color_interval:
+            # Remove the color maintenance task
+            taskMgr.remove(state.color_interval)
+            state.color_interval = None
+        
+        # Reset to base color scale
+        if obj:
+            obj.setColorScale(state.base_color_scale)
+            state.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
+    
+    def _apply_fire_visual(self, obj, state: ElementalVisualState):
+        """Apply fire visual effects - COLOR ONLY."""
+        # Apply strong fire color tint immediately
+        fire_tint = (1.4, 0.6, 0.3, 1.0)  # Strong orange-red tint
+        obj.setColorScale(fire_tint)
+        state.elemental_color_scale = fire_tint
+        
+        # Set up a persistent task to maintain the color
+        task_name = f'maintainFireColor-{id(obj)}'
+        def maintain_fire_color(task):
+            if obj and not obj.isEmpty():
+                # Reapply fire color if it's been changed
+                current_color = obj.getColorScale()
+                if (abs(current_color[0] - fire_tint[0]) > 0.1 or 
+                    abs(current_color[1] - fire_tint[1]) > 0.1 or 
+                    abs(current_color[2] - fire_tint[2]) > 0.1):
+                    obj.setColorScale(fire_tint)
+                return task.cont
+            return task.done
+        
+        taskMgr.add(maintain_fire_color, task_name)
+        state.color_interval = task_name  # Store task name for cleanup
+        
+        # TODO: Add fire particle effects here when needed
+        self._create_fire_particles_placeholder(obj, state)
+    
+    def _apply_water_visual(self, obj, state: ElementalVisualState):
+        """Apply water visual effects - COLOR ONLY."""
+        # Apply water color tint immediately
+        water_tint = (0.7, 0.9, 1.2, 1.0)  # Blue tint
+        obj.setColorScale(water_tint)
+        state.elemental_color_scale = water_tint
+        
+        # Set up a persistent task to maintain the color
+        task_name = f'maintainWaterColor-{id(obj)}'
+        def maintain_water_color(task):
+            if obj and not obj.isEmpty():
+                # Reapply water color if it's been changed
+                current_color = obj.getColorScale()
+                if (abs(current_color[0] - water_tint[0]) > 0.1 or 
+                    abs(current_color[1] - water_tint[1]) > 0.1 or 
+                    abs(current_color[2] - water_tint[2]) > 0.1):
+                    obj.setColorScale(water_tint)
+                return task.cont
+            return task.done
+        
+        taskMgr.add(maintain_water_color, task_name)
+        state.color_interval = task_name  # Store task name for cleanup
+        
+        # TODO: Add water particle effects here when needed
+        self._create_water_particles_placeholder(obj, state)
+    
+    def _create_fire_particles_placeholder(self, obj, state: ElementalVisualState):
+        """Placeholder for fire particle effects - currently does nothing."""
+        # Future implementation:
+        # - Create fire particle system
+        # - Attach to object
+        # - Store in state for cleanup
+        pass
+    
+    def _create_water_particles_placeholder(self, obj, state: ElementalVisualState):
+        """Placeholder for water particle effects - currently does nothing."""
+        # Future implementation:
+        # - Create water particle system (bubbles, mist, etc.)
+        # - Attach to object
+        # - Store in state for cleanup
+        pass
 
 
 class ElementalVisualFactory:

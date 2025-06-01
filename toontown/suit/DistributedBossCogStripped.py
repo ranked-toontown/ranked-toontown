@@ -164,7 +164,7 @@ class DistributedBossCogStripped(DistributedAvatar.DistributedAvatar, BossCog.Bo
             interval.finish()
             DelayDelete.cleanupDelayDeletes(interval)
 
-        # Clear the dictionary once you’re done
+        # Clear the dictionary once you're done
         self.activeIntervals.clear()
 
     def clearInterval(self, name, finish=1):
@@ -586,18 +586,43 @@ class DistributedBossCogStripped(DistributedAvatar.DistributedAvatar, BossCog.Bo
 
     def flashRed(self):
         self.cleanupFlash()
-        self.setColorScale(1, 1, 1, 1)
-        i = Sequence(self.colorScaleInterval(0.1, colorScale=VBase4(1, 0, 0, 1)),
-                     self.colorScaleInterval(0.3, colorScale=VBase4(1, 1, 1, 1)))
+        
+        # Get current color scale to preserve elemental effects
+        current_color = self.getColorScale()
+        
+        # Apply very gentle red flash that doesn't overwhelm elemental tint
+        red_flash_color = VBase4(
+            min(current_color[0] + 0.3, 1.0),  # Smaller red boost
+            current_color[1] * 0.7,            # Less reduction of green
+            current_color[2] * 0.7,            # Less reduction of blue  
+            current_color[3]                   # Keep alpha the same
+        )
+        
+        i = Sequence(
+            self.colorScaleInterval(0.05, colorScale=red_flash_color),    # Shorter flash
+            self.colorScaleInterval(0.1, colorScale=current_color)        # Quicker return
+        )
         self.flashInterval = i
         i.start()
 
     def flashGreen(self):
         self.cleanupFlash()
         if not self.isEmpty():
-            self.setColorScale(1, 1, 1, 1)
-            i = Sequence(self.colorScaleInterval(0.1, colorScale=VBase4(0, 1, 0, 1)),
-                         self.colorScaleInterval(0.3, colorScale=VBase4(1, 1, 1, 1)))
+            # Get current color scale to preserve elemental effects
+            current_color = self.getColorScale()
+            
+            # Apply green flash while preserving elemental tint
+            green_flash_color = VBase4(
+                current_color[0] * 0.3,            # Reduce red significantly
+                min(current_color[1] + 0.5, 1.0),  # Add green but don't exceed 1.0
+                current_color[2] * 0.3,            # Reduce blue significantly
+                current_color[3]                   # Keep alpha the same
+            )
+            
+            i = Sequence(
+                self.colorScaleInterval(0.1, colorScale=green_flash_color),   # Green flash with elemental tint
+                self.colorScaleInterval(0.3, colorScale=current_color)        # Return to elemental color
+            )
             self.flashInterval = i
             i.start()
 

@@ -12,6 +12,7 @@ from .DistributedBossCogStripped import DistributedBossCogStripped
 
 TTL = TTLocalizer
 from toontown.coghq import BossHealthBar
+from toontown.coghq.ElementalVisuals import ElementalVisualFactory
 
 
 class DistributedCashbotBossStripped(DistributedBossCogStripped):
@@ -33,6 +34,9 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.myHits = []
         self.tempHp = self.ruleset.CFO_MAX_HP
         self.processingHp = False
+        
+        # Initialize elemental visual effects
+        self.elementalVisualManager = ElementalVisualFactory.create_visual_manager()
         return
 
     def announceGenerate(self):
@@ -70,6 +74,9 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.eyes.hide()
 
     def delete(self):
+        # Clean up elemental visual effects
+        if hasattr(self, 'elementalVisualManager'):
+            self.elementalVisualManager.cleanup_all_effects()
         super().delete()
         self.ruleset = None
 
@@ -84,15 +91,15 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.modifiers = modsToSet
         self.modifiers.sort(key=lambda m: m.MODIFIER_TYPE)
 
-    def setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
+    def setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
 
         if avId != base.localAvatar.doId or isGoon or (objId not in self.myHits):
             if bossDamage > self.bossDamage:
                 delta = bossDamage - self.bossDamage
                 self.flashRed()
 
-                # Animate the hit if the CFO should flinch
-                if self.ruleset.CFO_FLINCHES_ON_HIT:
+                # Animate the hit if the CFO should flinch (but not for DOT damage)
+                if self.ruleset.CFO_FLINCHES_ON_HIT and not isDOT:
                     self.doAnimate('hit', now=1)
 
                 self.showHpText(-delta, scale=5)
@@ -209,3 +216,13 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
     def setRuleset(self, ruleset):
         self.ruleset = ruleset
         self.bossHealthBar.update(self.ruleset.CFO_MAX_HP - self.bossDamage, self.ruleset.CFO_MAX_HP)
+    
+    def applyElementalVisualEffect(self, elementType):
+        """Apply elemental visual effects to the CFO (distributed call)."""
+        if hasattr(self, 'elementalVisualManager'):
+            self.elementalVisualManager.set_elemental_visual_to_element(self.doId, elementType, self)
+    
+    def removeElementalVisualEffect(self):
+        """Remove elemental visual effects from the CFO (distributed call)."""
+        if hasattr(self, 'elementalVisualManager'):
+            self.elementalVisualManager.set_elemental_visual_to_element(self.doId, 0, self)  # 0 = ElementType.NONE

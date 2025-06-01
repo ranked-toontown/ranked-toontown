@@ -1314,8 +1314,8 @@ dclass DistributedBossCogStripped: DistributedNode {
 };
 
 dclass DistributedSellbotBossStripped: DistributedBossCogStripped {
-  setBossDamage(uint32, uint32, uint32) broadcast ram;
-  setAttackCode(uint8, uint32) broadcast;
+  setBossDamage(uint32, uint32, uint32, bool) broadcast ram;
+  setAttackCode(uint8, uint32, uint32) broadcast;
   hitBoss(uint8) airecv clsend;
   hitBossInsides() airecv clsend;
   hitToon(uint32) airecv clsend;
@@ -1323,8 +1323,10 @@ dclass DistributedSellbotBossStripped: DistributedBossCogStripped {
 };
 
 dclass DistributedCashbotBossStripped: DistributedBossCogStripped {
-  setBossDamage(uint32, uint32, uint32, bool) broadcast ram;
+  setBossDamage(uint32, uint32, uint32, bool, bool) broadcast ram;
   setAttackCode(uint8, uint32, uint32) broadcast;
+  applyElementalVisualEffect(uint8) broadcast;
+  removeElementalVisualEffect() broadcast;
 };
 
 dclass DistributedLawbotBossStripped: DistributedBossCogStripped {
