@@ -1,5 +1,4 @@
 from panda3d.core import *
-from direct.task.TaskManagerGlobal import taskMgr
 
 from toontown.coghq import CraneLeagueGlobals
 from toontown.coghq.DistributedCashbotBossHeavyCraneAI import DistributedCashbotBossHeavyCraneAI
@@ -229,20 +228,8 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         # Calculate the extension time: half of normal stun duration, minimum 3 seconds
         extensionTime = self.boss.progressValue(6, 3)  # Half duration, minimum 3 seconds
         
-        # Get the remaining time on the current stun
-        remainingStunTime = 0
-        taskName = boss.uniqueName('NextAttack')
-        existingTasks = taskMgr.getTasksNamed(taskName)
-        if existingTasks:
-            currentTime = globalClock.getFrameTime()
-            existingTask = existingTasks[0]
-            remainingStunTime = max(0, existingTask.wakeTime - currentTime)
-        
-        # Calculate total stun time: remaining time + extension time
-        totalStunTime = remainingStunTime + extensionTime
-        
-        # Apply the extended stun with the total duration
-        boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=totalStunTime)
+        # Extend the current stun by the extension time
+        boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=extensionTime)
         
         # Reset helmet cooldowns like goons do when they stun the CFO
         boss.stopHelmets()
@@ -253,7 +240,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         # Apply the damage from the VOLT re-stun (use original damage calculation)
         self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
         
-        self.boss.notify.info(f"VOLT safe {self.doId} re-stunned CFO! Remaining: {remainingStunTime:.1f}s + Extension: {extensionTime:.1f}s = Total: {totalStunTime:.1f}s")
+        self.boss.notify.info(f"VOLT safe {self.doId} re-stunned CFO! Extended stun by {extensionTime:.1f} seconds")
         
         # Remove elemental status after VOLT re-stun is applied
         self.__removeElementalStatus()
