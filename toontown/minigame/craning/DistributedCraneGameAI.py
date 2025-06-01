@@ -66,8 +66,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Elemental mode system
         self.fireElementalSafes = set()  # Set of safe doIds that are currently Fire elemental
         self.elementalTaskName = None  # Task name for elemental system
-        self.fireDoTTasks = {}  # Maps unique DoT ID -> task info for tracking active DoTs
-        self.nextDoTId = 0  # Counter for unique DoT IDs
 
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
 
@@ -1419,9 +1417,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Stop elemental system
         self.stopElementalSystem()
 
-        # Clean up all active fire DoTs
-        self.__cleanupAllFireDoTs()
-
         # Ignore death messages.
         self.ignoreToonDeaths()
         self.__cancelReviveTasks()
@@ -1492,7 +1487,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             else:
                 # Round is complete, but match continues
                 self.sendUpdate("declareVictor", [victorId])
-                taskMgr.doMethodLater(5, self.__startNextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
+                taskMgr.doMethodLater(3, self.__startNextRound, self.uniqueName("craneGameNextRound"), extraArgs=[])
         else:
             # Single round match
             self.sendUpdate("declareVictor", [victorId])
@@ -1546,96 +1541,3 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.b_setSpectators(currentSpectators)
         # Broadcast the spot status change to all clients
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
-
-    def applyFireDoT(self, avId, dotDamage, ticks):
-        """Apply a fire damage-over-time effect to the CFO"""
-        if dotDamage <= 0 or ticks <= 0:
-            return
-            
-        dotId = self.nextDoTId
-        self.nextDoTId += 1
-        
-        # Store DoT information
-        dotInfo = {
-            'avId': avId,
-            'damage': dotDamage,
-            'remainingTicks': ticks,
-            'originalTicks': ticks
-        }
-        
-        self.fireDoTTasks[dotId] = dotInfo
-        
-        # Start the DoT ticking after a 1-second delay
-        taskName = self.uniqueName(f'fireDoTTick-{dotId}')
-        taskMgr.doMethodLater(1.0, self.__doFireDoTTick, taskName, extraArgs=[dotId])
-        
-        self.notify.info(f"Applied Fire DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks (starting in 1 second)")
-
-    def __doFireDoTTick(self, dotId):
-        """Execute one tick of fire DoT damage"""
-        dotInfo = self.fireDoTTasks.get(dotId)
-        if not dotInfo:
-            return  # DoT was cleaned up
-            
-        # Apply the DoT damage (without flinching)
-        damage = dotInfo['damage']
-        avId = dotInfo['avId']
-        
-        # Record the DoT damage without causing flinch or combo increment
-        self.__recordDoTHit(damage, avId, dotId)
-        
-        # Decrement remaining ticks
-        dotInfo['remainingTicks'] -= 1
-        
-        self.notify.info(f"Fire DoT {dotId} tick: {damage} damage, {dotInfo['remainingTicks']} ticks remaining")
-        
-        # Schedule next tick or cleanup
-        if dotInfo['remainingTicks'] > 0:
-            # Schedule next tick in 1 second
-            taskName = self.uniqueName(f'fireDoTTick-{dotId}')
-            taskMgr.doMethodLater(1.0, self.__doFireDoTTick, taskName, extraArgs=[dotId])
-        else:
-            # DoT is finished, clean up
-            self.__cleanupFireDoT(dotId)
-
-    def __recordDoTHit(self, damage, avId, dotId):
-        """Record a DoT hit without causing flinch effects or combo increment"""
-        # Don't process a hit if we aren't in the play state
-        if self.gameFSM.getCurrentState().getName() != 'play':
-            return
-            
-        # Apply damage directly to boss without triggering any flinch/stun logic
-        # Use the boss's internal damage tracking, bypassing recordHit method
-        oldDamage = self.boss.bossDamage
-        self.boss.bossDamage += damage
-        
-        # Send damage update to clients with special objId (-1) to indicate DoT damage
-        # This allows the client to recognize this as DoT and skip flinching
-        self.boss.sendUpdate('setBossDamage', [self.boss.bossDamage, avId, 0xFFFFFFFF, False])  # objId = -1 (max uint32)
-        
-        # Award points for DoT damage (but no combo increment)
-        self.addScore(avId, damage)
-        
-        # Check if CFO is defeated
-        if self.boss.bossDamage >= self.ruleset.CFO_MAX_HP:
-            self.addScore(avId, self.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
-            self.toonsWon = True
-            self.gameFSM.request('victory')
-            
-        self.notify.info(f"DoT {dotId} dealt {damage} damage (no flinch, no combo)")
-
-    def __cleanupFireDoT(self, dotId):
-        """Clean up a finished DoT effect"""
-        if dotId in self.fireDoTTasks:
-            del self.fireDoTTasks[dotId]
-            
-        # Remove any pending task
-        taskName = self.uniqueName(f'fireDoTTick-{dotId}')
-        taskMgr.remove(taskName)
-        
-        self.notify.info(f"Cleaned up Fire DoT {dotId}")
-
-    def __cleanupAllFireDoTs(self):
-        """Clean up all active fire DoT effects"""
-        for dotId in list(self.fireDoTTasks.keys()):
-            self.__cleanupFireDoT(dotId)
