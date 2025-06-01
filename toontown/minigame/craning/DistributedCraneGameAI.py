@@ -23,6 +23,8 @@ from toontown.suit.DistributedCashbotBossGoonAI import DistributedCashbotBossGoo
 from toontown.suit.DistributedCashbotBossStrippedAI import DistributedCashbotBossStrippedAI
 from toontown.toon.DistributedToonAI import DistributedToonAI
 from toontown.toonbase import ToontownGlobals
+from toontown.coghq.ElementalSystem import ElementalSystem
+from toontown.coghq.ElementalEffects import ElementalEffectManager
 
 
 class DistributedCraneGameAI(DistributedMinigameAI):
@@ -104,6 +106,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
+
+        # Elemental system for elemental mastery modifier
+        self.elementalSystem = ElementalSystem()
+        self.elementalEffectManager = ElementalEffectManager()
 
     def isRanked(self) -> bool:
 
@@ -217,6 +223,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         if self.getBoss() is not None:
             self.getBoss().setRuleset(self.ruleset)
+
+        # Setup the elemental system based on the ruleset
+        self.setupElementalSystem()
 
     # Call to update the ruleset with the modifiers active, note calling more than once can cause unexpected behavior
     # if the ruleset doesn't fallback to an initial value, for example if a cfo hp increasing modifier is active and we
@@ -361,6 +370,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             safe = DistributedCashbotBossSafeAI(self.air, self, index)
             safe.generateWithRequired(self.zoneId)
             self.safes.append(safe)
+            
+            # Register safe with elemental system if enabled
+            if self.ruleset.ELEMENTAL_MASTERY_ENABLED and self.elementalSystem.is_enabled():
+                self.elementalSystem.register_safe(safe.doId)
 
         self.goons.clear()
         return
@@ -1182,6 +1195,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             taskMgr.remove(self.uniqueName('times-up-task'))
             self.d_updateTimer()
 
+        # Start elemental cycle if enabled
+        if self.ruleset.ELEMENTAL_MASTERY_ENABLED and self.elementalSystem.is_enabled():
+            self.__startElementalCycle()
+
     # Called when we actually run out of time, simply tell the clients we ran out of time then handle it later
     def __timesUp(self, task=None):
         taskMgr.remove(self.uniqueName('times-up-task'))
@@ -1302,6 +1319,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.currentlyInOvertime = False
         self.overtimeWillHappen = False
         self.d_setOvertime(CraneLeagueGlobals.OVERTIME_FLAG_DISABLE)
+
+        # Stop elemental cycle
+        self.__stopElementalCycle()
 
         # Ignore death messages.
         self.ignoreToonDeaths()
@@ -1427,3 +1447,51 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.b_setSpectators(currentSpectators)
         # Broadcast the spot status change to all clients
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
+
+    def setupElementalSystem(self):
+        """Setup the elemental system based on the current ruleset."""
+        if self.ruleset.ELEMENTAL_MASTERY_ENABLED:
+            self.elementalSystem.enable()
+            self.elementalEffectManager.enable()
+            # Register all existing safes
+            for safe in self.safes:
+                self.elementalSystem.register_safe(safe.doId)
+        else:
+            self.elementalSystem.disable()
+            self.elementalEffectManager.disable()
+
+    def __startElementalCycle(self):
+        """Start the elemental cycle task."""
+        self.__stopElementalCycle()
+        taskMgr.add(self.__elementalCycleTask, self.uniqueName('elemental-cycle'))
+
+    def __stopElementalCycle(self):
+        """Stop the elemental cycle task."""
+        taskMgr.remove(self.uniqueName('elemental-cycle'))
+
+    def __elementalCycleTask(self, task):
+        """Task that runs the elemental cycle every few seconds."""
+        if not self.elementalSystem.is_enabled():
+            return task.done
+        
+        # Update the elemental cycle
+        self.elementalSystem.update_elemental_cycle()
+        
+        # Send elemental updates to clients
+        self.d_updateElementalSafes()
+        
+        # Schedule next update
+        from toontown.coghq.ElementalSystem import ElementalSystemConfig
+        task.delayTime = ElementalSystemConfig.CYCLE_INTERVAL
+        return task.again
+
+    def d_updateElementalSafes(self):
+        """Send elemental safe updates to all clients."""
+        elemental_safes = self.elementalSystem.get_all_elemental_safes()
+        # Convert to parallel arrays for DC transmission
+        safe_ids = []
+        element_types = []
+        for safe_id, element_type in elemental_safes.items():
+            safe_ids.append(safe_id)
+            element_types.append(element_type.value)
+        self.sendUpdate('updateElementalSafes', [safe_ids, element_types])

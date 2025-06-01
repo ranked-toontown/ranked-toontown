@@ -1418,6 +1418,7 @@ struct CraneLeagueRuleset {
   bool CFO_FLINCHES_ON_HIT;
   bool SAFES_STUN_GOONS;
   bool GOONS_ALWAYS_WAKE_WHEN_GRABBED;
+  bool ELEMENTAL_MASTERY_ENABLED;
 };
 
 struct CraneLeagueModifier {
@@ -3941,6 +3942,7 @@ dclass DistributedCraneGame: DistributedMinigame {
   setOvertime(uint8 flag) broadcast ram;
   handleSpotStatusChanged(uint8 spotIndex, bool isPlayer) airecv clsend;
   updateSpotStatus(uint8 spotIndex, bool isPlayer) broadcast ram;
+  updateElementalSafes(uint32[], uint8[]) broadcast ram;
 };
 
 dclass DistributedScaleGame: DistributedMinigame {

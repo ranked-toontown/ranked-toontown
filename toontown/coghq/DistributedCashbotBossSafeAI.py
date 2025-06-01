@@ -100,6 +100,9 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 damage = math.ceil(damage)
                 
                 self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
+                
+                # Apply elemental effects if the safe is elemental
+                self.__applyElementalEffects(self.boss.getBoss().doId)
             else:
                 # If he's not dizzy, he grabs the safe and makes a
                 # helmet out of it only if he is allowed to safe helmet.
@@ -268,5 +271,23 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
 
     # Called from client when a safe destroys a goon
     def destroyedGoon(self):
-        avId = self.air.getAvatarIdFromSender()
-        self.boss.addScore(avId, self.boss.ruleset.POINTS_GOON_KILLED_BY_SAFE, reason=CraneLeagueGlobals.ScoreReason.GOON_KILL)
+        # this safe destroyed a goon; update our book-keeping.
+        self.boss.addScore(self.avId, self.boss.ruleset.POINTS_GOON_KILLED_BY_SAFE, reason=CraneLeagueGlobals.ScoreReason.GOON_KILL)
+
+    def __applyElementalEffects(self, target_id):
+        """Apply elemental effects if this safe is currently elemental."""
+        if not self.boss.ruleset.ELEMENTAL_MASTERY_ENABLED:
+            return
+        
+        # Check if this safe has an elemental effect
+        element_type = self.boss.elementalSystem.get_safe_element(self.doId)
+        
+        # Import here to avoid circular imports
+        from toontown.coghq.ElementalSystem import ElementType
+        from toontown.coghq.ElementalEffects import ElementalEffectFactory
+        
+        if element_type != ElementType.NONE:
+            # Create and apply the appropriate elemental effect
+            effect = ElementalEffectFactory.create_effect(element_type, target_id)
+            if effect:
+                self.boss.elementalEffectManager.apply_effect(target_id, effect)

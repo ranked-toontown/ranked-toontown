@@ -222,6 +222,9 @@ class CraneGameRuleset:
         # A for fun mechanic that makes toons have permanent damage buffs based on how much damage they do
         self.WANT_MOMENTUM_MECHANIC = False
 
+        # ELEMENTAL SYSTEM SETTINGS
+        self.ELEMENTAL_MASTERY_ENABLED = False  # Should the elemental system be enabled?
+
         # POINTS SETTINGS
         self.POINTS_GOON_STOMP = 1  # Points per goon stomp
         self.POINTS_STUN = 10  # Points per stun
@@ -303,6 +306,7 @@ class CraneGameRuleset:
             self.CFO_FLINCHES_ON_HIT,
             self.SAFES_STUN_GOONS,
             self.GOONS_ALWAYS_WAKE_WHEN_GRABBED,
+            self.ELEMENTAL_MASTERY_ENABLED,
         ]
 
     @classmethod
@@ -336,6 +340,7 @@ class CraneGameRuleset:
         rulesetInstance.CFO_FLINCHES_ON_HIT = attrs[25]
         rulesetInstance.SAFES_STUN_GOONS = attrs[26]
         rulesetInstance.GOONS_ALWAYS_WAKE_WHEN_GRABBED = attrs[27]
+        rulesetInstance.ELEMENTAL_MASTERY_ENABLED = attrs[28]
         return rulesetInstance
 
     def __str__(self):
@@ -1446,6 +1451,31 @@ class ModifierCFOCheatsEnabled(CFORulesetModifierBase):
 
     def apply(self, cfoRuleset):
         pass
+
+
+# (*) Elemental Mastery!
+# --------------------------------
+# - Enables elemental safes with Fire and Water effects
+class ModifierElementalMastery(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 32
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
+
+    TITLE_COLOR = CFORulesetModifierBase.PURPLE
+    DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
+
+    def getName(self):
+        return 'Elemental Mastery!'
+
+    def getDescription(self):
+        return f'Safes can become %(color_start)selemental%(color_end)s with Fire and Water effects!'
+
+    def getHeat(self):
+        return 3
+
+    def apply(self, cfoRuleset):
+        # Add a flag to enable elemental system
+        cfoRuleset.ELEMENTAL_MASTERY_ENABLED = True
 
 
 # Any implemented subclasses of CFORulesetModifierBase cannot go past this point
