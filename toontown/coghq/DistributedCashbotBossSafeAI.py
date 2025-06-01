@@ -85,10 +85,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             self.boss.addScore(avId, self.boss.ruleset.POINTS_PENALTY_SANDBAG, reason=CraneLeagueGlobals.ScoreReason.LOW_IMPACT)
             return
 
-        # Check if this safe has elemental status before processing the hit
-        elementType = self.boss.getSafeElementType(self.doId)
-        hadElementalStatus = elementType != 0  # ElementType.NONE = 0
-        
         # The client reports successfully striking the boss in the
         # head with this object.
         if self.boss.getBoss().heldObject == None:
@@ -103,14 +99,12 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
                 
                 # Apply elemental effects if this safe has any elemental status
+                elementType = self.boss.getSafeElementType(self.doId)
                 if elementType != 0:  # ElementType.NONE = 0
                     # Check for VOLT re-stun ability
                     if elementType == 2:  # ElementType.VOLT = 2
                         # VOLT safes can re-stun (extend stun time) even when CFO is already stunned
                         self.__performVoltReStun(impact, craneId, avId, damage)
-                        # Remove elemental status after VOLT re-stun is applied
-                        if hadElementalStatus:
-                            self.__removeElementalStatus()
                         return  # Exit early, re-stun handles everything
                     elif elementType != 2:  # Only apply DoT for non-VOLT elements
                         # Apply elemental DoT effect based on element type
@@ -124,6 +118,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
             else:
                 # Check if this is a VOLT elemental safe
+                elementType = self.boss.getSafeElementType(self.doId)
                 isVoltSafe = (elementType == 2)  # ElementType.VOLT = 2
                 
                 if isVoltSafe:
@@ -134,16 +129,10 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                     # If he's not dizzy, he grabs the safe and makes a
                     # helmet out of it only if he is allowed to safe helmet.
                     if self.boss.ruleset.DISABLE_SAFE_HELMETS:
-                        # Remove elemental status even if helmets are disabled
-                        if hadElementalStatus:
-                            self.__removeElementalStatus()
                         return
 
                     # Is there a cooldown for this toon on intentionally giving the boss a safe helmet?
                     if not self.boss.getBoss().allowedToSafeHelmet(avId):
-                        # Remove elemental status even if cooldown prevents helmet
-                        if hadElementalStatus:
-                            self.__removeElementalStatus()
                         return
 
                     self.demand('Grabbed', self.boss.getBoss().doId, self.boss.getBoss().doId)
@@ -156,6 +145,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 
         elif impact >= ToontownGlobals.CashbotBossSafeKnockImpact:
             # Check if this is a VOLT elemental safe
+            elementType = self.boss.getSafeElementType(self.doId)
             isVoltSafe = (elementType == 2)  # ElementType.VOLT = 2
             
             self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE, reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
@@ -169,12 +159,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             if isVoltSafe:
                 # VOLT safes also stun the CFO after knocking off helmet
                 self.__performVoltStun(impact, craneId, avId, afterHelmetKnockoff=True)
-        
-        # Remove elemental status after any successful hit on the CFO
-        # This ensures the elemental effect is "consumed" when used
-        if hadElementalStatus:
-            self.__removeElementalStatus()
-            
         return
 
     def __performVoltStun(self, impact, craneId, avId, afterHelmetKnockoff=False):
@@ -213,9 +197,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         
         # Apply the damage from the VOLT stun
         self.boss.recordHit(damage, impact, craneId, objId=self.doId)
-        
-        # Remove elemental status after VOLT stun is applied
-        self.__removeElementalStatus()
 
     def __performVoltReStun(self, impact, craneId, avId, damage):
         """Perform VOLT re-stun effect on the CFO when already stunned"""
@@ -241,9 +222,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
         
         self.boss.notify.info(f"VOLT safe {self.doId} re-stunned CFO! Extended stun by {extensionTime:.1f} seconds")
-        
-        # Remove elemental status after VOLT re-stun is applied
-        self.__removeElementalStatus()
 
     def requestInitial(self):
         # The client controlling the safe dropped it through the
@@ -387,15 +365,3 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
     def destroyedGoon(self):
         avId = self.air.getAvatarIdFromSender()
         self.boss.addScore(avId, self.boss.ruleset.POINTS_GOON_KILLED_BY_SAFE, reason=CraneLeagueGlobals.ScoreReason.GOON_KILL)
-
-    def __removeElementalStatus(self):
-        """Remove elemental status from this safe after it hits the CFO"""
-        # Only remove if this safe actually has elemental status
-        if self.boss.isSafeElemental(self.doId):
-            elementType = self.boss.getSafeElementType(self.doId)
-            elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
-            
-            # Remove from the elemental system immediately (don't wait for the normal 10-second timer)
-            self.boss._DistributedCraneGameAI__removeElemental(self.doId)
-            
-            self.boss.notify.info(f"Safe {self.doId} lost {elementName} elemental status after hitting CFO")
