@@ -19,6 +19,7 @@ from toontown.matchmaking.skill_profile_keys import CRANING_SOLOS, CRANING_CHAOS
 from toontown.minigame.DistributedMinigameAI import DistributedMinigameAI
 from toontown.minigame.craning import CraneGameGlobals
 from toontown.minigame.craning.CraneGamePracticeCheatAI import CraneGamePracticeCheatAI
+from toontown.minigame.craning.CraneGameElementHandlerAI import CraneGameElementHandlerAI
 from toontown.suit.DistributedCashbotBossGoonAI import DistributedCashbotBossGoonAI
 from toontown.suit.DistributedCashbotBossStrippedAI import DistributedCashbotBossStrippedAI
 from toontown.toon.DistributedToonAI import DistributedToonAI
@@ -104,6 +105,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
+        self.elementHandler: CraneGameElementHandlerAI = CraneGameElementHandlerAI(self)
 
     def isRanked(self) -> bool:
 
