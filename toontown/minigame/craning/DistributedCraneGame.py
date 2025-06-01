@@ -8,7 +8,7 @@ from direct.fsm import ClassicFSM
 from direct.fsm import State
 from direct.gui.OnscreenText import OnscreenText
 from direct.interval.FunctionInterval import Func, Wait
-from direct.interval.LerpInterval import LerpPosHprInterval, LerpScaleInterval, LerpColorScaleInterval
+from direct.interval.LerpInterval import LerpPosHprInterval
 from direct.interval.MetaInterval import Parallel, Sequence
 from direct.showbase.MessengerGlobal import messenger
 from direct.showbase.PythonUtil import reduceAngle
@@ -1606,14 +1606,12 @@ class DistributedCraneGame(DistributedMinigame):
         # Define element-specific visual properties
         elementProperties = {
             ElementType.FIRE: {
-                'useParticles': True,  # Use particle effects instead of text
                 'text': 'FIRE',
                 'color': (1.0, 0.4, 0.0, 1.0),  # Orange-red
                 'scale': 1.5,
                 'height': 10
             },
             ElementType.VOLT: {
-                'useParticles': False,  # Keep as text
                 'text': 'VOLT',
                 'color': (1.0, 0.98, 0.0, 1.0),  # Electric yellow
                 'scale': 1.5,
@@ -1659,105 +1657,6 @@ class DistributedCraneGame(DistributedMinigame):
         # Remove existing indicator if present
         self.__removeElementalIndicator(safeDoId)
         
-        if props.get('useParticles', False):
-            # Create fire particle effects for Fire element
-            elementalEffect = self.__createFireParticleEffect(safe, props)
-        else:
-            # Create text indicator for other elements
-            elementalEffect = self.__createTextIndicator(safe, props)
-        
-        # Store the indicator (using the old dict for compatibility)
-        self.fireElementalIndicators[safeDoId] = elementalEffect
-        
-        elementName = props['text']
-        self.notify.info(f"Created {elementName} elemental indicator for safe {safeDoId}")
-
-    def __createFireParticleEffect(self, safe, props):
-        """Create fire particle effects for Fire elemental safes"""
-        from toontown.battle import BattleParticles
-        from direct.interval.LerpInterval import LerpScaleInterval, LerpColorScaleInterval
-        from direct.interval.MetaInterval import Parallel, Sequence
-        from direct.interval.FunctionInterval import Func
-        
-        # Load the battle particles system
-        BattleParticles.loadParticles()
-        
-        # Create a container node for the fire effects - position at center of safe
-        fireContainer = safe.attachNewNode('fireElementalEffect')
-        fireContainer.setPos(0, 0, 5)  # Just above ground level
-        fireContainer.setScale(0, 0, 0)  # Start at scale 0 for smooth appearance
-        
-        # Create one large central fire effect that extends well beyond the safe
-        baseFlameEffect = BattleParticles.createParticleEffect(file='firedBaseFlame')
-        BattleParticles.setEffectTexture(baseFlameEffect, 'fire')
-        baseFlameEffect.reparentTo(fireContainer)
-        baseFlameEffect.setPos(0, 0, 0)
-        baseFlameEffect.setScale(12.0, 12.0, 15.0)  # Very large central fire effect
-        
-        # Make individual particles bigger and smooth the animation
-        # Use the same method as BattleParticles.setEffectTexture()
-        try:
-            particles = baseFlameEffect.getParticlesNamed('particles-1')
-            if particles:
-                renderer = particles.getRenderer()
-                
-                # Increase the size of individual particles significantly
-                renderer.setInitialXScale(0.25)  # Start 2x bigger than default
-                renderer.setInitialYScale(0.75)  # Start 4x bigger in Y (taller flames)
-                renderer.setFinalXScale(0.25)    # End up 4x bigger in X
-                renderer.setFinalYScale(0.75)    # End up 6x bigger in Y (much taller)
-                
-                # Enable smooth scaling interpolation
-                renderer.setXScaleFlag(1)  # Enable X scale interpolation
-                renderer.setYScaleFlag(1)  # Enable Y scale interpolation
-                
-                # Smooth the animation by adjusting particle properties
-                # Increase birth rate for smoother spawning
-                particles.setBirthRate(0.01)  # More frequent spawning (was 0.02)
-                
-                # Increase lifespan for smoother transitions
-                particles.factory.setLifespanBase(0.3)     # Longer life (was 0.1)
-                particles.factory.setLifespanSpread(0.1)   # Add some randomness
-                
-                # Adjust litter size for more consistent spawning
-                particles.setLitterSize(6)     # Fewer per spawn but more frequent
-                particles.setLitterSpread(2)   # Add some variation
-                
-                # Improve alpha blending for smoother transitions
-                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)  # Smooth fade out
-                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)  # Linear blending
-                
-                self.notify.info("Successfully modified fire particle sizes and smoothed animation")
-        except Exception as e:
-            self.notify.warning(f"Could not modify particle properties: {e}")
-        
-        # Start the fire effect
-        baseFlameEffect.start(fireContainer, fireContainer)
-        
-        # Add fiery glow/tint to the safe itself
-        fieryColor = (1.3, 0.7, 0.4, 1.0)  # Orangy-red fiery glow
-        safe.setColorScale(*fieryColor)
-        
-        # Create smooth appearance animation
-        appearTrack = Parallel(
-            # Scale up the fire effect smoothly
-            LerpScaleInterval(fireContainer, 1.5, (1, 1, 1), startScale=(0, 0, 0), blendType='easeOut'),
-            # Fade in the fiery glow on the safe
-            LerpColorScaleInterval(safe, 1.5, fieryColor, startColorScale=(1, 1, 1, 1), blendType='easeOut')
-        )
-        
-        # Store the appearance animation for immediate playback
-        fireContainer.setPythonTag('appearTrack', appearTrack)
-        appearTrack.start()
-        
-        # Store reference to the effect for cleanup using PythonTag
-        fireContainer.setPythonTag('baseFlameEffect', baseFlameEffect)
-        fireContainer.setPythonTag('safe', safe)  # Store safe reference for cleanup
-        
-        return fireContainer
-
-    def __createTextIndicator(self, safe, props):
-        """Create text indicator for non-Fire elemental safes"""
         # Create elemental text indicator using TextNode for proper 3D positioning
         textNode = TextNode(f'{props["text"].lower()}ElementalText')
         textNode.setText(props['text'])
@@ -1772,62 +1671,19 @@ class DistributedCraneGame(DistributedMinigame):
         elementalText.setPos(0, 0, props['height'])  # Position above the safe
         elementalText.setBillboardPointEye()  # Always face the camera
         
-        return elementalText
+        # Store the indicator (using the old dict for compatibility)
+        self.fireElementalIndicators[safeDoId] = elementalText
+        
+        elementName = props['text']
+        self.notify.info(f"Created {elementName} elemental indicator for safe {safeDoId}")
 
     def __removeElementalIndicator(self, safeDoId):
         """Remove any elemental indicator from a safe"""
         if safeDoId in self.fireElementalIndicators:
             indicator = self.fireElementalIndicators[safeDoId]
-            
-            # Get stored references
-            baseFlameEffect = indicator.getPythonTag('baseFlameEffect')
-            safe = indicator.getPythonTag('safe')
-            appearTrack = indicator.getPythonTag('appearTrack')
-            
-            # Stop any ongoing appearance animation
-            if appearTrack:
-                appearTrack.pause()
-            
-            # Create smooth disappearance animation
-            from direct.interval.LerpInterval import LerpScaleInterval, LerpColorScaleInterval
-            from direct.interval.MetaInterval import Parallel, Sequence
-            from direct.interval.FunctionInterval import Func
-            
-            def cleanupAfterAnimation():
-                # Clean up the fire effect properly
-                if baseFlameEffect is not None:
-                    try:
-                        baseFlameEffect.cleanup()
-                    except:
-                        pass  # Ignore cleanup errors
-                
-                # Reset safe color
-                if safe and not safe.isEmpty():
-                    safe.clearColorScale()
-                
-                # Remove the node
-                if not indicator.isEmpty():
-                    indicator.removeNode()
-                
-                # Remove from tracking dict
-                if safeDoId in self.fireElementalIndicators:
-                    del self.fireElementalIndicators[safeDoId]
-                
-                self.notify.info(f"Removed elemental indicator for safe {safeDoId}")
-            
-            # Create smooth disappearance animation
-            disappearTrack = Parallel(
-                # Scale down the fire effect smoothly
-                LerpScaleInterval(indicator, 1.0, (0, 0, 0), blendType='easeIn'),
-                # Fade out the fiery glow on the safe
-                Sequence(
-                    LerpColorScaleInterval(safe, 1.0, (1, 1, 1, 1), blendType='easeIn') if safe else Func(lambda: None),
-                    Func(cleanupAfterAnimation)
-                )
-            )
-            
-            # Start the disappearance animation
-            disappearTrack.start()
+            indicator.removeNode()
+            del self.fireElementalIndicators[safeDoId]
+            self.notify.info(f"Removed elemental indicator for safe {safeDoId}")
 
     def __nextRound(self, task=None):
         """Transition to the next round"""
