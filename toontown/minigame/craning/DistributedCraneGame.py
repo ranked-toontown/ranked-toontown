@@ -70,15 +70,12 @@ class DistributedCraneGame(DistributedMinigame):
         self.playButton = None
         self.participantsButton = None
         self.bestOfButton = None
-        self.elementalButton = None
         self.participantsPanel = None
         self.participantsList = None
         self.participantsPanelVisible = False
         self.bestOfValue = 1  # Default to Best of 1
-        self.elementalMode = False  # Default to vanilla mode
         self.currentRound = 1
         self.roundWins = {}  # Maps avId -> number of rounds won
-        self.fireElementalIndicators = {}  # Maps safeDoId -> text indicator NodePath
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -591,21 +588,6 @@ class DistributedCraneGame(DistributedMinigame):
         )
         self.bestOfButton.hide()  # Best of button starts hidden
         
-        # Create elemental button next to best of button
-        self.elementalButton = DirectButton(
-            relief=None,
-            text='Vanilla Mode',
-            text_scale=0.055,
-            text_pos=(0, -0.02),
-            geom=(btnGeom.find('**/QuitBtn_UP'),
-                  btnGeom.find('**/QuitBtn_DN'),
-                  btnGeom.find('**/QuitBtn_RLVR')),
-            geom_scale=(0.7, 1, 1),
-            pos=(1.25, 0, 0.85),
-            command=self.__handleElementalButton
-        )
-        self.elementalButton.hide()  # Elemental button starts hidden
-        
         btnGeom.removeNode()
         
         # Initialize participants panel variables
@@ -884,9 +866,6 @@ class DistributedCraneGame(DistributedMinigame):
         if self.bestOfButton is not None:
             self.bestOfButton.destroy()
             self.bestOfButton = None
-        if self.elementalButton is not None:
-            self.elementalButton.destroy()
-            self.elementalButton = None
         if self.participantsPanel is not None:
             self.participantsPanel.destroy()
             self.participantsPanel = None
@@ -1070,11 +1049,6 @@ class DistributedCraneGame(DistributedMinigame):
     def enterCleanup(self):
         self.notify.debug("enterCleanup")
         self.__cleanupRulesPanel()
-        
-        # Clean up fire elemental indicators
-        for safeDoId in list(self.fireElementalIndicators.keys()):
-            self.__removeFireElementalIndicator(safeDoId)
-        
         for toon in self.getParticipants():
             toon.setGhostMode(False)
             toon.show()
@@ -1290,7 +1264,6 @@ class DistributedCraneGame(DistributedMinigame):
             self.playButton.show()
             self.participantsButton.show()
             self.bestOfButton.show()
-            self.elementalButton.show()
         else:
             # Non-leader players automatically trigger ready
             messenger.send(self.rulesDoneEvent)
@@ -1591,83 +1564,8 @@ class DistributedCraneGame(DistributedMinigame):
         if self.scoreboard:
             self.scoreboard.setRoundInfo(currentRound, roundWins, self.bestOfValue)
 
-    def setElementalMode(self, enabled):
-        """Receive elemental mode setting from server"""
-        self.elementalMode = enabled
-        if self.elementalButton:
-            self.elementalButton['text'] = 'Elemental Mode' if self.elementalMode else 'Vanilla Mode'
-        self.notify.info(f"Elemental mode set to: {'On' if self.elementalMode else 'Off'}")
-
-    def setSafeFireElemental(self, safeDoId, isFireElemental):
-        """Handle fire elemental status updates from server"""
-        if isFireElemental:
-            self.__createFireElementalIndicator(safeDoId)
-        else:
-            self.__removeFireElementalIndicator(safeDoId)
-
-    def __createFireElementalIndicator(self, safeDoId):
-        """Create a 'Fire' text indicator above a safe"""
-        # Find the safe object in the boss's safes dictionary
-        safe = None
-        if self.boss and hasattr(self.boss, 'safes'):
-            for safeIndex, safeObj in self.boss.safes.items():
-                if safeObj.doId == safeDoId:
-                    safe = safeObj
-                    break
-        
-        # Fallback: search through distributed objects by doId
-        if not safe:
-            safe = base.cr.doId2do.get(safeDoId)
-        
-        if not safe:
-            self.notify.warning(f"Could not find safe {safeDoId} for fire elemental indicator")
-            return
-        
-        # Remove existing indicator if present
-        self.__removeFireElementalIndicator(safeDoId)
-        
-        # Create fire text indicator using TextNode for proper 3D positioning
-        textNode = TextNode('fireElementalText')
-        textNode.setText('FIRE')
-        textNode.setFont(ToontownGlobals.getInterfaceFont())
-        textNode.setTextColor(1, 0.2, 0, 1)  # Bright orange-red color
-        textNode.setShadow(0.05, 0.05)
-        textNode.setShadowColor(0, 0, 0, 1)  # Black shadow
-        textNode.setAlign(TextNode.ACenter)
-        
-        # Create NodePath from TextNode
-        fireText = safe.attachNewNode(textNode)
-        fireText.setScale(2.0)  # Large scale to be visible
-        fireText.setPos(0, 0, 10)  # Position above the safe
-        fireText.setBillboardPointEye()  # Make it always face the camera
-        
-        # Store the indicator for later cleanup
-        self.fireElementalIndicators[safeDoId] = fireText
-        
-        self.notify.info(f"Created fire elemental indicator for safe {safeDoId}")
-
-    def __removeFireElementalIndicator(self, safeDoId):
-        """Remove the fire elemental indicator from a safe"""
-        if safeDoId in self.fireElementalIndicators:
-            indicator = self.fireElementalIndicators[safeDoId]
-            indicator.removeNode()
-            del self.fireElementalIndicators[safeDoId]
-            self.notify.info(f"Removed fire elemental indicator for safe {safeDoId}")
-
     def __nextRound(self, task=None):
         """Transition to the next round"""
         # The server will handle the transition to the next round automatically
         # We just need to clean up the victory state
         return Task.done
-
-    def __handleElementalButton(self):
-        """Handle the "Elemental Mode" button click"""
-        self.elementalMode = not self.elementalMode
-        if self.elementalButton:
-            self.elementalButton['text'] = 'Elemental Mode' if self.elementalMode else 'Vanilla Mode'
-        
-        # Send update to server if we're the leader
-        if self.avIdList[0] == base.localAvatar.doId:
-            self.sendUpdate('setElementalMode', [self.elementalMode])
-        
-        self.notify.info(f"Elemental mode set to: {'On' if self.elementalMode else 'Off'}")

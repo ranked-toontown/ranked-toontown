@@ -97,12 +97,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 # Apply a multiplier if needed (heavy cranes)
                 damage *= crane.getDamageMultiplier()
                 damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
-                
-                # Apply Fire elemental bonus if this safe is Fire elemental
-                if self.boss.isSafeFireElemental(self.doId):
-                    damage *= 1.5  # 50% more damage
-                    self.boss.notify.info(f"Fire elemental safe {self.doId} dealt bonus damage!")
-                
                 damage = math.ceil(damage)
                 
                 self.boss.recordHit(max(damage, 2), impact, craneId, objId=self.doId)
