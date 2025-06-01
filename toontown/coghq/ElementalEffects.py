@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any
 from direct.task.TaskManagerGlobal import taskMgr
 from direct.showbase.DirectObject import DirectObject
-from .ElementalSystem import ElementType, SynergyType
+from .ElementalSystem import ElementType, SynergyType, ElementalSystem
 import abc
 
 
@@ -214,7 +214,6 @@ class ElementalEffectManager:
     
     def _check_synergies(self, new_effect: StatusEffect, existing_effects: List[StatusEffect], target):
         """Check for synergies between the new effect and existing effects."""
-        from .ElementalSystem import ElementalSystem, SynergyType
         
         # Create a temporary elemental system to check synergies
         elemental_system = ElementalSystem()

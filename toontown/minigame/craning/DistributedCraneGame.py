@@ -31,8 +31,9 @@ from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORAN
 from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
-from toontown.coghq.ElementalSystem import ElementalSystem, ElementType
+from toontown.coghq.ElementalSystem import ElementalSystem
 from toontown.coghq.ElementalEffects import ElementalEffectManager
+from toontown.coghq.ElementalVisuals import ElementalVisualFactory
 from direct.gui.DirectGui import DGG, DirectFrame
 from direct.gui.DirectScrolledList import DirectScrolledList
 from direct.gui.DirectLabel import DirectLabel
@@ -110,9 +111,10 @@ class DistributedCraneGame(DistributedMinigame):
         self.scoreboard = CashbotBossScoreboard(ruleset=self.ruleset)
         self.scoreboard.hide()
 
-        # Client-side elemental system
+        # Initialize elemental systems
         self.elementalSystem = ElementalSystem()
         self.elementalEffectManager = ElementalEffectManager()
+        self.elementalVisualManager = ElementalVisualFactory.create_visual_manager()
         self.elementalSafes = {}  # Maps safe doId to current element type
 
         self.walkStateData = CraneWalk('walkDone')
@@ -893,6 +895,10 @@ class DistributedCraneGame(DistributedMinigame):
         # If the scoreboard was made then update the ruleset
         if self.scoreboard:
             self.scoreboard.set_ruleset(self.ruleset)
+        
+        # Clean up any existing elemental visual effects when ruleset changes
+        if hasattr(self, 'elementalVisualManager'):
+            self.elementalVisualManager.cleanup_all_effects()
 
         self.heatDisplay.update(self.modifiers)
 
@@ -1086,7 +1092,15 @@ class DistributedCraneGame(DistributedMinigame):
         self.boss = None
 
     def exitCleanup(self):
-        pass
+        # Clean up elemental visual effects
+        if hasattr(self, 'elementalVisualManager'):
+            self.elementalVisualManager.cleanup_all_effects()
+        
+        # Clean up any elemental effect manager state
+        if hasattr(self, 'elementalEffectManager'):
+            self.elementalEffectManager.cleanup()
+        
+        DistributedMinigame.exitCleanup(self)
 
     """
     Updates from server to client
@@ -1598,64 +1612,17 @@ class DistributedCraneGame(DistributedMinigame):
         # Update our local tracking
         self.elementalSafes = safeElements
         
-        # Update visual effects for all safes
+        # Update visual effects for all safes using the visual manager
         for safeId, elementType in safeElements.items():
-            self.__updateSafeElementalVisuals(safeId, elementType)
+            safe = base.cr.getDo(safeId)
+            if safe:
+                self.elementalVisualManager.apply_elemental_visual(safe, elementType, safeId)
         
         # Clear visuals for safes that are no longer elemental
-        for safeId in list(self.elementalSafes.keys()):
-            if safeId not in safeElements:
-                self.__updateSafeElementalVisuals(safeId, 0)  # 0 = NONE
-
-    def __updateSafeElementalVisuals(self, safeId, elementType):
-        """Update the visual effects for an elemental safe."""
-        safe = base.cr.getDo(safeId)
-        if not safe:
-            return
-        
-        # Remove existing elemental visual effects
-        existing_effect = safe.find('**/elementalEffect')
-        if existing_effect:
-            existing_effect.removeNode()
-        
-        if elementType == 0:  # 0 = NONE
-            # Remove any color scaling
-            safe.clearColorScale()
-            return
-        
-        # Get the element name and color
-        from toontown.coghq.ElementalSystem import ElementType
-        element_names = {
-            ElementType.FIRE.value: "FIRE",
-            ElementType.WATER.value: "WATER"
-        }
-        
-        element_colors = {
-            ElementType.FIRE.value: (1.0, 0.3, 0.1, 1.0),   # Red-orange
-            ElementType.WATER.value: (0.1, 0.5, 1.0, 1.0),  # Blue
-        }
-        
-        element_name = element_names.get(elementType, "ELEMENTAL")
-        color = element_colors.get(elementType, (1, 1, 1, 1))
-        
-        # Apply color scaling to the safe
-        safe.setColorScale(color[0], color[1], color[2], 1.0)
-        
-        # Create simple text label above the safe
-        from direct.gui.OnscreenText import OnscreenText
-        text_effect = OnscreenText(
-            text=element_name,
-            pos=(0, 0, 12),  # Position above the safe
-            scale=0.8,
-            fg=color,
-            shadow=(0, 0, 0, 1),
-            mayChange=False,
-            parent=safe
-        )
-        text_effect.setName('elementalEffect')
-        
-        # Make the text face the camera
-        text_effect.setBillboardAxis()
+        all_safe_ids = set(safeElements.keys())
+        for tracked_id in list(self.elementalSafes.keys()):
+            if tracked_id not in all_safe_ids:
+                self.elementalVisualManager.remove_elemental_visual(tracked_id)
 
     def __nextRound(self, task=None):
         """Transition to the next round"""
