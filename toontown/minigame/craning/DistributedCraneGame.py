@@ -1635,7 +1635,7 @@ class DistributedCraneGame(DistributedMinigame):
                 'height': 10
             },
             ElementType.VOLT: {
-                'useParticles': True,  # Use particle effects for VOLT too
+                'useParticles': False,  # Keep as text
                 'text': 'VOLT',
                 'color': (1.0, 0.98, 0.0, 1.0),  # Electric yellow
                 'scale': 1.5,
@@ -1682,14 +1682,8 @@ class DistributedCraneGame(DistributedMinigame):
         self.__removeElementalIndicator(safeDoId)
         
         if props.get('useParticles', False):
-            # Create particle effects based on element type
-            if elementType == ElementType.FIRE:
-                elementalEffect = self.__createFireParticleEffect(safe, props)
-            elif elementType == ElementType.VOLT:
-                elementalEffect = self.__createVoltParticleEffect(safe, props)
-            else:
-                # Fallback to text for unknown particle types
-                elementalEffect = self.__createTextIndicator(safe, props)
+            # Create fire particle effects for Fire element
+            elementalEffect = self.__createFireParticleEffect(safe, props)
         else:
             # Create text indicator for other elements
             elementalEffect = self.__createTextIndicator(safe, props)
@@ -1792,99 +1786,6 @@ class DistributedCraneGame(DistributedMinigame):
         
         return fireContainer
 
-    def __createVoltParticleEffect(self, safe, props):
-        """Create electric/lightning particle effects for VOLT elemental safes"""
-        
-        # Load the battle particles system
-        BattleParticles.loadParticles()
-        
-        # Create a container node for the electric effects - position at center of safe
-        voltContainer = safe.attachNewNode('voltElementalEffect')
-        voltContainer.setPos(0, 0, 5)  # Just above ground level
-        voltContainer.setScale(0.01, 0.01, 0.01)  # Start very small instead of 0 to avoid transform issues
-        
-        # Create the main electric spark effect using existing spark particles
-        sparkEffect = BattleParticles.createParticleEffect(file='tnt')  # Use the TNT spark effect as base
-        BattleParticles.setEffectTexture(sparkEffect, 'spark')  # Use spark texture
-        sparkEffect.reparentTo(voltContainer)
-        sparkEffect.setPos(0, 0, 0)
-        sparkEffect.setScale(24.0, 24.0, 28.0)  # Large electric effect around the safe
-        
-        # Store reference to the effect for cleanup using PythonTag
-        voltContainer.setPythonTag('sparkEffect', sparkEffect)
-        
-        # Start the electric effect first
-        sparkEffect.start(voltContainer, voltContainer)
-        
-        # Customize the spark particles for electric effect
-        try:
-            particles = sparkEffect.getParticlesNamed('particles-1')
-            if particles:
-                renderer = particles.getRenderer()
-                
-                # Electric sparks should be quick and jagged
-                renderer.setInitialXScale(0.1)   # Start medium size
-                renderer.setInitialYScale(0.1)   
-                renderer.setFinalXScale(0.5)     # Grow slightly  
-                renderer.setFinalYScale(0.8)    # But become very thin (lightning-like)
-                
-                # Enable smooth scaling interpolation
-                renderer.setXScaleFlag(1)  # Enable X scale interpolation
-                renderer.setYScaleFlag(1)  # Enable Y scale interpolation
-                
-                # Set electric yellow color
-                renderer.setColor(Vec4(1.0, 0.98, 0.0, 1.0))  # Bright electric yellow
-                
-                # Quick, crackling electric animation
-                particles.setBirthRate(0.005)  # Very frequent spawning for electric crackle
-                
-                # Short, sharp electric bursts
-                particles.factory.setLifespanBase(0.2)     # Very short life for quick zaps
-                particles.factory.setLifespanSpread(0.1)   # Some randomness
-                
-                # More litter for electric crackling effect
-                particles.setLitterSize(3)     # More sparks per spawn
-                particles.setLitterSpread(1)   # Some variation
-                
-                # Electric alpha blending for bright sparks
-                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)  # Fade out
-                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)  # Linear blending
-                
-                self.notify.info("Successfully modified electric particle properties")
-        except Exception as e:
-            self.notify.warning(f"Could not modify electric particle properties: {e}")
-        
-        # Create smooth appearance animation with electric blue-white glow
-        try:
-            # Safe gets an electric yellow-white glow
-            safeGlowInterval = LerpColorScaleInterval(
-                safe, 0.8,  # 0.8 second duration for quick electric response
-                colorScale=(1.2, 1.2, 0.6, 1.0),  # Electric yellow-white tint
-                startColorScale=(1.0, 1.0, 1.0, 1.0)  # Start from normal
-            )
-            
-            # Electric particles scale up quickly
-            particleScaleInterval = LerpScaleInterval(
-                voltContainer, 0.8,  # 0.8 second duration for quick response
-                scale=(1.0, 1.0, 1.0),  # Scale to normal size
-                startScale=(0.01, 0.01, 0.01)  # Start very small
-            )
-            
-            # Play both animations in parallel for electric appearance
-            appearanceInterval = Parallel(safeGlowInterval, particleScaleInterval)
-            appearanceInterval.start()
-            
-            # Store the appearance interval for potential cleanup
-            voltContainer.setPythonTag('appearanceInterval', appearanceInterval)
-            
-        except Exception as e:
-            self.notify.warning(f"Could not create electric appearance animation: {e}")
-            # Fallback: set to normal scale immediately
-            voltContainer.setScale(1.0, 1.0, 1.0)
-            safe.setColorScale(1.2, 1.2, 0.6, 1.0)
-        
-        return voltContainer
-
     def __createTextIndicator(self, safe, props):
         """Create text indicator for non-Fire elemental safes"""
         # Create elemental text indicator using TextNode for proper 3D positioning
@@ -1908,11 +1809,10 @@ class DistributedCraneGame(DistributedMinigame):
         if safeDoId in self.fireElementalIndicators:
             indicator = self.fireElementalIndicators[safeDoId]
             
-            # Check if this is a particle effect container by checking for PythonTags
+            # Check if this is a fire particle effect container by checking for PythonTags
             baseFlameEffect = indicator.getPythonTag('baseFlameEffect')
-            sparkEffect = indicator.getPythonTag('sparkEffect')
             
-            if baseFlameEffect is not None or sparkEffect is not None:
+            if baseFlameEffect is not None:
                 # Find the safe object
                 safe = None
                 if self.boss and hasattr(self.boss, 'safes'):
@@ -1927,35 +1827,24 @@ class DistributedCraneGame(DistributedMinigame):
                 
                 if safe:
                     # Create smooth disappearance animation
-                    if baseFlameEffect is not None:
-                        # Fire effect cleanup
-                        safeGlowFadeInterval = LerpColorScaleInterval(
-                            safe, 0.8,  # 0.8 second duration
-                            colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                            startColorScale=(1.3, 0.7, 0.4, 1.0)  # From fiery orange
-                        )
-                    elif sparkEffect is not None:
-                        # VOLT effect cleanup
-                        safeGlowFadeInterval = LerpColorScaleInterval(
-                            safe, 0.6,  # 0.6 second duration for quick electric fade
-                            colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                            startColorScale=(1.2, 1.2, 0.6, 1.0)  # From electric yellow-white
-                        )
+                    # Safe glow fades back to normal
+                    safeGlowFadeInterval = LerpColorScaleInterval(
+                        safe, 0.8,  # 0.8 second duration
+                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
+                        startColorScale=(1.3, 0.7, 0.4, 1.0)  # From fiery orange
+                    )
                     
-                    # Particles scale down to very small instead of 0
+                    # Fire particles scale down to very small instead of 0
                     particleScaleDownInterval = LerpScaleInterval(
-                        indicator, 0.6 if sparkEffect else 0.8,  # Faster fade for electric
+                        indicator, 0.8,  # 0.8 second duration
                         scale=(0.01, 0.01, 0.01),  # Scale down to very small
                         startScale=(1.0, 1.0, 1.0)  # From normal size
                     )
                     
                     # Clean up after animation completes
-                    def cleanupParticleEffect():
+                    def cleanupFireEffect():
                         try:
-                            if baseFlameEffect:
-                                baseFlameEffect.cleanup()
-                            if sparkEffect:
-                                sparkEffect.cleanup()
+                            baseFlameEffect.cleanup()
                         except:
                             pass  # Ignore cleanup errors
                         
@@ -1966,16 +1855,13 @@ class DistributedCraneGame(DistributedMinigame):
                     # Play both animations in parallel, then cleanup
                     disappearanceInterval = Sequence(
                         Parallel(safeGlowFadeInterval, particleScaleDownInterval),
-                        Func(cleanupParticleEffect)
+                        Func(cleanupFireEffect)
                     )
                     disappearanceInterval.start()
                 else:
                     # Fallback: immediate cleanup if safe not found
                     try:
-                        if baseFlameEffect:
-                            baseFlameEffect.cleanup()
-                        if sparkEffect:
-                            sparkEffect.cleanup()
+                        baseFlameEffect.cleanup()
                     except:
                         pass
                     if not indicator.isEmpty():
@@ -2006,8 +1892,6 @@ class DistributedCraneGame(DistributedMinigame):
         """Create elemental effects on the CFO"""
         if elementType == ElementType.FIRE:
             self.__createCFOFireEffect()
-        elif elementType == ElementType.VOLT:
-            self.__createCFOVoltEffect()
         # Future element types can be handled here:
         # elif elementType == ElementType.ICE:
         #     self.__createCFOIceEffect()
@@ -2109,111 +1993,6 @@ class DistributedCraneGame(DistributedMinigame):
         self.cfoElementalEffects[ElementType.FIRE] = fireContainer
         self.notify.info("Created fire effect on CFO")
 
-    def __createCFOVoltEffect(self):
-        """Create electric effects on the CFO when he's taking VOLT DoT"""
-        if not self.boss:
-            self.notify.warning("Cannot create CFO volt effect - no boss found")
-            return
-            
-        # Remove existing volt effect if present
-        self.__removeCFOElementalEffect(ElementType.VOLT)
-        
-        # Load the battle particles system
-        BattleParticles.loadParticles()
-        
-        # Create a container node for the electric effects on the CFO
-        voltContainer = self.boss.attachNewNode('cfoVoltElementalEffect')
-        voltContainer.setPos(0, 0, 8)  # Position above CFO's center
-        voltContainer.setScale(0.01, 0.01, 0.01)  # Start very small for smooth appearance
-        
-        # Create multiple electric spark effects for dramatic CFO electrocution
-        sparkEffect = BattleParticles.createParticleEffect(file='tnt')
-        BattleParticles.setEffectTexture(sparkEffect, 'spark')
-        sparkEffect.reparentTo(voltContainer)
-        sparkEffect.setPos(0, 0, 0)  # Center
-        sparkEffect.setScale(45.0, 45.0, 50.0)  # Very large to engulf the CFO
-        
-        # Store references to all effects for cleanup
-        voltContainer.setPythonTag('sparkEffect1', sparkEffect)
-        
-        # Start all electric effects
-        sparkEffect.start(voltContainer, voltContainer)
-        
-        # Customize all spark effects for intense electric CFO effect
-        for i, effect in enumerate([sparkEffect], 1):
-            try:
-                particles = effect.getParticlesNamed('particles-1')
-                if particles:
-                    renderer = particles.getRenderer()
-                    
-                    # Intense electric sparks for CFO electrocution
-                    renderer.setInitialXScale(0.2)   # Start larger for dramatic effect
-                    renderer.setInitialYScale(0.2)   
-                    renderer.setFinalXScale(0.6)     # Grow to very large electric bolts
-                    renderer.setFinalYScale(0.8)     # Very thin like lightning
-                    
-                    # Enable smooth scaling interpolation
-                    renderer.setXScaleFlag(1)
-                    renderer.setYScaleFlag(1)
-                    
-                    # Bright electric yellow-white color
-                    renderer.setColor(Vec4(1.0, 1.0, 0.8, 1.0))  # Bright electric yellow-white
-                    
-                    # Intense electric crackling animation
-                    particles.setBirthRate(0.002)     # Very frequent for intense effect
-                    
-                    # Quick electric bursts for CFO effect
-                    particles.factory.setLifespanBase(0.3)     # Slightly longer for visibility
-                    particles.factory.setLifespanSpread(0.15)   
-                    
-                    # More intense electric crackling
-                    particles.setLitterSize(5 + i)     # Increasing intensity per effect
-                    particles.setLitterSpread(2)       
-                    
-                    # Bright electric blending
-                    renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)
-                    renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)
-                    
-                    self.notify.info(f"CFO electric effect {i} particles configured successfully")
-            except Exception as e:
-                self.notify.warning(f"Could not modify CFO electric effect {i} particle properties: {e}")
-        
-        # Create smooth appearance animation with intense electric effect
-        try:
-            # Get the current color to start from (in case there's another effect in progress)
-            currentColor = self.boss.getColorScale()
-            
-            # CFO gets intense electric yellow-white glow
-            cfoGlowInterval = LerpColorScaleInterval(
-                self.boss, 0.5,  # 0.5 second duration for quick electric response
-                colorScale=(1.3, 1.3, 0.8, 1.0),  # Intense electric yellow-white tint
-                startColorScale=currentColor  # Start from whatever color CFO currently has
-            )
-            
-            # Electric particles scale up dramatically and quickly
-            particleScaleInterval = LerpScaleInterval(
-                voltContainer, 0.5,  # 0.5 second duration for quick electric response
-                scale=(1.0, 1.0, 1.0),  # Scale to normal size
-                startScale=(0.01, 0.01, 0.01)
-            )
-            
-            # Play both animations in parallel
-            appearanceInterval = Parallel(cfoGlowInterval, particleScaleInterval)
-            appearanceInterval.start()
-            
-            # Store the appearance interval for cleanup
-            voltContainer.setPythonTag('appearanceInterval', appearanceInterval)
-            
-        except Exception as e:
-            self.notify.warning(f"Could not create CFO electric appearance animation: {e}")
-            # Fallback: set effects immediately
-            voltContainer.setScale(1.0, 1.0, 1.0)
-            self.boss.setColorScale(1.3, 1.3, 0.8, 1.0)
-        
-        # Store the volt effect
-        self.cfoElementalEffects[ElementType.VOLT] = voltContainer
-        self.notify.info("Created electric effect on CFO")
-
     def __removeCFOElementalEffect(self, elementType):
         """Remove elemental effects from the CFO"""
         if elementType not in self.cfoElementalEffects:
@@ -2266,56 +2045,6 @@ class DistributedCraneGame(DistributedMinigame):
                         effect.removeNode()
             except Exception as e:
                 self.notify.warning(f"Error during CFO fire effect removal: {e}")
-                # Fallback: immediate cleanup
-                if not effect.isEmpty():
-                    effect.removeNode()
-        elif elementType == ElementType.VOLT:
-            # Create smooth disappearance animation for electric effect
-            try:
-                # CFO glow fades back to normal
-                if self.boss:
-                    # Get current color in case there are other effects in progress
-                    currentColor = self.boss.getColorScale()
-                    
-                    cfoGlowFadeInterval = LerpColorScaleInterval(
-                        self.boss, 0.7,  # 0.7 second duration for quick electric fade
-                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                        startColorScale=currentColor  # From whatever color CFO currently has
-                    )
-                    
-                    # Electric particles scale down quickly
-                    particleScaleDownInterval = LerpScaleInterval(
-                        effect, 0.7,  # 0.7 second duration for quick electric fade
-                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
-                        startScale=(1.0, 1.0, 1.0)
-                    )
-                    
-                    # Clean up after animation
-                    def cleanupCFOVoltEffect():
-                        try:
-                            # Cleanup all spark effects
-                            for i in range(1, 4):
-                                sparkEffect = effect.getPythonTag(f'sparkEffect{i}')
-                                if sparkEffect:
-                                    sparkEffect.cleanup()
-                        except:
-                            pass
-                        
-                        if not effect.isEmpty():
-                            effect.removeNode()
-                    
-                    # Play disappearance animation then cleanup
-                    disappearanceInterval = Sequence(
-                        Parallel(cfoGlowFadeInterval, particleScaleDownInterval),
-                        Func(cleanupCFOVoltEffect)
-                    )
-                    disappearanceInterval.start()
-                else:
-                    # No boss available, immediate cleanup
-                    if not effect.isEmpty():
-                        effect.removeNode()
-            except Exception as e:
-                self.notify.warning(f"Error during CFO electric effect removal: {e}")
                 # Fallback: immediate cleanup
                 if not effect.isEmpty():
                     effect.removeNode()

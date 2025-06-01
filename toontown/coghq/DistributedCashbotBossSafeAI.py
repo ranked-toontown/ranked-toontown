@@ -212,23 +212,11 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         
         boss.b_setAttackCode(ToontownGlobals.BossCogDizzy, delayTime=delayTime)
         
-        # Trigger CFO VOLT visual effect for the duration of the stun
-        self.boss.d_setCFOElementalStatus(2, True)  # ElementType.VOLT = 2, enabled = True
-        
-        # Schedule removal of VOLT effect when stun ends
-        taskMgr.doMethodLater(delayTime, self.__removeVoltEffectFromCFO, 
-                             self.boss.getBoss().uniqueName('removeVoltEffect'))
-        
         # Apply the damage from the VOLT stun
         self.boss.recordHit(damage, impact, craneId, objId=self.doId)
         
         # Remove elemental status after VOLT stun is applied
         self.__removeElementalStatus()
-
-    def __removeVoltEffectFromCFO(self, task=None):
-        """Remove VOLT visual effect from CFO when stun expires"""
-        self.boss.d_setCFOElementalStatus(2, False)  # ElementType.VOLT = 2, enabled = False
-        return task.done
 
     def __performVoltReStun(self, impact, craneId, avId, damage):
         """Perform VOLT re-stun effect on the CFO when already stunned"""
@@ -258,17 +246,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         
         # Reset helmet cooldowns like goons do when they stun the CFO
         boss.stopHelmets()
-        
-        # If CFO doesn't already have VOLT effect, apply it
-        # (This handles edge cases where VOLT re-stun happens right as effect was about to expire)
-        self.boss.d_setCFOElementalStatus(2, True)  # ElementType.VOLT = 2, enabled = True
-        
-        # Cancel any existing VOLT effect removal task
-        taskMgr.remove(boss.uniqueName('removeVoltEffect'))
-        
-        # Schedule new removal of VOLT effect when extended stun ends
-        taskMgr.doMethodLater(totalStunTime, self.__removeVoltEffectFromCFO, 
-                             boss.uniqueName('removeVoltEffect'))
         
         # Give points for the re-stun
         self.boss.addScore(avId, self.boss.ruleset.POINTS_STUN, reason=CraneLeagueGlobals.ScoreReason.STUN)
