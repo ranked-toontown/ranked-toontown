@@ -222,9 +222,6 @@ class CraneGameRuleset:
         # A for fun mechanic that makes toons have permanent damage buffs based on how much damage they do
         self.WANT_MOMENTUM_MECHANIC = False
 
-        # ELEMENTAL SETTINGS
-        self.ELEMENTAL_MODE = False  # Should elemental effects be enabled (fire safes, etc.)?
-
         # POINTS SETTINGS
         self.POINTS_GOON_STOMP = 1  # Points per goon stomp
         self.POINTS_STUN = 10  # Points per stun
@@ -306,7 +303,6 @@ class CraneGameRuleset:
             self.CFO_FLINCHES_ON_HIT,
             self.SAFES_STUN_GOONS,
             self.GOONS_ALWAYS_WAKE_WHEN_GRABBED,
-            self.ELEMENTAL_MODE,
         ]
 
     @classmethod
@@ -340,7 +336,6 @@ class CraneGameRuleset:
         rulesetInstance.CFO_FLINCHES_ON_HIT = attrs[25]
         rulesetInstance.SAFES_STUN_GOONS = attrs[26]
         rulesetInstance.GOONS_ALWAYS_WAKE_WHEN_GRABBED = attrs[27]
-        rulesetInstance.ELEMENTAL_MODE = attrs[28]
         return rulesetInstance
 
     def __str__(self):
@@ -1451,30 +1446,6 @@ class ModifierCFOCheatsEnabled(CFORulesetModifierBase):
 
     def apply(self, cfoRuleset):
         pass
-
-
-# (-) Elemental Mastery!
-# --------------------------------
-# - Enables elemental effects like fire safes that deal 50% more damage
-class ModifierElementalMode(CFORulesetModifierBase):
-    # The enum used by astron to know the type
-    MODIFIER_ENUM = 32
-    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
-
-    TITLE_COLOR = CFORulesetModifierBase.DARK_PURPLE
-    DESCRIPTION_COLOR = CFORulesetModifierBase.PURPLE
-
-    def getName(self):
-        return 'Elemental Mastery!'
-
-    def getDescription(self):
-        return f'Safes randomly become %(color_start)sfire elemental%(color_end)s, dealing 50%% more damage!'
-
-    def getHeat(self):
-        return 2
-
-    def apply(self, cfoRuleset):
-        cfoRuleset.ELEMENTAL_MODE = True
 
 
 # Any implemented subclasses of CFORulesetModifierBase cannot go past this point

@@ -1418,7 +1418,6 @@ struct CraneLeagueRuleset {
   bool CFO_FLINCHES_ON_HIT;
   bool SAFES_STUN_GOONS;
   bool GOONS_ALWAYS_WAKE_WHEN_GRABBED;
-  bool ELEMENTAL_MODE;
 };
 
 struct CraneLeagueModifier {
