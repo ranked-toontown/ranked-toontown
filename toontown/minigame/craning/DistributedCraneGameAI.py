@@ -1649,20 +1649,12 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         
         self.elementalDoTTasks[dotId] = dotInfo
         
-        # Apply visual effects to the CFO for Fire DoT
-        if elementType == ElementType.FIRE:
-            self.d_setCFOElementalStatus(ElementType.FIRE, True)
-        
         # Start the DoT ticking after the element-specific delay
         taskName = self.uniqueName(f'elementalDoTTick-{dotId}')
         taskMgr.doMethodLater(props['startDelay'], self.__doElementalDoTTick, taskName, extraArgs=[dotId])
         
         elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
         self.notify.info(f"Applied {elementName} DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks")
-
-    def d_setCFOElementalStatus(self, elementType, enabled):
-        """Send CFO elemental status update to all clients"""
-        self.sendUpdate('setCFOElementalStatus', [elementType, enabled])
 
     def applyFireDoT(self, avId, dotDamage, ticks):
         """Apply a fire damage-over-time effect to the CFO - legacy method for compatibility"""
@@ -1730,21 +1722,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def __cleanupElementalDoT(self, dotId):
         """Clean up a finished elemental DoT effect"""
         if dotId in self.elementalDoTTasks:
-            dotInfo = self.elementalDoTTasks[dotId]
-            elementType = dotInfo['elementType']
-            
-            # Remove visual effects from CFO when DoT ends
-            if elementType == ElementType.FIRE:
-                # Check if there are any other active Fire DoTs before removing effects
-                hasOtherFireDoTs = False
-                for otherId, otherInfo in self.elementalDoTTasks.items():
-                    if otherId != dotId and otherInfo['elementType'] == ElementType.FIRE:
-                        hasOtherFireDoTs = True
-                        break
-                        
-                if not hasOtherFireDoTs:
-                    self.d_setCFOElementalStatus(ElementType.FIRE, False)
-            
             del self.elementalDoTTasks[dotId]
             
         # Remove any pending task
@@ -1755,12 +1732,5 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __cleanupAllElementalDoTs(self):
         """Clean up all active elemental DoT effects"""
-        # Check if we need to remove CFO fire effects
-        hasFireDoTs = any(dotInfo['elementType'] == ElementType.FIRE for dotInfo in self.elementalDoTTasks.values())
-        
         for dotId in list(self.elementalDoTTasks.keys()):
             self.__cleanupElementalDoT(dotId)
-            
-        # Make sure CFO effects are removed if there were any fire DoTs
-        if hasFireDoTs:
-            self.d_setCFOElementalStatus(ElementType.FIRE, False)

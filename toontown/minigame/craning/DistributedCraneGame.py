@@ -92,7 +92,6 @@ class DistributedCraneGame(DistributedMinigame):
         self.currentRound = 1
         self.roundWins = {}  # Maps avId -> number of rounds won
         self.fireElementalIndicators = {}  # Maps safeDoId -> text indicator NodePath
-        self.cfoElementalEffects = {}  # Maps elementType -> effect NodePath for CFO effects
         self.boss = None
         self.bossRequest = None
         self.wantCustomCraneSpawns = False
@@ -1015,33 +1014,14 @@ class DistributedCraneGame(DistributedMinigame):
         self.__checkSpectatorState()
 
     def exitPlay(self):
+
         if self.boss is not None:
             self.boss.cleanupBossBattle()
-        
+
         self.scoreboard.disableSpectating()
         self.scoreboard.finish()
 
         self.walkStateData.exit()
-
-        # Clean up any elemental indicators
-        for safeDoId in list(self.fireElementalIndicators.keys()):
-            self.__removeElementalIndicator(safeDoId)
-        self.fireElementalIndicators.clear()
-        
-        # Clean up CFO elemental effects
-        for elementType in list(self.cfoElementalEffects.keys()):
-            self.__removeCFOElementalEffect(elementType)
-        self.cfoElementalEffects.clear()
-        
-        # Reset CFO color scale to normal if boss exists
-        if self.boss:
-            try:
-                self.boss.setColorScale(1.0, 1.0, 1.0, 1.0)
-            except:
-                pass
-        
-        # We just need to clean up the victory state
-        return Task.done
 
     def enterVictory(self):
         if self.victor == 0:
@@ -1086,7 +1066,7 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Clean up fire elemental indicators
         for safeDoId in list(self.fireElementalIndicators.keys()):
-            self.__removeElementalIndicator(safeDoId)
+            self.__removeFireElementalIndicator(safeDoId)
         
         for toon in self.getParticipants():
             toon.setGhostMode(False)
@@ -1880,201 +1860,3 @@ class DistributedCraneGame(DistributedMinigame):
         # The server will handle the transition to the next round automatically
         # We just need to clean up the victory state
         return Task.done
-
-    def setCFOElementalStatus(self, elementType, enabled):
-        """Handle CFO elemental status updates from server"""
-        if enabled:
-            self.__createCFOElementalEffect(elementType)
-        else:
-            self.__removeCFOElementalEffect(elementType)
-
-    def __createCFOElementalEffect(self, elementType):
-        """Create elemental effects on the CFO"""
-        if elementType == ElementType.FIRE:
-            self.__createCFOFireEffect()
-        # Future element types can be handled here:
-        # elif elementType == ElementType.ICE:
-        #     self.__createCFOIceEffect()
-
-    def __createCFOFireEffect(self):
-        """Create fire effects on the CFO when he's taking Fire DoT"""
-        if not self.boss:
-            self.notify.warning("Cannot create CFO fire effect - no boss found")
-            return
-            
-        # Remove existing fire effect if present
-        self.__removeCFOElementalEffect(ElementType.FIRE)
-        
-        # Load the battle particles system
-        BattleParticles.loadParticles()
-        
-        # Create a container node for the fire effects on the CFO
-        fireContainer = self.boss.attachNewNode('cfoFireElementalEffect')
-        fireContainer.setPos(0, 0, 8)  # Position above CFO's center
-        fireContainer.setScale(0.01, 0.01, 0.01)  # Start very small for smooth appearance
-        
-        # Create large fire effect that engulfs the CFO
-        fireEffect = BattleParticles.createParticleEffect(file='firedBaseFlame')
-        BattleParticles.setEffectTexture(fireEffect, 'fire')
-        fireEffect.reparentTo(fireContainer)
-        fireEffect.setPos(0, 0, 0)
-        fireEffect.setScale(25.0, 25.0, 30.0)  # Very large to engulf the CFO
-        
-        # Store reference to the effect for cleanup
-        fireContainer.setPythonTag('fireEffect', fireEffect)
-        
-        # Start the fire effect
-        fireEffect.start(fireContainer, fireContainer)
-        
-        # Make individual particles bigger for dramatic effect
-        try:
-            particles = fireEffect.getParticlesNamed('particles-1')
-            if particles:
-                renderer = particles.getRenderer()
-                
-                # Large particles that grow over time
-                renderer.setInitialXScale(0.1)   # Start larger than safe fire
-                renderer.setInitialYScale(0.1)   
-                renderer.setFinalXScale(0.5)     # Grow to very large size
-                renderer.setFinalYScale(1.0)     # Extra tall flames
-                
-                # Enable smooth scaling interpolation
-                renderer.setXScaleFlag(1)
-                renderer.setYScaleFlag(1)
-                
-                # Dramatic fire animation settings
-                particles.setBirthRate(0.005)     # More frequent spawning for intensity
-                particles.factory.setLifespanBase(0.6)    # Longer life for sustained effect
-                particles.factory.setLifespanSpread(0.2)  
-                particles.setLitterSize(8)        # More particles per spawn
-                particles.setLitterSpread(3)      
-                
-                # Improved blending for dramatic effect
-                renderer.setAlphaMode(BaseParticleRenderer.PRALPHAOUT)
-                renderer.setAlphaBlendMethod(BaseParticleRenderer.PPBLENDLINEAR)
-                
-                self.notify.info("CFO fire effect particles configured successfully")
-        except Exception as e:
-            self.notify.warning(f"Could not modify CFO fire particle properties: {e}")
-        
-        # Create smooth appearance animation
-        try:
-            # Get the current color to start from (in case there's a red flash in progress)
-            currentColor = self.boss.getColorScale()
-            
-            # CFO gets fiery orange glow - start from current color instead of assuming white
-            cfoGlowInterval = LerpColorScaleInterval(
-                self.boss, 0.6,  # 0.6 second duration for snappy response
-                colorScale=(1.4, 0.6, 0.3, 1.0),  # Intense fiery orange tint
-                startColorScale=currentColor  # Start from whatever color CFO currently has
-            )
-            
-            # Fire particles scale up dramatically
-            particleScaleInterval = LerpScaleInterval(
-                fireContainer, 0.6,  # 0.6 second duration for snappy response
-                scale=(1.0, 1.0, 1.0),  # Scale to normal size
-                startScale=(0.01, 0.01, 0.01)
-            )
-            
-            # Play both animations in parallel
-            appearanceInterval = Parallel(cfoGlowInterval, particleScaleInterval)
-            appearanceInterval.start()
-            
-            # Store the appearance interval for cleanup
-            fireContainer.setPythonTag('appearanceInterval', appearanceInterval)
-            
-        except Exception as e:
-            self.notify.warning(f"Could not create CFO fire appearance animation: {e}")
-            # Fallback: set effects immediately
-            fireContainer.setScale(1.0, 1.0, 1.0)
-            self.boss.setColorScale(1.4, 0.6, 0.3, 1.0)
-        
-        # Store the fire effect
-        self.cfoElementalEffects[ElementType.FIRE] = fireContainer
-        self.notify.info("Created fire effect on CFO")
-
-    def __removeCFOElementalEffect(self, elementType):
-        """Remove elemental effects from the CFO"""
-        if elementType not in self.cfoElementalEffects:
-            return
-            
-        effect = self.cfoElementalEffects[elementType]
-        
-        if elementType == ElementType.FIRE:
-            # Create smooth disappearance animation for fire effect
-            try:
-                # CFO glow fades back to normal
-                if self.boss:
-                    # Get current color in case there are other effects in progress
-                    currentColor = self.boss.getColorScale()
-                    
-                    cfoGlowFadeInterval = LerpColorScaleInterval(
-                        self.boss, 1.0,  # 1 second duration
-                        colorScale=(1.0, 1.0, 1.0, 1.0),  # Back to normal
-                        startColorScale=currentColor  # From whatever color CFO currently has
-                    )
-                    
-                    # Fire particles scale down
-                    particleScaleDownInterval = LerpScaleInterval(
-                        effect, 1.0,  # 1 second duration
-                        scale=(0.01, 0.01, 0.01),  # Scale down to very small
-                        startScale=(1.0, 1.0, 1.0)
-                    )
-                    
-                    # Clean up after animation
-                    def cleanupCFOFireEffect():
-                        try:
-                            fireEffect = effect.getPythonTag('fireEffect')
-                            if fireEffect:
-                                fireEffect.cleanup()
-                        except:
-                            pass
-                        
-                        if not effect.isEmpty():
-                            effect.removeNode()
-                    
-                    # Play disappearance animation then cleanup
-                    disappearanceInterval = Sequence(
-                        Parallel(cfoGlowFadeInterval, particleScaleDownInterval),
-                        Func(cleanupCFOFireEffect)
-                    )
-                    disappearanceInterval.start()
-                else:
-                    # No boss available, immediate cleanup
-                    if not effect.isEmpty():
-                        effect.removeNode()
-            except Exception as e:
-                self.notify.warning(f"Error during CFO fire effect removal: {e}")
-                # Fallback: immediate cleanup
-                if not effect.isEmpty():
-                    effect.removeNode()
-        else:
-            # For other element types, just remove immediately
-            if not effect.isEmpty():
-                effect.removeNode()
-        
-        # Remove from dictionary
-        del self.cfoElementalEffects[elementType]
-        
-        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
-        self.notify.info(f"Removed {elementName} effect from CFO")
-
-    def disable(self):
-        # Clean up any elemental indicators
-        for safeDoId in list(self.fireElementalIndicators.keys()):
-            self.__removeElementalIndicator(safeDoId)
-        self.fireElementalIndicators.clear()
-        
-        # Clean up CFO elemental effects
-        for elementType in list(self.cfoElementalEffects.keys()):
-            self.__removeCFOElementalEffect(elementType)
-        self.cfoElementalEffects.clear()
-        
-        if self.boss:
-            # Reset CFO color scale to normal
-            try:
-                self.boss.setColorScale(1.0, 1.0, 1.0, 1.0)
-            except:
-                pass
-        
-        DistributedMinigame.disable(self)
