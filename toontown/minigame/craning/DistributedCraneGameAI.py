@@ -74,13 +74,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMaxScale = 2.4
 
         # Elemental mode system - refactored for multiple element types
-        self.elementalSafes = {}  # Maps safeDoId -> elementType
-        self.previousCycleElementalSafes = set()  # Track which safes were elemental in the previous cycle
-        self.elementalDoTTasks = {}  # Maps dotId -> dotInfo for tracking DoT effects
-        self.cfoElementalStatus = {}  # Maps elementType -> enabled for tracking CFO elemental effects
-        self.nextDoTId = 1  # Unique ID counter for DoT effects
-        self.elementalTaskName = None  # Track the elemental system task
-        self.elementalCycleCounter = 0  # Track elemental cycle count
+        self.elementalSafes = {}  # Maps safe doId -> ElementType for tracking active elementals
+        self.previousCycleElementalSafes = set()  # Track which safes had elements in the previous cycle
+        self.elementalTaskName = None  # Task name for elemental system
+        self.elementalDoTTasks = {}  # Maps unique DoT ID -> task info for tracking active DoTs
+        self.nextDoTId = 0  # Counter for unique DoT IDs
 
         self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
 
@@ -1599,10 +1597,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Define element-specific DoT properties
         elementProperties = {
             ElementType.FIRE: {
-                'damagePerTick': 2,                      # 2 damage per tick
-                'ticks': 10,                             # 15 ticks total
-                'tickInterval': 0.3,                     # 1 second between ticks
-                'startDelay': 0.5                        # 1 second delay before starting
+                'damagePerTick': int(baseDamage * 0.1),  # 10% of original damage per tick
+                'ticks': 5,                              # 5 ticks total
+                'tickInterval': 1.0,                     # 1 second between ticks
+                'startDelay': 1.0                        # 1 second delay before starting
             },
             ElementType.VOLT: {
                 'damagePerTick': 0,                      # No DoT damage for VOLT
@@ -1663,18 +1661,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.notify.info(f"Applied {elementName} DoT {dotId}: {dotDamage} damage per tick for {ticks} ticks")
 
     def d_setCFOElementalStatus(self, elementType, enabled):
-        """Send CFO elemental status update to all clients and track server-side"""
-        # Track the status server-side for synergy calculations
-        if enabled:
-            self.cfoElementalStatus[elementType] = True
-        else:
-            self.cfoElementalStatus.pop(elementType, None)
-            
+        """Send CFO elemental status update to all clients"""
         self.sendUpdate('setCFOElementalStatus', [elementType, enabled])
-        
-        elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
-        statusText = "enabled" if enabled else "disabled"
-        self.notify.info(f"CFO {elementName} elemental status {statusText}")
 
     def applyFireDoT(self, avId, dotDamage, ticks):
         """Apply a fire damage-over-time effect to the CFO - legacy method for compatibility"""
@@ -1717,24 +1705,18 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Don't process a hit if we aren't in the play state
         if self.gameFSM.getCurrentState().getName() != 'play':
             return
-        
-        finalDamage = damage
-            
-        # Check for VOLT synergy - DOT effects do 25% more damage when VOLT is active
-        synergyBonus = 1.0
-        if elementType == ElementType.FIRE and self.__isCFOElementalStatusActive(ElementType.VOLT): 
-            finalDamage += 1
             
         # Apply damage directly to boss without triggering any flinch/stun logic
         # Use the boss's internal damage tracking, bypassing recordHit method
-        self.boss.bossDamage += finalDamage
+        oldDamage = self.boss.bossDamage
+        self.boss.bossDamage += damage
         
         # Send damage update to clients with special objId (-1) to indicate DoT damage
         # This allows the client to recognize this as DoT and skip flinching
         self.boss.sendUpdate('setBossDamage', [self.boss.bossDamage, avId, 0xFFFFFFFF, False])  # objId = -1 (max uint32)
         
         # Award points for DoT damage (but no combo increment)
-        self.addScore(avId, finalDamage)
+        self.addScore(avId, damage)
         
         # Check if CFO is defeated
         if self.boss.bossDamage >= self.ruleset.CFO_MAX_HP:
@@ -1742,9 +1724,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.toonsWon = True
             self.gameFSM.request('victory')
             
-        elementName = {1: 'Fire', 2: 'Volt'}.get(elementType, f'Element{elementType}')
-        synergyText = f" (with VOLT synergy: {damage} -> {finalDamage})" if synergyBonus > 1.0 else ""
-        self.notify.info(f"{elementName} DoT {dotId} dealt {finalDamage} damage{synergyText} (no flinch, no combo)")
+        elementName = {ElementType.FIRE: 'Fire', ElementType.VOLT: 'Volt'}.get(elementType, f'Element{elementType}')
+        self.notify.info(f"{elementName} DoT {dotId} dealt {damage} damage (no flinch, no combo)")
 
     def __cleanupElementalDoT(self, dotId):
         """Clean up a finished elemental DoT effect"""
@@ -1783,7 +1764,3 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Make sure CFO effects are removed if there were any fire DoTs
         if hasFireDoTs:
             self.d_setCFOElementalStatus(ElementType.FIRE, False)
-
-    def __isCFOElementalStatusActive(self, elementType):
-        """Check if the CFO has an active elemental status"""
-        return elementType in self.cfoElementalStatus and self.cfoElementalStatus[elementType]
