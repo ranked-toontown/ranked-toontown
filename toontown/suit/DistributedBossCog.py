@@ -289,7 +289,7 @@ class DistributedBossCog(DistributedAvatar.DistributedAvatar, BossCog.BossCog):
             interval.finish()
             DelayDelete.cleanupDelayDeletes(interval)
 
-        # Clear the dictionary once you're done
+        # Clear the dictionary once you’re done
         self.activeIntervals.clear()
 
     def clearInterval(self, name, finish = 1):
@@ -992,25 +992,8 @@ class DistributedBossCog(DistributedAvatar.DistributedAvatar, BossCog.BossCog):
 
     def flashRed(self):
         self.cleanupFlash()
-        
-        # Get the current color scale to blend with
-        currentColor = self.getColorScale()
-        
-        # Create a red-tinted version of the current color for dramatic flash effect
-        # Mix the current color with red (multiply by red tint while preserving some original color)
-        flashColor = (
-            min(1.0, currentColor[0] * 1.0 + 0.5),  # Add red while keeping current red component
-            min(1.0, currentColor[1] * 0.3),        # Reduce green for red effect
-            min(1.0, currentColor[2] * 0.3),        # Reduce blue for red effect  
-            currentColor[3]                          # Keep alpha unchanged
-        )
-        
-        # Flash to red-tinted color, then back to current color
-        i = Sequence(
-            self.colorScaleInterval(0.1, colorScale=VBase4(*flashColor)),
-            self.colorScaleInterval(0.3, colorScale=currentColor)
-        )
-        
+        self.setColorScale(1, 1, 1, 1)
+        i = Sequence(self.colorScaleInterval(0.1, colorScale=VBase4(1, 0, 0, 1)), self.colorScaleInterval(0.3, colorScale=VBase4(1, 1, 1, 1)))
         self.flashInterval = i
         i.start()
 
