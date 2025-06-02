@@ -175,7 +175,16 @@ class ElementalSystem:
             current_time = globalClock.getFrameTime()
             properties.apply_element(element_type, current_time)
     
-    def update_elemental_cycle(self):
+    def remove_safe_element(self, safe_id: int):
+        """Remove the elemental effect from a specific safe."""
+        if not self._enabled:
+            return
+        
+        properties = self._elemental_safes.get(safe_id)
+        if properties:
+            properties.clear_element()
+    
+    def update_elemental_cycle(self, safe_objects=None):
         """Update the elemental cycle for all registered safes."""
         if not self._enabled:
             return
@@ -188,6 +197,7 @@ class ElementalSystem:
         skipped_already_elemental = 0
         skipped_cooldown = 0
         skipped_chance = 0
+        skipped_invalid_state = 0
         
         for safe_id, properties in self._elemental_safes.items():
             # Clear expired elements first
@@ -209,6 +219,15 @@ class ElementalSystem:
                 skipped_cooldown += 1
                 continue
             
+            # Check safe state if safe objects are provided
+            if safe_objects is not None:
+                safe_obj = safe_objects.get(safe_id)
+                if safe_obj and hasattr(safe_obj, 'state'):
+                    # Skip safes that are being grabbed or dropped
+                    if safe_obj.state in ['Grabbed', 'Dropped']:
+                        skipped_invalid_state += 1
+                        continue
+            
             # Roll for elemental chance
             if random.random() >= self.config.ELEMENTAL_CHANCE:
                 # Failed the random chance
@@ -222,10 +241,10 @@ class ElementalSystem:
             print(f"Applied {new_element.name} to safe {safe_id}")
         
         # Summary logging
-        if expired_count > 0 or applied_count > 0:
+        if expired_count > 0 or applied_count > 0 or skipped_invalid_state > 0:
             print(f"Elemental Cycle Summary: {applied_count} applied, {expired_count} expired, "
                   f"{skipped_already_elemental} already elemental, {skipped_cooldown} on cooldown, "
-                  f"{skipped_chance} failed chance roll")
+                  f"{skipped_chance} failed chance roll, {skipped_invalid_state} invalid state")
     
     def get_all_elemental_safes(self) -> Dict[int, ElementType]:
         """Get all currently elemental safes and their elements."""

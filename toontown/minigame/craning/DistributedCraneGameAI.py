@@ -1474,8 +1474,13 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if not self.elementalSystem.is_enabled():
             return task.done
         
-        # Update the elemental cycle
-        self.elementalSystem.update_elemental_cycle()
+        # Create a dictionary of safe objects by their doId for state checking
+        safe_objects = {}
+        for safe in self.safes:
+            safe_objects[safe.doId] = safe
+        
+        # Update the elemental cycle with safe objects for state checking
+        self.elementalSystem.update_elemental_cycle(safe_objects)
         
         # Send elemental updates to clients
         self.d_updateElementalSafes()

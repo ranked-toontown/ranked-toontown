@@ -263,8 +263,8 @@ class ElementalVisualManager(DirectObject):
     
     def _apply_fire_visual(self, obj, state: ElementalVisualState):
         """Apply fire visual effects - COLOR ONLY with smooth glow."""
-        # More subtle fire glow - warm orange with less intensity
-        fire_tint = (1.15, 0.85, 0.7, 1.0)  # Subtle warm orange glow
+        # Enhanced fire glow - more intense warm orange
+        fire_tint = (1.3, 0.75, 0.5, 1.0)  # Increased intensity warm orange glow
         
         # Clean up any existing color interval
         if state.color_interval:
@@ -307,8 +307,8 @@ class ElementalVisualManager(DirectObject):
     
     def _apply_water_visual(self, obj, state: ElementalVisualState):
         """Apply water visual effects - COLOR ONLY with smooth glow."""
-        # More subtle water glow - cool blue with less intensity
-        water_tint = (0.85, 0.95, 1.1, 1.0)  # Subtle cool blue glow
+        # Enhanced water glow - more intense cool blue
+        water_tint = (0.7, 0.9, 1.25, 1.0)  # Increased intensity cool blue glow
         
         # Clean up any existing color interval
         if state.color_interval:

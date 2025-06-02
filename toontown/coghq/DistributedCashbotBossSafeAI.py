@@ -82,6 +82,9 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             return
 
         if impact <= self.getMinImpact():
+            # Remove elemental effect from the safe for any hit that reaches this point
+            self.__removeElementalEffect()
+            self.boss.d_updateElementalSafes()
             self.boss.addScore(avId, self.boss.ruleset.POINTS_PENALTY_SANDBAG, reason=CraneLeagueGlobals.ScoreReason.LOW_IMPACT)
             return
 
@@ -103,6 +106,10 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 
                 # Apply elemental effects if the safe is elemental
                 self.__applyElementalEffects(self.boss.getBoss().doId)
+
+                # Remove elemental effect from the safe for any hit that reaches this point
+                self.__removeElementalEffect()
+                self.boss.d_updateElementalSafes()
             else:
                 # If he's not dizzy, he grabs the safe and makes a
                 # helmet out of it only if he is allowed to safe helmet.
@@ -120,6 +127,10 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
 
                 # Don't allow this toon to safe helmet again for some period of time.
                 self.boss.getBoss().addSafeHelmetCooldown(avId)
+
+                # Remove elemental effect from the safe for any hit that reaches this point
+                self.__removeElementalEffect()
+                self.boss.d_updateElementalSafes()
                 
         elif impact >= ToontownGlobals.CashbotBossSafeKnockImpact:
             self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE,reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
@@ -291,3 +302,8 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             effect = ElementalEffectFactory.create_effect(element_type, target_id)
             if effect:
                 self.boss.elementalEffectManager.apply_effect(target_id, effect)
+
+    def __removeElementalEffect(self):
+        """Remove elemental effect from the safe after hitting the CFO."""
+        if self.boss.ruleset.ELEMENTAL_MASTERY_ENABLED:
+            self.boss.elementalSystem.remove_safe_element(self.doId)

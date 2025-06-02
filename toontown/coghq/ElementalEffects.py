@@ -46,6 +46,7 @@ class StatusEffect(abc.ABC):
     def cancel(self):
         """Cancel this effect immediately."""
         self.is_active = False
+        self._cancelled = True
 
 
 class BurnEffect(StatusEffect):
@@ -234,17 +235,18 @@ class ElementalEffectManager:
         
         existing_effects = self._active_effects[target_id]
         
-        # Check for synergies with existing effects
+        # Check for synergies with existing effects BEFORE applying anything
         cancelled_effects = self._check_synergies(effect, existing_effects, target)
         
         # Don't add the effect if it was cancelled by synergy
         if effect._cancelled:
-            self.notify.debug(f"Effect {effect.get_effect_name()} cancelled by synergy")
-            # Update visuals since existing effects may have been removed
-            self._update_visual_effects(target_id, target)
+            self.notify.debug(f"Effect {effect.get_effect_name()} cancelled by synergy - no visual effects applied")
+            # Only update visuals if existing effects were removed
+            if cancelled_effects:
+                self._update_visual_effects(target_id, target)
             return
         
-        # Add the new effect to the actual list
+        # Add the new effect to the actual list only after synergy check passes
         existing_effects.append(effect)
         effect.apply_effect(target)
         
