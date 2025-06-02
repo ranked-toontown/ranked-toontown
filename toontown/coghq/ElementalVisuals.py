@@ -75,8 +75,8 @@ class ElementalColorManager(DirectObject):
     
     # Elemental color definitions (following Panda3D 0.0-1.0 range)
     ELEMENTAL_COLORS = {
-        ElementType.FIRE: (1.4, 0.7, 0.4, 1.0),     # Warm orange glow - more intense
-        ElementType.WATER: (0.7, 0.9, 1.4, 1.0),    # Cool blue glow - more intense
+        ElementType.FIRE: (1.0, 0.8, 0.6, 1.0),     # Warm orange glow - more intense
+        ElementType.WATER: (0.8, 0.9, 1.0, 1.0),    # Cool blue glow - more intense
         ElementType.NONE: (1.0, 1.0, 1.0, 1.0),     # Neutral/base color
     }
     
