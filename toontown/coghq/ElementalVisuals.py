@@ -1,394 +1,361 @@
 """
-Elemental Visual Effects System
+Elemental Visual Effects System - Foolproof Color Management
 
-This module handles all visual effects for elemental objects in the game,
-focusing on color tinting with placeholder functions for future particle effects.
+This module provides bulletproof color tinting using proper Panda3D patterns,
+state management, and cleanup procedures. Based on comprehensive analysis
+of Panda3D color manipulation throughout the Toontown codebase.
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from .ElementalSystem import ElementType
 from direct.showbase.DirectObject import DirectObject
 from direct.task.TaskManagerGlobal import taskMgr
+from direct.directnotify import DirectNotifyGlobal
 from panda3d.core import *
 from direct.interval.IntervalGlobal import LerpColorScaleInterval, Sequence, Wait, Func
 
 
-class ElementalVisualState:
-    """Tracks the visual state of an object to prevent conflicts and accumulation."""
+class ColorState:
+    """
+    Tracks complete color state for an object to enable foolproof restoration.
     
-    def __init__(self):
-        self.current_element = ElementType.NONE
-        self.color_interval = None
-        self.last_update_time = 0
-        self.reference_count = 0  # Track how many effects want this visual state
-        self.base_color_scale = (1.0, 1.0, 1.0, 1.0)  # Store base color for additive scaling
-        self.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)  # Store elemental color component
+    This follows the pattern used in battle movies and other Toontown systems
+    for reliable color state management.
+    """
+    
+    def __init__(self, node_path):
+        """Initialize color state by capturing current state."""
+        self.node_path = node_path
+        self.capture_base_state()
+        self.elemental_active = False
+        self.elemental_type = ElementType.NONE
+        self.active_interval = None
+        self.maintenance_task = None
+        
+    def capture_base_state(self):
+        """Capture the base color state of the object."""
+        if not self.node_path or self.node_path.isEmpty():
+            self.base_color_scale = (1.0, 1.0, 1.0, 1.0)
+            self.base_transparency = False
+            return
+            
+        # Capture current color scale
+        current_scale = self.node_path.getColorScale()
+        self.base_color_scale = (current_scale[0], current_scale[1], current_scale[2], current_scale[3])
+        
+        # Capture transparency state
+        self.base_transparency = self.node_path.hasTransparency()
+        
+    def is_valid(self):
+        """Check if the node path is still valid."""
+        return self.node_path and not self.node_path.isEmpty()
     
     def cleanup(self):
-        """Clean up all visual effects and intervals."""
-        if self.color_interval:
-            # Remove the color maintenance task
-            taskMgr.remove(self.color_interval)
-            self.color_interval = None
-        
-        self.current_element = ElementType.NONE
-        self.reference_count = 0
-        self.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
+        """Clean up all intervals and tasks."""
+        if self.active_interval:
+            self.active_interval.finish()
+            self.active_interval = None
+            
+        if self.maintenance_task:
+            taskMgr.remove(self.maintenance_task)
+            self.maintenance_task = None
 
 
-class ElementalVisualManager(DirectObject):
+class ElementalColorManager(DirectObject):
     """
-    Manages visual effects for elemental objects with simple color tinting.
+    Foolproof color management system for elemental effects.
     
-    Provides reliable color effects and placeholder functions for future particle systems.
+    Key design principles:
+    1. Always capture and restore base state
+    2. Use proper Panda3D color scaling (multiplicative)
+    3. Handle transparency correctly
+    4. Prevent color accumulation
+    5. Provide reliable cleanup
     """
+    
+    # Elemental color definitions (following Panda3D 0.0-1.0 range)
+    ELEMENTAL_COLORS = {
+        ElementType.FIRE: (1.4, 0.7, 0.4, 1.0),     # Warm orange glow - more intense
+        ElementType.WATER: (0.7, 0.9, 1.4, 1.0),    # Cool blue glow - more intense
+        ElementType.NONE: (1.0, 1.0, 1.0, 1.0),     # Neutral/base color
+    }
+    
+    # Animation timing
+    FADE_IN_TIME = 0.3    # Fast fade in for responsiveness
+    FADE_OUT_TIME = 0.4   # Slightly slower fade out for smoothness
     
     def __init__(self):
         DirectObject.__init__(self)
-        self.visual_states: Dict[int, ElementalVisualState] = {}
-        self.debounce_delay = 0.05  # Very short debounce for responsiveness
+        self.color_states: Dict[int, ColorState] = {}
+        self.notify = DirectNotifyGlobal.directNotify.newCategory('ElementalColorManager')
         
-    def apply_elemental_visual(self, obj, element_type: int, object_id: int):
+    def apply_elemental_color(self, object_id: int, element_type: ElementType, node_path=None):
         """
-        Apply visual effects with proper state management.
+        Apply elemental color tinting with proper state management.
         
         Args:
-            obj: The object to apply effects to
-            element_type: Integer representing the element (0=None, 1=Fire, 2=Water)
-            object_id: Unique identifier for state tracking
+            object_id: Unique identifier for the object
+            element_type: The element type to apply
+            node_path: The NodePath to apply effects to (optional, will auto-detect)
         """
-        current_time = globalClock.getFrameTime()
-        
-        # Get or create visual state for this object
-        if object_id not in self.visual_states:
-            self.visual_states[object_id] = ElementalVisualState()
-        
-        state = self.visual_states[object_id]
-        requested_element = ElementType(element_type) if element_type != 0 else ElementType.NONE
-        
-        # Debounce rapid updates
-        if current_time - state.last_update_time < self.debounce_delay:
-            if requested_element == state.current_element:
-                state.reference_count += 1
-            return
-        
-        state.last_update_time = current_time
-        
-        # Handle element removal (when element_type is 0 or ElementType.NONE)
-        if requested_element == ElementType.NONE:
-            # Force remove all visual effects
-            self._cleanup_visual_state(state, obj)
-            obj.setColorScale(state.base_color_scale)
-            state.current_element = ElementType.NONE
-            state.reference_count = 0
-            return
-        
-        # If already showing the correct element, just increment reference count
-        if state.current_element == requested_element:
-            state.reference_count += 1
-            return
-        
-        # Different element requested - clean up current and apply new
-        self._cleanup_visual_state(state, obj)
-        
-        # Apply new visual effects
-        if requested_element == ElementType.FIRE:
-            self._apply_fire_visual(obj, state)
-            state.current_element = ElementType.FIRE
-            state.reference_count = 1
-        elif requested_element == ElementType.WATER:
-            self._apply_water_visual(obj, state)
-            state.current_element = ElementType.WATER
-            state.reference_count = 1
-    
-    def remove_elemental_visual(self, object_id: int):
-        """Remove visual effects with proper reference counting."""
-        if object_id not in self.visual_states:
-            return
-        
-        state = self.visual_states[object_id]
-        
-        # Decrease reference count
-        state.reference_count = max(0, state.reference_count - 1)
-        
-        # Only clean up if no more references
-        if state.reference_count <= 0:
-            # Get the object and clear color scale
-            obj = self._get_object_from_id(object_id)
-            if obj:
-                obj.setColorScale(state.base_color_scale)
+        if not node_path:
+            node_path = self._get_node_path(object_id)
             
-            # Always clean up the state even if object not found
-            state.cleanup()
-            del self.visual_states[object_id]
-    
-    def set_elemental_visual_to_element(self, object_id: int, element_type: int, obj=None):
-        """Set the visual effect to a specific element, bypassing reference counting."""
-        if obj is None:
-            obj = self._get_object_from_id(object_id)
-        if not obj:
-            return
-        
-        # Get or create visual state for this object
-        if object_id not in self.visual_states:
-            self.visual_states[object_id] = ElementalVisualState()
-        
-        state = self.visual_states[object_id]
-        requested_element = ElementType(element_type) if element_type != 0 else ElementType.NONE
-        
-        # If we're removing effects (ElementType.NONE), do a smooth fade out
-        if requested_element == ElementType.NONE:
-            self._smooth_fade_to_base(state, obj)
-            state.current_element = ElementType.NONE
-            state.reference_count = 0
-            return
-        
-        # If changing to a different element, clean up current and apply new
-        if state.current_element != requested_element:
-            self._cleanup_visual_state(state, obj)
+        if not node_path or node_path.isEmpty():
+            self.notify.warning(f"Cannot apply color to object {object_id}: invalid node path")
+            return False
             
-            # Wait a bit for fade out to complete before applying new effect
-            task_name = f'delayedElementalApplication-{id(obj)}'
-            def apply_new_element(task):
-                if requested_element == ElementType.FIRE:
-                    self._apply_fire_visual(obj, state)
-                    state.current_element = ElementType.FIRE
-                    state.reference_count = 1
-                elif requested_element == ElementType.WATER:
-                    self._apply_water_visual(obj, state)
-                    state.current_element = ElementType.WATER
-                    state.reference_count = 1
-                return task.done
+        # Get or create color state
+        if object_id not in self.color_states:
+            self.color_states[object_id] = ColorState(node_path)
+        
+        color_state = self.color_states[object_id]
+        
+        # If requesting the same element that's already active, do nothing
+        if color_state.elemental_active and color_state.elemental_type == element_type:
+            self.notify.debug(f"Element {element_type} already active on object {object_id}")
+            return True
             
-            taskMgr.doMethodLater(0.35, apply_new_element, task_name)
-        else:
-            # Same element, just maintain it
-            state.reference_count = 1
+        # Clean up any existing effects
+        color_state.cleanup()
+        
+        # Handle removal (ElementType.NONE)
+        if element_type == ElementType.NONE:
+            return self._remove_elemental_color(object_id, color_state)
+        
+        # Apply new elemental color
+        return self._apply_element_color(object_id, element_type, color_state)
     
-    def force_remove_elemental_visual(self, object_id: int):
-        """Force remove visual effects regardless of reference count."""
-        if object_id not in self.visual_states:
+    def _apply_element_color(self, object_id: int, element_type: ElementType, color_state: ColorState):
+        """Apply elemental color with smooth animation."""
+        if not color_state.is_valid():
+            return False
+            
+        target_color = self.ELEMENTAL_COLORS[element_type]
+        node_path = color_state.node_path
+        
+        # Set up transparency if needed (when color has alpha < 1 or values > 1 for glow effect)
+        needs_transparency = (target_color[3] < 1.0 or 
+                            max(target_color[:3]) > 1.0)
+        
+        if needs_transparency and not color_state.base_transparency:
+            node_path.setTransparency(TransparencyAttrib.MAlpha)
+        
+        # Create smooth fade to elemental color
+        current_color = node_path.getColorScale()
+        
+        fade_interval = LerpColorScaleInterval(
+            node_path,
+            duration=self.FADE_IN_TIME,
+            colorScale=target_color,
+            startColorScale=current_color,
+            blendType='easeOut'
+        )
+        
+        # Set up maintenance task to ensure color persistence
+        def maintain_color():
+            """Maintain elemental color against external changes."""
+            if color_state.is_valid() and color_state.elemental_active:
+                # Check if color has been externally modified
+                current = color_state.node_path.getColorScale()
+                expected = self.ELEMENTAL_COLORS[color_state.elemental_type]
+                
+                # Allow small tolerance for floating point errors
+                tolerance = 0.01
+                if (abs(current[0] - expected[0]) > tolerance or
+                    abs(current[1] - expected[1]) > tolerance or
+                    abs(current[2] - expected[2]) > tolerance or
+                    abs(current[3] - expected[3]) > tolerance):
+                    
+                    self.notify.debug(f"Restoring elemental color on object {object_id}")
+                    color_state.node_path.setColorScale(expected)
+                    
+        # Start maintenance after fade completes
+        def start_maintenance():
+            if color_state.elemental_active:
+                task_name = f'maintain_elemental_color_{object_id}'
+                color_state.maintenance_task = task_name
+                taskMgr.doMethodLater(0.1, lambda task: maintain_color() or task.again, 
+                                    task_name)
+        
+        # Complete sequence
+        complete_sequence = Sequence(
+            fade_interval,
+            Func(start_maintenance),
+            name=f'elemental_color_apply_{object_id}'
+        )
+        
+        # Update state and start animation
+        color_state.elemental_active = True
+        color_state.elemental_type = element_type
+        color_state.active_interval = complete_sequence
+        
+        complete_sequence.start()
+        
+        self.notify.debug(f"Applied {element_type} color to object {object_id}")
+        return True
+    
+    def _remove_elemental_color(self, object_id: int, color_state: ColorState):
+        """Remove elemental color and restore base state."""
+        if not color_state.is_valid():
+            # Clean up the state even if node path is invalid
+            if object_id in self.color_states:
+                del self.color_states[object_id]
+            return True
+            
+        node_path = color_state.node_path
+        current_color = node_path.getColorScale()
+        target_color = color_state.base_color_scale
+        
+        # Create smooth fade back to base color
+        fade_interval = LerpColorScaleInterval(
+            node_path,
+            duration=self.FADE_OUT_TIME,
+            colorScale=target_color,
+            startColorScale=current_color,
+            blendType='easeIn'
+        )
+        
+        def cleanup_after_fade():
+            """Clean up transparency and state after fade completes."""
+            if color_state.is_valid():
+                # Restore transparency state
+                if not color_state.base_transparency:
+                    node_path.clearTransparency()
+                    
+                # Ensure we're at exact base color (fix floating point drift)
+                node_path.setColorScale(color_state.base_color_scale)
+            
+            # Clean up state
+            color_state.elemental_active = False
+            color_state.elemental_type = ElementType.NONE
+            
+        complete_sequence = Sequence(
+            fade_interval,
+            Func(cleanup_after_fade),
+            name=f'elemental_color_remove_{object_id}'
+        )
+        
+        color_state.active_interval = complete_sequence
+        complete_sequence.start()
+        
+        self.notify.debug(f"Removed elemental color from object {object_id}")
+        return True
+    
+    def force_remove_elemental_color(self, object_id: int):
+        """
+        Immediately remove elemental color without animation.
+        Used for emergency cleanup or when object is being destroyed.
+        """
+        if object_id not in self.color_states:
             return
+            
+        color_state = self.color_states[object_id]
+        color_state.cleanup()
         
-        state = self.visual_states[object_id]
-        obj = self._get_object_from_id(object_id)
-        if obj:
-            # Use smooth fade out instead of instant removal
-            self._smooth_fade_to_base(state, obj)
+        if color_state.is_valid():
+            # Immediate restoration
+            color_state.node_path.setColorScale(color_state.base_color_scale)
+            
+            if not color_state.base_transparency:
+                color_state.node_path.clearTransparency()
         
-        # Clean up the state after a delay to allow fade out to complete
-        task_name = f'delayedCleanup-{object_id}'
-        def delayed_cleanup(task):
-            state.cleanup()
-            if object_id in self.visual_states:
-                del self.visual_states[object_id]
-            return task.done
+        # Clean up state
+        color_state.elemental_active = False
+        color_state.elemental_type = ElementType.NONE
+        del self.color_states[object_id]
         
-        taskMgr.doMethodLater(0.5, delayed_cleanup, task_name)
+        self.notify.debug(f"Force removed elemental color from object {object_id}")
+    
+    def get_elemental_color(self, object_id: int) -> ElementType:
+        """Get the current elemental color type for an object."""
+        if object_id in self.color_states:
+            return self.color_states[object_id].elemental_type
+        return ElementType.NONE
+    
+    def is_elemental_active(self, object_id: int) -> bool:
+        """Check if an object has active elemental coloring."""
+        if object_id in self.color_states:
+            return self.color_states[object_id].elemental_active
+        return False
     
     def cleanup_all_effects(self):
-        """Remove all active visual effects."""
-        for object_id in list(self.visual_states.keys()):
-            state = self.visual_states[object_id]
-            obj = self._get_object_from_id(object_id)
-            if obj:
-                obj.setColorScale(state.base_color_scale)
-            state.cleanup()
+        """Clean up all active elemental effects."""
+        self.notify.debug("Cleaning up all elemental color effects")
         
-        self.visual_states.clear()
+        for object_id in list(self.color_states.keys()):
+            self.force_remove_elemental_color(object_id)
     
-    def _get_object_from_id(self, object_id: int):
-        """Get object by ID from the distributed object registry."""
-        # Try multiple ways to find the object
+    def _get_node_path(self, object_id: int):
+        """Get NodePath for an object by ID."""
+        # Try multiple methods to find the object
         
-        # Method 1: Try client side first
+        # Method 1: Client side
         try:
             if hasattr(base, 'cr') and base.cr:
                 obj = base.cr.getDo(object_id)
-                if obj:
-                    return obj
+                if obj and hasattr(obj, 'getNodePath'):
+                    return obj.getNodePath()
+                elif obj:
+                    return obj  # Object might be a NodePath itself
         except:
             pass
         
-        # Method 2: Try AI side
+        # Method 2: AI side
         try:
             if hasattr(simbase, 'air') and simbase.air:
                 obj = simbase.air.getDo(object_id)
-                if obj:
-                    return obj
-        except:
-            pass
-        
-        # Method 3: Try looking in base.cr.doId2do directly
-        try:
-            if hasattr(base, 'cr') and hasattr(base.cr, 'doId2do'):
-                obj = base.cr.doId2do.get(object_id)
-                if obj:
-                    return obj
-        except:
-            pass
-        
-        # Method 4: Try global doId2do if it exists
-        try:
-            if 'doId2do' in globals():
-                obj = doId2do.get(object_id)
-                if obj:
+                if obj and hasattr(obj, 'getNodePath'):
+                    return obj.getNodePath()
+                elif obj:
                     return obj
         except:
             pass
         
         return None
     
-    def _cleanup_visual_state(self, state: ElementalVisualState, obj):
-        """Clean up current visual state before applying new effects."""
-        if state.color_interval:
-            # Remove the color maintenance task
-            taskMgr.remove(state.color_interval)
-            state.color_interval = None
-        
-        # Reset to base color scale with smooth fade out
-        if obj:
-            # Smooth fade out to base color
-            current_color = obj.getColorScale()
-            fade_out_interval = LerpColorScaleInterval(
-                obj, 
-                duration=0.3,  # Slightly faster fade out
-                colorScale=state.base_color_scale,
-                startColorScale=current_color,
-                blendType='easeInOut'
-            )
-            fade_out_interval.start()
-            
-            state.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
-    
-    def _apply_fire_visual(self, obj, state: ElementalVisualState):
-        """Apply fire visual effects - COLOR ONLY with smooth glow."""
-        # Enhanced fire glow - more intense warm orange
-        fire_tint = (1.3, 0.75, 0.5, 1.0)  # Increased intensity warm orange glow
-        
-        # Clean up any existing color interval
-        if state.color_interval:
-            taskMgr.remove(state.color_interval)
-            state.color_interval = None
-        
-        # Smooth fade in to fire color
-        current_color = obj.getColorScale()
-        fade_in_interval = LerpColorScaleInterval(
-            obj, 
-            duration=0.5,  # Half second fade in
-            colorScale=fire_tint,
-            startColorScale=current_color,
-            blendType='easeInOut'
-        )
-        fade_in_interval.start()
-        
-        state.elemental_color_scale = fire_tint
-        
-        # Set up a persistent task to maintain the color after fade in
-        task_name = f'maintainFireColor-{id(obj)}'
-        def maintain_fire_color(task):
-            if obj and not obj.isEmpty():
-                # Reapply fire color if it's been changed (but not during transitions)
-                current_color = obj.getColorScale()
-                if (abs(current_color[0] - fire_tint[0]) > 0.15 or 
-                    abs(current_color[1] - fire_tint[1]) > 0.15 or 
-                    abs(current_color[2] - fire_tint[2]) > 0.15):
-                    # Only reapply if the difference is significant (avoiding interference with other effects)
-                    obj.setColorScale(fire_tint)
-                return task.cont
-            return task.done
-        
-        # Start maintenance task after fade in completes
-        taskMgr.doMethodLater(0.6, maintain_fire_color, task_name)
-        state.color_interval = task_name  # Store task name for cleanup
-        
-        # TODO: Add fire particle effects here when needed
-        self._create_fire_particles_placeholder(obj, state)
-    
-    def _apply_water_visual(self, obj, state: ElementalVisualState):
-        """Apply water visual effects - COLOR ONLY with smooth glow."""
-        # Enhanced water glow - more intense cool blue
-        water_tint = (0.7, 0.9, 1.25, 1.0)  # Increased intensity cool blue glow
-        
-        # Clean up any existing color interval
-        if state.color_interval:
-            taskMgr.remove(state.color_interval)
-            state.color_interval = None
-        
-        # Smooth fade in to water color
-        current_color = obj.getColorScale()
-        fade_in_interval = LerpColorScaleInterval(
-            obj, 
-            duration=0.5,  # Half second fade in
-            colorScale=water_tint,
-            startColorScale=current_color,
-            blendType='easeInOut'
-        )
-        fade_in_interval.start()
-        
-        state.elemental_color_scale = water_tint
-        
-        # Set up a persistent task to maintain the color after fade in
-        task_name = f'maintainWaterColor-{id(obj)}'
-        def maintain_water_color(task):
-            if obj and not obj.isEmpty():
-                # Reapply water color if it's been changed (but not during transitions)
-                current_color = obj.getColorScale()
-                if (abs(current_color[0] - water_tint[0]) > 0.15 or 
-                    abs(current_color[1] - water_tint[1]) > 0.15 or 
-                    abs(current_color[2] - water_tint[2]) > 0.15):
-                    # Only reapply if the difference is significant
-                    obj.setColorScale(water_tint)
-                return task.cont
-            return task.done
-        
-        # Start maintenance task after fade in completes
-        taskMgr.doMethodLater(0.6, maintain_water_color, task_name)
-        state.color_interval = task_name  # Store task name for cleanup
-        
-        # TODO: Add water particle effects here when needed
-        self._create_water_particles_placeholder(obj, state)
-    
-    def _create_fire_particles_placeholder(self, obj, state: ElementalVisualState):
-        """Placeholder for fire particle effects - currently does nothing."""
-        # Future implementation:
-        # - Create fire particle system
-        # - Attach to object
-        # - Store in state for cleanup
-        pass
-    
-    def _create_water_particles_placeholder(self, obj, state: ElementalVisualState):
-        """Placeholder for water particle effects - currently does nothing."""
-        # Future implementation:
-        # - Create water particle system (bubbles, mist, etc.)
-        # - Attach to object
-        # - Store in state for cleanup
-        pass
+    def destroy(self):
+        """Clean up the color manager."""
+        self.cleanup_all_effects()
+        DirectObject.destroy(self)
 
-    def _smooth_fade_to_base(self, state: ElementalVisualState, obj):
-        """Smoothly fade the object back to its base color."""
-        if state.color_interval:
-            taskMgr.remove(state.color_interval)
-            state.color_interval = None
-        
-        if obj:
-            current_color = obj.getColorScale()
-            fade_out_interval = LerpColorScaleInterval(
-                obj, 
-                duration=0.4,  # Smooth fade out
-                colorScale=state.base_color_scale,
-                startColorScale=current_color,
-                blendType='easeInOut'
-            )
-            fade_out_interval.start()
-            
-            state.elemental_color_scale = (1.0, 1.0, 1.0, 1.0)
+
+class ElementalVisualManager:
+    """
+    Simplified visual manager that delegates to the color system.
+    Maintains compatibility with existing elemental system.
+    """
+    
+    def __init__(self):
+        self.color_manager = ElementalColorManager()
+    
+    def apply_elemental_visual(self, obj, element_type: int, object_id: int):
+        """Apply elemental visual effects (legacy interface)."""
+        element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
+        return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
+    
+    def set_elemental_visual_to_element(self, object_id: int, element_type: int, obj=None):
+        """Set elemental visual to specific element (legacy interface)."""
+        element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
+        return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
+    
+    def remove_elemental_visual(self, object_id: int):
+        """Remove elemental visual effects."""
+        return self.color_manager.apply_elemental_color(object_id, ElementType.NONE)
+    
+    def force_remove_elemental_visual(self, object_id: int):
+        """Force remove elemental visual effects."""
+        self.color_manager.force_remove_elemental_color(object_id)
+    
+    def cleanup_all_effects(self):
+        """Clean up all effects."""
+        self.color_manager.cleanup_all_effects()
 
 
 class ElementalVisualFactory:
-    """Factory class for creating elemental visual managers."""
+    """Factory for creating visual managers."""
     
     @staticmethod
     def create_visual_manager() -> ElementalVisualManager:
-        """Create a new ElementalVisualManager instance."""
+        """Create a new elemental visual manager."""
         return ElementalVisualManager() 
