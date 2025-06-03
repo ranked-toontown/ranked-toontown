@@ -23,7 +23,7 @@ class LeaderboardRow(DirectFrame):
         name = player_name
         if len(name) >= 24:
             name = name[:24]
-        self.player_name['text'] = player_name
+        self.player_name['text'] = name
 
         rank = Rank.get_from_skill_rating(skill_rating)
         self.skill_rating['text'] = f"{rank} ({skill_rating})"
