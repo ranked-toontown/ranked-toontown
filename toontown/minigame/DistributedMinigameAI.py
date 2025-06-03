@@ -423,7 +423,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
             self.notify.warning(f"post-openskill adjustment deltas: {[p for p in deltas.get_player_results().values()]}")
 
         points = self.context.get_total_points()
-        scoreList = [points.get(player, 0) for player in self.avIdList]
+        scoreList = [max(0, points.get(player, 0)) for player in self.avIdList]
 
         pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
         pm.generateWithRequired(self.zoneId)
