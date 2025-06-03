@@ -34,6 +34,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
          TTLocalizer.CheckPageTitle,
          TTLocalizer.LocationPageTitle,
          TTLocalizer.MapPageTitle,
+         TTLocalizer.LeaderboardPageTitle,
          TTLocalizer.InventoryPageTitle,
          TTLocalizer.QuestPageToonTasks,
          TTLocalizer.SuitPageTitle,
@@ -290,6 +291,11 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         elif pageName == TTLocalizer.SpellbookPageTitle:
             iconModels = loader.loadModel('phase_3.5/models/gui/sos_textures')
             iconGeom = iconModels.find('**/spellbookIcon')
+            iconModels.detachNode()
+        elif pageName == TTLocalizer.LeaderboardPageTitle:
+            iconModels = loader.loadModel('phase_3.5/models/gui/inventory_icons')
+            iconGeom = iconModels.find('**/inventory_ladder')
+            iconScale = 7.5
             iconModels.detachNode()
         if pageName == TTLocalizer.OptionsPageTitle:
             pageName = TTLocalizer.OptionsTabTitle

@@ -52,6 +52,7 @@ from toontown.archipelago.gui.ArchipelagoOnscreenLog import ArchipelagoOnscreenL
 from ..archipelago.definitions.color_profile import ColorProfile
 from ..archipelago.definitions.death_reason import DeathReason
 from ..groups.DistributedGroupManager import DistributedGroupManager
+from ..shtiker.LeaderboardPage import LeaderboardPage
 from ..shtiker.ShtikerPage import ShtikerPage
 
 WantNewsPage = base.config.GetBool('want-news-page', ToontownGlobals.DefaultWantNewsPageSetting)
@@ -350,6 +351,9 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         self.mapPage = MapPage.MapPage()
         self.mapPage.load()
         self.book.addPage(self.mapPage, pageName=TTLocalizer.MapPageTitle)
+        self.leaderboardPage = LeaderboardPage()
+        self.leaderboardPage.load()
+        self.book.addPage(self.leaderboardPage, pageName=TTLocalizer.LeaderboardPageTitle)
         self.invPage = InventoryPage.InventoryPage()
         self.invPage.load()
         self.book.addPage(self.invPage, pageName=TTLocalizer.InventoryPageTitle)
