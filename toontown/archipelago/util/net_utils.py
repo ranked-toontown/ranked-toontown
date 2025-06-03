@@ -214,7 +214,7 @@ class JSONPartFormatter:
     COLOR_GRAY = (.5, .5, .5, 1)
     COLOR_GUNMETAL = (.35, .35, .35, 1)
     COLOR_SILVER = (.6, .6, .6, 1)
-    COLOR_BROWN = (.32, .26, .2, 1)
+    COLOR_BROWN = (.5, .3, .2, 1)
     COLOR_GOLD = (.9, .75, .0, 1)
     COLOR_RED = (.76, .35, .35, 1)
     COLOR_DEEP_RED = (1, 0, .25, 1)

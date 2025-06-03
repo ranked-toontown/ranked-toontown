@@ -34,14 +34,14 @@ class LeaderboardRow(DirectFrame):
         self.win_rate['text'] = f"{wins}W-{losses}L"
 
     def loading(self):
-        self.setColorScale(.5, .5, .5, 1)
+        self.setColorScale(.5, .5, .5, .5)
         self.ranking['text'] = f"#?"
         self.player_name['text'] = f"Loading..."
         self.skill_rating['text'] = f""
         self.win_rate['text'] = f""
 
     def empty(self):
-        self.setColorScale(.5, .5, .5, 1)
+        self.setColorScale(.5, .5, .5, .5)
         self.ranking['text'] = f"#?"
         self.player_name['text'] = f"Nobody yet!"
         self.skill_rating['text'] = f""
@@ -53,6 +53,13 @@ class LeaderboardRow(DirectFrame):
         self.player_name.destroy()
         self.skill_rating.destroy()
         self.win_rate.destroy()
+
+    def setColorScale(self, *args, **kwargs):
+        super().setColorScale(*args, **kwargs)
+        self.ranking.setColorScale(*args, **kwargs)
+        self.player_name.setColorScale(*args, **kwargs)
+        self.skill_rating.setColorScale(*args, **kwargs)
+        self.win_rate.setColorScale(*args, **kwargs)
 
 
 class LeaderboardPage(ShtikerPage):
