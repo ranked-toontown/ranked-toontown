@@ -121,23 +121,25 @@ class OpenSkillMatch:
 
         # Construct the low level OpenSkill "match", where it is a 2D list of teams with players.
         match: list[list[Any]] = []
+        ranks = []
         for team in self.teams:
             members = []
+            rank, _ = self.get_team_ranking(team)
+            ranks.append(rank)
             for player in team.as_list():
                 members.append(MODEL.rating(mu=player.mu, sigma=player.sigma, name=str(player.identifier)))
             match.append(members)
 
         # Adjust OpenSkill ratings.
-        scores = [t.get_team_score() for t in self.teams]
         weights = [t.generate_weight_list() for t in self.teams]
         results = MODEL.rate(
             match,
-            scores=scores,
-            # weights=weights,
+            ranks=ranks,
+            weights=weights,
         )
 
         notify.warning(f"Generated match with the following teams: {match}")
-        notify.warning(f"the following scores were used to rate: {scores}")
+        notify.warning(f"the following ranks were used to rate: {ranks}")
         notify.warning(f"the following weights were used: {weights}")
         notify.warning(f"the following results were returned: {results}")
 
