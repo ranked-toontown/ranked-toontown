@@ -212,16 +212,23 @@ class JSONPartFormatter:
 
     COLOR_BLACK = (0, 0, 0, 1)
     COLOR_GRAY = (.5, .5, .5, 1)
-    COLOR_RED = (.93, 0, 0, 1)
+    COLOR_GUNMETAL = (.35, .35, .35, 1)
+    COLOR_SILVER = (.6, .6, .6, 1)
+    COLOR_BROWN = (.32, .26, .2, 1)
+    COLOR_GOLD = (.9, .75, .0, 1)
+    COLOR_RED = (.76, .35, .35, 1)
+    COLOR_DEEP_RED = (1, 0, .25, 1)
     COLOR_GREEN = (0, 1, .5, 1)
     COLOR_YELLOW = (.98, .98, .82, 1)
     COLOR_BLUE = (.4, .58, .93, 1)
     COLOR_MAGENTA = (.93, 0, .93, 1)
+    COLOR_PURPLE = (.6, .05, 1, 1)
     COLOR_CYAN = (0, .93, .93, 1)
+    COLOR_LIGHT_BLUE = (0, .82, .7, 1)
     COLOR_WHITE = (1, 1, 1, 1)
 
     COLOR_PLUM = (.69, .6, .93, 1)
-    COLOR_SLATEBLUE = (.43, .54, .9, 1)
+    COLOR_SLATEBLUE = (0.13, 0.13, 1, 1)
     COLOR_SALMON = (.97, .5, .45, 1)
 
     COLOR_MAP = {

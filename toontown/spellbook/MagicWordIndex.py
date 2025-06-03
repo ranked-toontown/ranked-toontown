@@ -1861,7 +1861,7 @@ class ListRanks(MagicWord):
         message = ""
         mmr = 100
         last = RankTier.IRON
-        ranks: dict[RankTier, int] = {}
+        ranks: dict[RankTier, int] = {last: 0}
         while mmr <= 3000:
             current = Rank.get_from_skill_rating(mmr).tier
             if current != last:
@@ -1870,7 +1870,9 @@ class ListRanks(MagicWord):
             mmr += 100
 
         for rank, mmr in ranks.items():
-            message += f"{rank.value}: {mmr}\n"
+            t = Rank.get_from_skill_rating(mmr)
+            t.division = 0
+            message += f"{t.colored()}: {mmr}\n"
 
         return message
 

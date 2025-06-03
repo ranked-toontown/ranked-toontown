@@ -54,11 +54,37 @@ __TEXT_PROPERTIES_BLACK.setTextColor(*JSONPartFormatter.COLOR_BLACK)
 __register_property('black', TEXT_PROPERTIES_CODE_BLACK, __TEXT_PROPERTIES_BLACK)
 
 
+# Gunmetal Gray text
+TEXT_PROPERTIES_CODE_GUNMETAL = "json_gunmetal"
+__TEXT_PROPERTIES_GUNMETAL = TextProperties()
+__TEXT_PROPERTIES_GUNMETAL.setTextColor(*JSONPartFormatter.COLOR_GUNMETAL)
+__register_property('gunmetal', TEXT_PROPERTIES_CODE_GUNMETAL, __TEXT_PROPERTIES_GUNMETAL)
+
 # Gray text
 TEXT_PROPERTIES_CODE_GRAY = "json_gray"
 __TEXT_PROPERTIES_GRAY = TextProperties()
 __TEXT_PROPERTIES_GRAY.setTextColor(*JSONPartFormatter.COLOR_GRAY)
 __register_property('gray', TEXT_PROPERTIES_CODE_GRAY, __TEXT_PROPERTIES_GRAY)
+
+# Silver text
+TEXT_PROPERTIES_CODE_SILVER = "json_silver"
+__TEXT_PROPERTIES_SILVER = TextProperties()
+__TEXT_PROPERTIES_SILVER.setTextColor(*JSONPartFormatter.COLOR_SILVER)
+__register_property('silver', TEXT_PROPERTIES_CODE_SILVER, __TEXT_PROPERTIES_SILVER)
+
+
+# Brown text
+TEXT_PROPERTIES_CODE_BROWN = "json_brown"
+__TEXT_PROPERTIES_BROWN = TextProperties()
+__TEXT_PROPERTIES_BROWN.setTextColor(*JSONPartFormatter.COLOR_BROWN)
+__register_property('brown', TEXT_PROPERTIES_CODE_BROWN, __TEXT_PROPERTIES_BROWN)
+
+
+# Gold text
+TEXT_PROPERTIES_CODE_GOLD = "json_gold"
+__TEXT_PROPERTIES_GOLD = TextProperties()
+__TEXT_PROPERTIES_GOLD.setTextColor(*JSONPartFormatter.COLOR_GOLD)
+__register_property('gold', TEXT_PROPERTIES_CODE_GOLD, __TEXT_PROPERTIES_GOLD)
 
 
 # Red text
@@ -66,6 +92,13 @@ TEXT_PROPERTIES_CODE_RED = "json_red"
 __TEXT_PROPERTIES_RED = TextProperties()
 __TEXT_PROPERTIES_RED.setTextColor(*JSONPartFormatter.COLOR_RED)
 __register_property('red', TEXT_PROPERTIES_CODE_RED, __TEXT_PROPERTIES_RED)
+
+
+# Deep Red text
+TEXT_PROPERTIES_CODE_DEEP_RED = "json_deep_red"
+__TEXT_PROPERTIES_DEEP_RED = TextProperties()
+__TEXT_PROPERTIES_DEEP_RED.setTextColor(*JSONPartFormatter.COLOR_DEEP_RED)
+__register_property('deep_red', TEXT_PROPERTIES_CODE_DEEP_RED, __TEXT_PROPERTIES_DEEP_RED)
 
 
 # Green text
@@ -96,11 +129,25 @@ __TEXT_PROPERTIES_MAGENTA.setTextColor(*JSONPartFormatter.COLOR_MAGENTA)
 __register_property('magenta', TEXT_PROPERTIES_CODE_MAGENTA, __TEXT_PROPERTIES_MAGENTA)
 
 
+# Purple text
+TEXT_PROPERTIES_CODE_PURPLE = "json_purple"
+__TEXT_PROPERTIES_PURPLE = TextProperties()
+__TEXT_PROPERTIES_PURPLE.setTextColor(*JSONPartFormatter.COLOR_PURPLE)
+__register_property('purple', TEXT_PROPERTIES_CODE_PURPLE, __TEXT_PROPERTIES_PURPLE)
+
+
 # Cyan text
 TEXT_PROPERTIES_CODE_CYAN = "json_cyan"
 __TEXT_PROPERTIES_CYAN = TextProperties()
 __TEXT_PROPERTIES_CYAN.setTextColor(*JSONPartFormatter.COLOR_CYAN)
 __register_property('cyan', TEXT_PROPERTIES_CODE_CYAN, __TEXT_PROPERTIES_CYAN)
+
+
+# Light Blue text
+TEXT_PROPERTIES_CODE_LIGHT_BLUE = "json_light_blue"
+__TEXT_PROPERTIES_LIGHT_BLUE = TextProperties()
+__TEXT_PROPERTIES_LIGHT_BLUE.setTextColor(*JSONPartFormatter.COLOR_LIGHT_BLUE)
+__register_property('light_blue', TEXT_PROPERTIES_CODE_LIGHT_BLUE, __TEXT_PROPERTIES_LIGHT_BLUE)
 
 
 # White text

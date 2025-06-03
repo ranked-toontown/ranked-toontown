@@ -5,6 +5,7 @@ from direct.gui.DirectFrame import DirectFrame
 from direct.gui.DirectLabel import DirectLabel
 from panda3d.core import TextNode
 
+from toontown.archipelago.util.global_text_properties import get_raw_formatted_string, MinimalJsonMessagePart
 from toontown.matchmaking.rank import Rank
 from toontown.matchmaking.skill_profile_keys import SkillProfileKey
 from toontown.shtiker.ShtikerPage import ShtikerPage
@@ -16,9 +17,10 @@ class LeaderboardRow(DirectFrame):
         self.ranking: DirectLabel = DirectLabel(parent=self, relief=None, pos=(-15, 0, 0), text='#1', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
         self.player_name: DirectLabel = DirectLabel(parent=self, relief=None, pos=(-12, 0, 0), text='name goes here', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
         self.skill_rating: DirectLabel = DirectLabel(parent=self, relief=None, pos=(1, 0, 0), text='Plastic II (0000)', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
-        self.win_rate: DirectLabel = DirectLabel(parent=self, relief=None, pos=(10, 0, 0), text='69W-69L', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
+        self.win_rate: DirectLabel = DirectLabel(parent=self, relief=None, pos=(12, 0, 0), text='69W-69L', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
 
     def update(self, ranking: int, player_name: str, skill_rating: int, wins: int, games: int):
+        self.setColorScale(1, 1, 1, 1)
         self.ranking['text'] = f"#{ranking}"
         name = player_name
         if len(name) >= 20:
@@ -26,17 +28,20 @@ class LeaderboardRow(DirectFrame):
         self.player_name['text'] = name
 
         rank = Rank.get_from_skill_rating(skill_rating)
-        self.skill_rating['text'] = f"{rank} ({skill_rating})"
+        sr_str = get_raw_formatted_string([MinimalJsonMessagePart(message=f"({skill_rating})", color='gray')])
+        self.skill_rating['text'] = f"{rank.colored()} {sr_str}"
         losses = games - wins
         self.win_rate['text'] = f"{wins}W-{losses}L"
 
     def loading(self):
+        self.setColorScale(.5, .5, .5, 1)
         self.ranking['text'] = f"#?"
         self.player_name['text'] = f"Loading..."
         self.skill_rating['text'] = f""
         self.win_rate['text'] = f""
 
     def empty(self):
+        self.setColorScale(.5, .5, .5, 1)
         self.ranking['text'] = f"#?"
         self.player_name['text'] = f"Nobody yet!"
         self.skill_rating['text'] = f""

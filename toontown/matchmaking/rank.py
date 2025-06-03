@@ -1,4 +1,6 @@
 from enum import Enum
+from toontown.archipelago.util.global_text_properties import get_raw_formatted_string
+from toontown.archipelago.util.global_text_properties import MinimalJsonMessagePart as Component
 
 # How much SR does a player need to "promote" from one division to another? e.g. Diamond 1 -> Diamond 2
 SKILL_RATING_PER_DIVISION = 100
@@ -40,6 +42,38 @@ class Rank:
             return 'V'
 
         return str(self.division)
+
+    def color(self) -> str:
+
+        match self.tier:
+            case RankTier.IRON:
+                return 'gunmetal'
+            case RankTier.BRONZE:
+                return 'brown'
+            case RankTier.SILVER:
+                return 'silver'
+            case RankTier.GOLD:
+                return 'gold'
+            case RankTier.PLATINUM:
+                return 'light_blue'
+            case RankTier.DIAMOND:
+                return 'slateblue'
+            case RankTier.EXECUTIVE:
+                return 'red'
+            case RankTier.PRESIDENT:
+                return 'purple'
+            case RankTier.TRANSCENDENT:
+                return 'deep_red'
+
+        return 'black'
+
+    def colored(self) -> str:
+        """
+        Returns a colored formatting of this rank. Looks the exact same as the raw string representation, but has color.
+        """
+        return get_raw_formatted_string([
+            Component(message=self.__str__(), color=self.color())
+        ])
 
     def __str__(self):
         return f"{self.tier.value} {self.__roman()}".strip()
