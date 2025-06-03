@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Any
 
+from direct.directnotify import DirectNotifyGlobal
 from openskill.models import PlackettLuce, PlackettLuceRating
 
 from toontown.matchmaking.player_skill_profile import PlayerSkillProfile, TeamSkillProfileCollection
@@ -12,6 +13,7 @@ BASE_SR_CHANGE = 20
 # You can view the different models available here: https://openskill.me/en/stable/manual.html#picking-models
 # You can also customize the inner workings on skill estimation, but the defaults are probably fine.
 MODEL = PlackettLuce()
+notify = DirectNotifyGlobal.directNotify.newCategory("OpenSkill")
 
 class OpenSkillMatchDeltaResults:
     """
@@ -134,10 +136,10 @@ class OpenSkillMatch:
             weights=weights,
         )
 
-        print(f"[OpenSkill] Generated match with the following teams: {match}")
-        print(f"[OpenSkill] the following scores were used to rate: {scores}")
-        print(f"[OpenSkill] the following weights were used: {weights}")
-        print(f"[OpenSkill] the following results were returned: {results}")
+        notify.warning(f"Generated match with the following teams: {match}")
+        notify.warning(f"the following scores were used to rate: {scores}")
+        notify.warning(f"the following weights were used: {weights}")
+        notify.warning(f"the following results were returned: {results}")
 
         # The results should match up 1-to-1 with our team layout. Adjust sigma and mu values according to OpenSkill.
         for teamIndex, team in enumerate(results):
