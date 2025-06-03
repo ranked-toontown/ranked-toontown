@@ -77,7 +77,14 @@ class ElementalColorManager(DirectObject):
     ELEMENTAL_COLORS = {
         ElementType.FIRE: (1.0, 0.8, 0.6, 1.0),     # Warm orange glow - more intense
         ElementType.WATER: (0.8, 0.9, 1.0, 1.0),    # Cool blue glow - more intense
+        ElementType.WIND: (0.7, 1.0, 0.8, 1.0),     # Light soft green
         ElementType.NONE: (1.0, 1.0, 1.0, 1.0),     # Neutral/base color
+    }
+    
+    # Special effect colors for synergy results
+    SPECIAL_EFFECT_COLORS = {
+        'FREEZE': (0.9, 0.95, 1.0, 1.0),    # Very light blue for freeze
+        'SHATTERED': (0.8, 0.85, 0.9, 1.0), # Light blue-grey for shattered
     }
     
     # Animation timing
@@ -267,7 +274,23 @@ class ElementalColorManager(DirectObject):
         
         self.notify.debug(f"Force removed elemental color from object {object_id}")
     
-    def get_elemental_color(self, object_id: int) -> ElementType:
+    def get_elemental_color(self, element_type: ElementType, special_effect: str = None) -> tuple:
+        """
+        Get the color for an elemental effect.
+        
+        Args:
+            element_type: The type of element
+            special_effect: Optional special effect name (e.g., 'FREEZE', 'SHATTERED')
+        
+        Returns:
+            RGBA color tuple (0.0-1.0 range)
+        """
+        if special_effect and special_effect in self.SPECIAL_EFFECT_COLORS:
+            return self.SPECIAL_EFFECT_COLORS[special_effect]
+        
+        return self.ELEMENTAL_COLORS.get(element_type, self.ELEMENTAL_COLORS[ElementType.NONE])
+    
+    def get_current_elemental_color(self, object_id: int) -> ElementType:
         """Get the current elemental color type for an object."""
         if object_id in self.color_states:
             return self.color_states[object_id].elemental_type
@@ -319,6 +342,71 @@ class ElementalColorManager(DirectObject):
         self.cleanup_all_effects()
         DirectObject.destroy(self)
 
+    def apply_special_effect_color(self, object_id: int, effect_name: str, node_path=None):
+        """Apply a special effect color (like freeze or shattered)."""
+        if effect_name not in self.SPECIAL_EFFECT_COLORS:
+            self.notify.warning(f"Unknown special effect: {effect_name}")
+            return False
+            
+        if not node_path:
+            node_path = self._get_node_path(object_id)
+            
+        if not node_path or node_path.isEmpty():
+            self.notify.warning(f"Cannot apply special effect to object {object_id}: invalid node path")
+            return False
+            
+        # Get or create color state
+        if object_id not in self.color_states:
+            self.color_states[object_id] = ColorState(node_path)
+        
+        color_state = self.color_states[object_id]
+        
+        # Clean up any existing effects
+        color_state.cleanup()
+        
+        # Apply special effect color
+        target_color = self.SPECIAL_EFFECT_COLORS[effect_name]
+        return self._apply_direct_color(object_id, target_color, color_state, effect_name)
+    
+    def _apply_direct_color(self, object_id: int, target_color: tuple, color_state: ColorState, effect_name: str):
+        """Apply a color directly without using element types."""
+        if not color_state.is_valid():
+            return False
+            
+        node_path = color_state.node_path
+        
+        # Set up transparency if needed
+        needs_transparency = (target_color[3] < 1.0 or max(target_color[:3]) > 1.0)
+        
+        if needs_transparency and not color_state.base_transparency:
+            node_path.setTransparency(TransparencyAttrib.MAlpha)
+        
+        # Create smooth fade to special color
+        current_color = node_path.getColorScale()
+        
+        fade_interval = LerpColorScaleInterval(
+            node_path,
+            duration=self.FADE_IN_TIME,
+            colorScale=target_color,
+            startColorScale=current_color,
+            blendType='easeOut'
+        )
+        
+        complete_sequence = Sequence(
+            fade_interval,
+            name=f'special_effect_{effect_name}_{object_id}'
+        )
+        
+        # Update state
+        color_state.elemental_active = True
+        color_state.elemental_type = f"SPECIAL_{effect_name}"  # Custom type for special effects
+        color_state.active_interval = complete_sequence
+        
+        complete_sequence.start()
+        
+        self.notify.debug(f"Applied {effect_name} special effect to object {object_id}")
+        return True
+
 
 class ElementalVisualManager:
     """
@@ -331,13 +419,28 @@ class ElementalVisualManager:
     
     def apply_elemental_visual(self, obj, element_type: int, object_id: int):
         """Apply elemental visual effects (legacy interface)."""
-        element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
-        return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
+        if element_type == -1 or element_type == 100:
+            # Special freeze effect - use freeze color
+            return self.color_manager.apply_special_effect_color(object_id, 'FREEZE', obj)
+        elif element_type == -2 or element_type == 101:
+            # Special shattered effect - use shattered color
+            return self.color_manager.apply_special_effect_color(object_id, 'SHATTERED', obj)
+        else:
+            from .ElementalSystem import ElementType
+            element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
+            return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
     
     def set_elemental_visual_to_element(self, object_id: int, element_type: int, obj=None):
         """Set elemental visual to specific element (legacy interface)."""
-        element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
-        return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
+        if element_type == 100:
+            # Special freeze effect
+            return self.color_manager.apply_special_effect_color(object_id, 'FREEZE', obj)
+        elif element_type == 101:
+            # Special shattered effect
+            return self.color_manager.apply_special_effect_color(object_id, 'SHATTERED', obj)
+        else:
+            element_enum = ElementType(element_type) if element_type != 0 else ElementType.NONE
+            return self.color_manager.apply_elemental_color(object_id, element_enum, obj)
     
     def remove_elemental_visual(self, object_id: int):
         """Remove elemental visual effects."""
@@ -350,6 +453,10 @@ class ElementalVisualManager:
     def cleanup_all_effects(self):
         """Clean up all effects."""
         self.color_manager.cleanup_all_effects()
+
+    def apply_special_effect(self, object_id: int, effect_name: str, obj=None):
+        """Apply a special effect visual (like freeze or shattered)."""
+        return self.color_manager.apply_special_effect_color(object_id, effect_name, obj)
 
 
 class ElementalVisualFactory:

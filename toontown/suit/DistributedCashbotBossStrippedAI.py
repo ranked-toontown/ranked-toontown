@@ -269,6 +269,53 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return False
 
     def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        # Check for elemental effects before applying damage
+        if hasattr(self.game, 'elementalEffectManager'):
+            # Calculate the damage delta that's being applied
+            damage_delta = bossDamage - self.bossDamage
+            
+            if damage_delta > 0:  # Only check for positive damage
+                # Import the effect classes
+                from toontown.coghq.ElementalEffects import FreezeEffect, ShatteredEffect, BurnEffect
+                
+                # Check if target is frozen - Fire/Burn should override freeze
+                if self.game.elementalEffectManager.has_active_effect(self.doId, FreezeEffect):
+                    # Check if this damage is from a fire source (objId represents the safe)
+                    is_fire_damage = False
+                    if objId > 0:  # If we have a safe object ID, check if it's fire elemental
+                        safe = self.air.getDo(objId)
+                        if safe and hasattr(safe, 'boss') and hasattr(safe.boss, 'elementalSystem'):
+                            from toontown.coghq.ElementalSystem import ElementType
+                            safe_element = safe.boss.elementalSystem.get_safe_element(objId)
+                            if safe_element == ElementType.FIRE:
+                                is_fire_damage = True
+                    
+                    if is_fire_damage:
+                        # Fire overrides freeze - remove freeze and apply burn
+                        freeze_effect = self.game.elementalEffectManager.get_active_effect(self.doId, FreezeEffect)
+                        if freeze_effect:
+                            # Remove freeze effect
+                            if self.doId in self.game.elementalEffectManager._active_effects:
+                                effects = self.game.elementalEffectManager._active_effects[self.doId]
+                                if freeze_effect in effects:
+                                    freeze_effect.remove_effect(self)
+                                    freeze_effect.cancel()
+                                    effects.remove(freeze_effect)
+                            
+                            # Apply burn effect
+                            burn_effect = BurnEffect(self.doId)
+                            self.game.elementalEffectManager.apply_effect(self.doId, burn_effect)
+                            
+                            self.notify.info("Fire damage overrode freeze effect and applied burn")
+                
+                # Check if target is shattered and apply damage vulnerability
+                if self.game.elementalEffectManager.has_active_effect(self.doId, ShatteredEffect):
+                    shattered_effect = self.game.elementalEffectManager.get_active_effect(self.doId, ShatteredEffect)
+                    if shattered_effect:
+                        damage_delta = int(damage_delta * shattered_effect.damage_multiplier)  # 25% more damage
+                        self.notify.info(f"Shattered CFO hit - applied {damage_delta} damage (25% vulnerability bonus)")
+                        bossDamage = self.bossDamage + damage_delta
+        
         self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
         self.setBossDamage(bossDamage)
 

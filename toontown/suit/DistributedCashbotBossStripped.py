@@ -98,8 +98,12 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
                 delta = bossDamage - self.bossDamage
                 self.flashRed()
 
-                # Animate the hit if the CFO should flinch (but not for DOT damage)
-                if self.ruleset.CFO_FLINCHES_ON_HIT and not isDOT:
+                # Animate the hit if the CFO should flinch (but not for DOT damage or when frozen)
+                should_flinch = (self.ruleset.CFO_FLINCHES_ON_HIT and 
+                               not isDOT and 
+                               self.attackCode != ToontownGlobals.BossCogFrozen)
+                
+                if should_flinch:
                     self.doAnimate('hit', now=1)
 
                 self.showHpText(-delta, scale=5)
@@ -158,8 +162,34 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.storeInterval(seq, intervalName)
 
     def setAttackCode(self, attackCode, avId=0, delayTime=0):
-        super().setAttackCode(attackCode, avId)
+        # Call parent method first to handle most cases
+        if attackCode == ToontownGlobals.BossCogFrozen:
+            # Handle frozen state specially - don't call parent (which doesn't know about freeze)
+            self.attackCode = attackCode
+            self.attackAvId = avId
+            
+            # Stop all animations and movement when frozen
+            self.stopAnimate()
+            self.cleanupIntervals()
+            self.setDizzy(0)  # Make sure dizzy visuals are off
+            
+            # Track that we were frozen for when we unfreeze
+            self._wasFrozen = True
+            
+            # Don't call doAnimate or any movement - stay completely still
+            return
+        else:
+            # For all other states, call the parent method
+            super().setAttackCode(attackCode, avId)
+            
+            # Handle post-freeze recovery
+            if hasattr(self, '_wasFrozen') and self._wasFrozen and attackCode != ToontownGlobals.BossCogFrozen:
+                # Resume animation when unfrozen
+                self._wasFrozen = False
+                if attackCode == ToontownGlobals.BossCogNoAttack:
+                    self.doAnimate(None, raised=1)
 
+        # Original CFO-specific handling
         if attackCode == ToontownGlobals.BossCogAreaAttack:
             self.saySomething(TTLocalizer.CashbotBossAreaAttackTaunt)
             base.playSfx(self.warningSfx)
@@ -220,7 +250,15 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
     def applyElementalVisualEffect(self, elementType):
         """Apply elemental visual effects to the CFO (distributed call)."""
         if hasattr(self, 'elementalVisualManager'):
-            self.elementalVisualManager.set_elemental_visual_to_element(self.doId, elementType, self)
+            if elementType == 100:
+                # Special freeze effect
+                self.elementalVisualManager.apply_special_effect(self.doId, 'FREEZE', self)
+            elif elementType == 101:
+                # Special shattered effect
+                self.elementalVisualManager.apply_special_effect(self.doId, 'SHATTERED', self)
+            else:
+                # Normal elemental effect
+                self.elementalVisualManager.set_elemental_visual_to_element(self.doId, elementType, self)
     
     def removeElementalVisualEffect(self):
         """Remove elemental visual effects from the CFO (distributed call)."""

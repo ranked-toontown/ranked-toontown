@@ -88,6 +88,11 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             self.boss.addScore(avId, self.boss.ruleset.POINTS_PENALTY_SANDBAG, reason=CraneLeagueGlobals.ScoreReason.LOW_IMPACT)
             return
 
+        # Check if this is a Wind elemental safe
+        from toontown.coghq.ElementalSystem import ElementType
+        current_element = self.boss.elementalSystem.get_safe_element(self.doId)
+        is_wind_safe = (current_element == ElementType.WIND)
+
         # The client reports successfully striking the boss in the
         # head with this object.
         if self.boss.getBoss().heldObject == None:
@@ -110,8 +115,93 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 # Remove elemental effect from the safe for any hit that reaches this point
                 self.__removeElementalEffect()
                 self.boss.d_updateElementalSafes()
+            elif self.boss.getBoss().attackCode == ToontownGlobals.BossCogFrozen:
+                # While the boss is frozen, hits deal damage but don't trigger stuns
+                # Handle similar to Wind safes - bypass recordHit to avoid stunning
+                damage = int(impact * 50)
+                crane = simbase.air.doId2do.get(craneId)
+                
+                # Apply multipliers
+                damage *= crane.getDamageMultiplier()
+                damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
+                damage = math.ceil(damage)
+                
+                # Apply damage directly through setBossDamage instead of recordHit
+                avId = self.air.getAvatarIdFromSender()
+                
+                # Apply elemental effects if the safe is elemental
+                self.__applyElementalEffects(self.boss.getBoss().doId)
+                
+                # Apply damage directly without going through recordHit (which checks for stuns)
+                new_damage = self.boss.getBoss().bossDamage + max(damage, 2)
+                self.boss.getBoss().b_setBossDamage(new_damage, avId=avId, objId=self.doId, isGoon=False)
+                
+                # Award points directly since we're bypassing recordHit
+                if impact == 1.0:
+                    self.boss.addScore(avId, self.boss.ruleset.POINTS_IMPACT, reason=CraneLeagueGlobals.ScoreReason.FULL_IMPACT)
+                self.boss.addScore(avId, damage)
+                
+                # Update combo tracker directly
+                comboTracker = self.boss.comboTrackers[avId]
+                comboTracker.incrementCombo((comboTracker.combo + 1.0) / 10.0 * damage)
+                
+                # Check for victory but don't process stunning
+                if self.boss.getBoss().bossDamage >= self.boss.ruleset.CFO_MAX_HP:
+                    self.boss.addScore(avId, self.boss.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
+                    self.boss.toonsWon = True
+                    self.boss.gameFSM.request('victory')
+
+                # Remove elemental effect from the safe for any hit that reaches this point
+                self.__removeElementalEffect()
+                self.boss.d_updateElementalSafes()
+            elif is_wind_safe:
+                # Wind safes can damage the CFO even when not stunned, but cannot stun
+                damage = int(impact * 25)  # Reduced damage when not stunned
+                crane = simbase.air.doId2do.get(craneId)
+                
+                # Apply multipliers
+                damage *= crane.getDamageMultiplier()
+                damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
+                damage = math.ceil(damage)
+                
+                # Wind safes bypass the normal recordHit method to avoid stunning
+                # Apply damage directly through setBossDamage instead of recordHit
+                avId = self.air.getAvatarIdFromSender()
+                
+                # Apply elemental effects (Wind effect)
+                self.__applyElementalEffects(self.boss.getBoss().doId)
+                
+                # Apply damage directly without going through recordHit (which checks for stuns)
+                new_damage = self.boss.getBoss().bossDamage + max(damage, 1)
+                self.boss.getBoss().b_setBossDamage(new_damage, avId=avId, objId=self.doId, isGoon=False)
+                
+                # Award points directly since we're bypassing recordHit
+                if impact == 1.0:
+                    self.boss.addScore(avId, self.boss.ruleset.POINTS_IMPACT, reason=CraneLeagueGlobals.ScoreReason.FULL_IMPACT)
+                self.boss.addScore(avId, damage)
+                
+                # Update combo tracker directly
+                comboTracker = self.boss.comboTrackers[avId]
+                comboTracker.incrementCombo((comboTracker.combo + 1.0) / 10.0 * damage)
+                
+                # Check for victory but don't process stunning
+                if self.boss.getBoss().bossDamage >= self.boss.ruleset.CFO_MAX_HP:
+                    self.boss.addScore(avId, self.boss.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
+                    self.boss.toonsWon = True
+                    self.boss.gameFSM.request('victory')
+                else:
+                    # Trigger CFO recovery animations (same as regular hits)
+                    if self.boss.ruleset.CFO_FLINCHES_ON_HIT:
+                        self.boss.getBoss().b_setAttackCode(ToontownGlobals.BossCogNoAttack)
+                    
+                    # Wait for next helmet (same as regular hits)
+                    self.boss.getBoss().waitForNextHelmet()
+
+                # Remove elemental effect from the safe
+                self.__removeElementalEffect()
+                self.boss.d_updateElementalSafes()
             else:
-                # If he's not dizzy, he grabs the safe and makes a
+                # Regular safe behavior - if he's not dizzy, he grabs the safe and makes a
                 # helmet out of it only if he is allowed to safe helmet.
                 if self.boss.ruleset.DISABLE_SAFE_HELMETS:
                     return

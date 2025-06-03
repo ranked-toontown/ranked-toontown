@@ -8,11 +8,12 @@ class ElementType(Enum):
     NONE = 0
     FIRE = 1
     WATER = 2
+    WIND = 3
     # Future elements can be added here
-    # EARTH = 3
-    # AIR = 4
-    # ICE = 5
-    # LIGHTNING = 6
+    # EARTH = 4
+    # AIR = 5
+    # ICE = 6
+    # LIGHTNING = 7
 
 
 class SynergyType(Enum):
@@ -85,12 +86,13 @@ class ElementalSystemConfig:
     ELEMENTAL_COOLDOWN = 5.0
     
     # Available elements that can be randomly assigned
-    AVAILABLE_ELEMENTS = [ElementType.FIRE, ElementType.WATER]
+    AVAILABLE_ELEMENTS = [ElementType.FIRE, ElementType.WATER, ElementType.WIND]
     
     # Visual effect colors for each element (R, G, B, A)
     ELEMENT_COLORS = {
         ElementType.FIRE: (1.0, 0.3, 0.1, 0.8),   # Red-orange
         ElementType.WATER: (0.1, 0.5, 1.0, 0.8),  # Blue
+        ElementType.WIND: (0.7, 1.0, 0.8, 0.8),   # Light soft green
         ElementType.NONE: (1.0, 1.0, 1.0, 0.0),   # Transparent
     }
 
@@ -111,6 +113,26 @@ class ElementalSynergyManager:
                 ElementType.WATER, 
                 SynergyType.NEGATIVE,
                 "Water extinguishes fire"
+            )
+        )
+        
+        # Wind enhances Fire (positive synergy)
+        self._synergies.append(
+            ElementalSynergy(
+                ElementType.FIRE,
+                ElementType.WIND,
+                SynergyType.POSITIVE,
+                "Wind feeds fire, creating explosion"
+            )
+        )
+        
+        # Wind enhances Water (positive synergy)
+        self._synergies.append(
+            ElementalSynergy(
+                ElementType.WATER,
+                ElementType.WIND,
+                SynergyType.POSITIVE,
+                "Wind and water create freezing effect"
             )
         )
     

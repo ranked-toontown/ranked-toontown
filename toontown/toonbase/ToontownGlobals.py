@@ -675,20 +675,27 @@ BossCogGolfAttack = 17
 BossCogGolfAreaAttack = 18
 BossCogGearDirectedAttack = 19
 BossCogOvertimeAttack = 20
+BossCogFrozen = 21
 BossCogAttackTimes = {BossCogElectricFence: 0,
  BossCogSwatLeft: 5.5,
  BossCogSwatRight: 5.5,
- BossCogAreaAttack: 4.21,
- BossCogFrontAttack: 2.65,
- BossCogRecoverDizzyAttack: 5.1,
- BossCogDirectedAttack: 4.84,
- BossCogNoAttack: 6,
+ BossCogAreaAttack: 3.0,
+ BossCogFrontAttack: 3.0,
+ BossCogRecoverDizzyAttack: 3.5,
+ BossCogDirectedAttack: 3.2,
+ BossCogStrafeAttack: 2.0,
+ BossCogNoAttack: 6.0,
  BossCogSlowDirectedAttack: 7.84,
- BossCogMoveAttack: 3,
- BossCogGolfAttack: 6,
- BossCogGolfAreaAttack: 7,
- BossCogGearDirectedAttack: 4.84,
- BossCogOvertimeAttack: 5}
+ BossCogGavelStomp: 3.0,
+ BossCogGavelHandle: 3.0,
+ BossCogLawyerAttack: 3.0,
+ BossCogMoveAttack: 4.0,
+ BossCogGolfAttack: 3.0,
+ BossCogGolfAreaAttack: 5.0,
+ BossCogGearDirectedAttack: 3.0,
+ BossCogOvertimeAttack: 8.0,
+ BossCogFrozen: 5.0,  # Frozen state lasts 5 seconds
+ }
 BossCogDamageLevels = {BossCogElectricFence: 1,
  BossCogSwatLeft: 5,
  BossCogSwatRight: 5,
@@ -706,7 +713,8 @@ BossCogDamageLevels = {BossCogElectricFence: 1,
  BossCogGolfAttack: 15,
  BossCogGolfAreaAttack: 15,
  BossCogGearDirectedAttack: 15,
- BossCogOvertimeAttack: 10}
+ BossCogOvertimeAttack: 10,
+ BossCogFrozen: 0}  # Frozen state does no damage
 
 BossCogDizzyStates = [
  BossCogDizzy,
