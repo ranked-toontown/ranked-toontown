@@ -20,6 +20,9 @@ class LeaderboardRow(DirectFrame):
 
     def update(self, ranking: int, player_name: str, skill_rating: int, wins: int, games: int):
         self.ranking['text'] = f"#{ranking}"
+        name = player_name
+        if len(name) >= 24:
+            name = name[:24]
         self.player_name['text'] = player_name
 
         rank = Rank.get_from_skill_rating(skill_rating)

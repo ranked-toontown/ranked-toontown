@@ -15,7 +15,7 @@ for yaml_file in yaml_dir.glob("*.yaml"):
     if isinstance(data, dict) and 'fields' in data:
         fields = data['fields']
         if isinstance(fields, dict) and key_to_remove in fields:
-            print(f"Removing key '{key_to_remove}' from {yaml_file}")
+            print(f"Removing key '{key_to_remove}' from {yaml_file}. Value was: {fields[key_to_remove]}")
             del fields[key_to_remove]
 
             # Save the file back
