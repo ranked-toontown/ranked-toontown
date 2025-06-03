@@ -279,6 +279,7 @@ from toontown.parties import DistributedPartyValentineJukeboxActivity/AI
 from toontown.parties import DistributedPartyValentineJukebox40Activity/AI
 from toontown.friends import TTPlayerFriendsManager/UD
 from toontown.friends import OnlinePlayerManager/UD
+from toontown.matchmaking import LeaderboardManager/AI/UD
 from toontown.uberdog import TTSpeedchatRelay/UD
 from toontown.safezone import DistributedGolfKart/AI
 from toontown.safezone import DistributedPicnicBasket/AI
@@ -3638,6 +3639,15 @@ dclass OnlinePlayerManager : DistributedObject {
   setOnlineToons(OnlineToon[]);
   toonCameOnline(OnlineToon);
   toonWentOffline(uint32 doId);
+};
+
+struct NameMapping {
+  uint32 avId;
+  string name;
+};
+
+dclass LeaderboardManager : DistributedObject {
+    handleRankedMatchResultsAiToUd(SkillProfile[], NameMapping[]);
 };
 
 dclass TTSpeedchatRelay : SpeedchatRelay {
