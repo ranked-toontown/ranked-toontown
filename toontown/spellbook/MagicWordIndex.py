@@ -1859,16 +1859,20 @@ class ListRanks(MagicWord):
     def handleWord(self, invoker, avId, toon, *args):
         from toontown.matchmaking.rank import Rank, RankTier, DIVISIONS_PER_TIER, SKILL_RATING_PER_DIVISION
         message = ""
-        mmr = 0
-        for rank in RankTier.__members__.values():
-            upper = DIVISIONS_PER_TIER * SKILL_RATING_PER_DIVISION
-            if rank == RankTier.PRESIDENT:
-                break
-            message += f"{rank.value}: {mmr}\n"
-            mmr += upper
-        message += f"{RankTier.PRESIDENT.value}: {mmr}+"
-        return message
+        mmr = 100
+        last = RankTier.IRON
+        ranks: dict[RankTier, int] = {}
+        while mmr <= 3000:
+            current = Rank.get_from_skill_rating(mmr).tier
+            if current != last:
+                ranks[current] = mmr
+            last = current
+            mmr += 100
 
+        for rank, mmr in ranks.items():
+            message += f"{rank.value}: {mmr}\n"
+
+        return message
 
 class RestartPieRound(MagicWord):
     aliases = ['rsp', 'restartpie']
