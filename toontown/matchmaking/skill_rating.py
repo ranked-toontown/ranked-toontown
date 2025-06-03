@@ -133,7 +133,7 @@ class OpenSkillMatch:
         results = MODEL.rate(
             match,
             scores=scores,
-            weights=weights,
+            # weights=weights,
         )
 
         notify.warning(f"Generated match with the following teams: {match}")
