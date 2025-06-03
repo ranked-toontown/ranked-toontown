@@ -126,11 +126,18 @@ class OpenSkillMatch:
             match.append(members)
 
         # Adjust OpenSkill ratings.
+        scores = [t.get_team_score() for t in self.teams]
+        weights = [t.generate_weight_list() for t in self.teams]
         results = MODEL.rate(
             match,
-            scores=[t.get_team_score() for t in self.teams],
-            weights=[t.generate_weight_list() for t in self.teams],
+            scores=scores,
+            weights=weights,
         )
+
+        print(f"[OpenSkill] Generated match with the following teams: {match}")
+        print(f"[OpenSkill] the following scores were used to rate: {scores}")
+        print(f"[OpenSkill] the following weights were used: {weights}")
+        print(f"[OpenSkill] the following results were returned: {results}")
 
         # The results should match up 1-to-1 with our team layout. Adjust sigma and mu values according to OpenSkill.
         for teamIndex, team in enumerate(results):
