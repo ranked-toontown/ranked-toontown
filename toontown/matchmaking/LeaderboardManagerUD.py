@@ -1,3 +1,4 @@
+import copy
 import json
 
 from direct.directnotify import DirectNotifyGlobal
@@ -40,7 +41,7 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
         """
         Called from the AI. A ranked match has just concluded, and the district is informing of us of rating updates.
         """
-        self.notify.warning('got results: ' + str(results))
+        self.notify.debug('got results: ' + str(results))
         names = {key: value for key, value in nameMap}
 
         # Any toon that we just got word of needs to start being tracked if they aren't already.
@@ -59,10 +60,56 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
                 data = {}
                 self.__sr_cache[profile.key] = data
 
-            data[profile.identifier] = [names[profile.identifier], profile.skill_rating]
+            data[profile.identifier] = [names[profile.identifier], profile.skill_rating, profile.wins, profile.games_played]
             self.__sr_cache[profile.key] = data
 
         self.__save_leaderboard_data()
+
+    def requestRankingsClientToUd(self, key: str, start: int, amount: int):
+        avId = self.air.getAvatarIdFromSender()
+
+        # Validate the key. If it is invalid, don't do anything.
+        profileKey = SkillProfileKey.from_value(key)
+        if profileKey is None:
+            return
+
+        # Validate that proper bounds were given.
+        if start <= 0:
+            return
+
+        # Verify that we weren't given some ridiculous amount to query. Our GUI only does 10 at a time.
+        if amount > 50:
+            return
+
+        # Verify that we aren't attempting to query something insanely out of reach.
+        if start > 500:
+            return
+
+        # Check that we have entries cached for the key. If we don't we can send an empty list of records!
+        if profileKey.value not in self.__sr_cache:
+            self.notify.debug(f"Sending empty {profileKey.value} ratings update to {avId} - no records on file")
+            self.sendUpdateToAvatarId(avId, 'requestRankingsResponse', [profileKey.value, []])
+            return
+
+        # We are good to return some data. Do not make DB calls. Create a sorted list of the top profile entries.
+        records = copy.deepcopy(list(self.__sr_cache[profileKey.value].values()))
+        # Sort the records based on SR.
+        records.sort(key=lambda x: x[1], reverse=True)
+        # Slice the list from where the user wanted it to start. Just to make this easier, let's add a dummy record
+        # First of all, do we even have enough records? If they requested out of bounds, we want to give them an empty list.
+        end_index = start + amount - 1
+        end_index = min(end_index, len(records))
+        if len(records) < start:
+            records = []
+        else:
+            records = records[start-1:end_index]
+
+        # Append ranking to all the records.
+        for i, record in enumerate(records):
+            record.insert(0, i+1)
+
+        self.notify.debug(f"Sending {profileKey.value} ratings update to {avId}: {records}")
+        self.sendUpdateToAvatarId(avId, 'requestRankingsResponse', [profileKey.value, records])
 
     def __database_callback(self, dclass, fields):
         """
@@ -77,7 +124,7 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
             return
 
         if 'setSkillProfiles' not in fields:
-            self.notify.warning(f"Failed to retrieve skill profiles. Toon does not have any skill profiles on record.")
+            self.notify.debug(f"Failed to retrieve skill profiles. Toon does not have any skill profiles on record.")
             return
 
         if 'setName' not in fields:
@@ -100,7 +147,7 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
                 mode_data = {}
 
             # Store the player's name and SR under their toon ID for this gamemode and save the changes to the cache.
-            mode_data[profile.identifier] = [name, profile.skill_rating]
+            mode_data[profile.identifier] = [name, profile.skill_rating, profile.wins, profile.games_played]
             self.__sr_cache[profile.key] = mode_data
 
     def __refresh_task(self, task):
@@ -139,13 +186,13 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
 
                     # Skip bad keys.
                     if profile_type is None:
-                        self.notify.warning(f"Failed to parse key: {key} - JSON is either malformed or out of date. Skipping.")
+                        self.notify.debug(f"Failed to parse key: {key} - JSON is either malformed or out of date. Skipping.")
                         continue
 
                     # Skip bad data as a value for this key.
                     active_ids = data[key]
                     if not isinstance(active_ids, list):
-                        self.notify.warning(f"Failed to parse data for key {key} - Expected list of IDs but got {type(active_ids)}")
+                        self.notify.debug(f"Failed to parse data for key {key} - Expected list of IDs but got {type(active_ids)}")
                         continue
 
                     # Set the data.

@@ -1,8 +1,11 @@
+from typing import Any
+
 from direct.gui.DirectButton import DirectButton
 from direct.gui.DirectFrame import DirectFrame
 from direct.gui.DirectLabel import DirectLabel
 from panda3d.core import TextNode
 
+from toontown.matchmaking.rank import Rank
 from toontown.matchmaking.skill_profile_keys import SkillProfileKey
 from toontown.shtiker.ShtikerPage import ShtikerPage
 from toontown.toonbase import TTLocalizer, ToontownGlobals
@@ -15,11 +18,30 @@ class LeaderboardRow(DirectFrame):
         self.skill_rating: DirectLabel = DirectLabel(parent=self, relief=None, pos=(1, 0, 0), text='Plastic II (0000)', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
         self.win_rate: DirectLabel = DirectLabel(parent=self, relief=None, pos=(10, 0, 0), text='69W-69L', text_font=ToontownGlobals.getCompetitionFont(), text_align=TextNode.A_left)
 
-    def update(self, player_name: str, skill_rating: str, win_rate: str):
-        pass
+    def update(self, ranking: int, player_name: str, skill_rating: int, wins: int, games: int):
+        self.ranking['text'] = f"#{ranking}"
+        self.player_name['text'] = player_name
+
+        rank = Rank.get_from_skill_rating(skill_rating)
+        self.skill_rating['text'] = f"{rank} ({skill_rating})"
+        losses = games - wins
+        self.win_rate['text'] = f"{wins}W-{losses}L"
+
+    def loading(self):
+        self.ranking['text'] = f"#?"
+        self.player_name['text'] = f"Loading..."
+        self.skill_rating['text'] = f""
+        self.win_rate['text'] = f""
+
+    def empty(self):
+        self.ranking['text'] = f"#?"
+        self.player_name['text'] = f"Nobody yet!"
+        self.skill_rating['text'] = f""
+        self.win_rate['text'] = f""
 
     def destroy(self):
         super().destroy()
+        self.ranking.destroy()
         self.player_name.destroy()
         self.skill_rating.destroy()
         self.win_rate.destroy()
@@ -38,6 +60,7 @@ class LeaderboardPage(ShtikerPage):
         self._mode_previous_button: DirectButton | None = None
         self._mode_next_button: DirectButton | None = None
         self._mode_label: DirectLabel | None = None
+        self._top_ranking: int = 1  # Used to query which ranks we want to start displaying.
 
     def load(self):
         ShtikerPage.load(self)
@@ -82,6 +105,11 @@ class LeaderboardPage(ShtikerPage):
         super().enter()
         self.__set_gamemode(SkillProfileKey.CRANING_SOLOS)
 
+    def exit(self):
+        super().exit()
+        base.cr.leaderboardManager.clearRankingsCache()
+        self.ignore('leaderboard-ranking-response')
+
     def unload(self):
         if self.title is not None:
             self.title.destroy()
@@ -103,10 +131,40 @@ class LeaderboardPage(ShtikerPage):
         # Update to new mode.
         self.__set_gamemode(new_mode)
 
-
     def __set_gamemode(self, gamemode: SkillProfileKey):
+
+        self.ignore('leaderboard-ranking-response')
+        self.acceptOnce('leaderboard-ranking-response', self.__handle_rankings_update)
 
         self.current_mode = gamemode
 
         # Update required UI elements.
         self._mode_label['text'] = gamemode.name.replace('_', ' ').title()
+        for row in self.rows:
+            row.loading()
+
+        # Attempts to see if anything is already cached for what we are currently querying. If not, UD will be contacted
+        # and we will update later.
+        results = base.cr.leaderboardManager.getRankings(self.current_mode, self._top_ranking, 10)
+
+        # Did we already have it cached?
+        if len(results) == 10:
+            self.__handle_rankings_update(self.current_mode.value, results)
+
+    def __handle_rankings_update(self, key: str, results: list[Any]):
+        """
+        If we are running this method, it means we requested data from UD and didn't cancel it yet. So we can assume
+        that we are still viewing the page that is relevant to the data receieved.
+        """
+
+        self.notify.debug(f"Applying {key} update using results {results}")
+        # Empty all rows just in case we don't have data.
+        for row in self.rows:
+            row.empty()
+
+        # Assign data to rows if it exists.
+        for i, row in enumerate(self.rows):
+            if i >= len(results):
+                continue
+            ranking, name, sr, wins, games = results[i]
+            row.update(ranking, name, sr, wins, games)
