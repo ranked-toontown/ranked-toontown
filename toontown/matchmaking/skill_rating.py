@@ -5,7 +5,7 @@ from direct.directnotify import DirectNotifyGlobal
 from openskill.models import PlackettLuce, PlackettLuceRating
 
 from toontown.matchmaking.player_skill_profile import PlayerSkillProfile, TeamSkillProfileCollection
-from toontown.matchmaking.skill_rating_utils import interpolate_number, mu_to_skill_rating
+from toontown.matchmaking.skill_rating_utils import interpolate_number
 
 BASE_SR_CHANGE = 20
 
@@ -47,7 +47,10 @@ class OpenSkillMatchDeltaResults:
                 # Use differences in values to construct the profile.
                 new_data.mu - old_data.mu,
                 new_data.sigma - old_data.sigma,
-                new_data.skill_rating - old_data.skill_rating
+                new_data.skill_rating - old_data.skill_rating,
+                new_data.wins,
+                new_data.games_played,
+                new_data.placements_needed
             )
 
         return ret
@@ -147,8 +150,18 @@ class OpenSkillMatch:
         for teamIndex, team in enumerate(results):
             for memberIndex, member in enumerate(team):
                 old_player = self.teams[teamIndex].as_list()[memberIndex]
-                old_player.sigma = member.sigma
-                old_player.mu = member.mu
+                old_player.sigma = int(round(member.sigma))
+                old_player.mu = int(round(member.mu))
+
+        # Update games played for everyone involved. If it's the winning team, give them a win.
+        for i, team in enumerate(self.teams):
+            for player in team.as_list():
+                player.games_played += 1
+                player.placements_needed -= 1
+                player.placements_needed = max(0, player.placements_needed)
+                if ranks[i] == 1:
+                    player.wins += 1
+
 
         # Now, SR adjustment. SR is pretty artificial, and is meant to be a dopamine chaser.
         # SR should attempt to "equalize" on the player's mu rating, but it can be affected by a lot of things.
@@ -174,9 +187,8 @@ class OpenSkillMatch:
             if sr_adjustments[player.identifier] == 0:
                 continue
 
-            mu_to_sr = mu_to_skill_rating(player.mu)
             # How big is the gap? Rate this from -400-400.
-            gap = mu_to_sr - player.skill_rating
+            gap = player.mu - player.skill_rating
             # If gap is positive, that means they deserve higher SR, so we should apply a bonus.
             if gap > 0:
                 sr_adjustments[player.identifier] += interpolate_number(0, 10, gap/500)
