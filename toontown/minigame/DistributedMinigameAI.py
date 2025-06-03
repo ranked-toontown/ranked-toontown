@@ -16,7 +16,7 @@ from direct.showbase import PythonUtil
 from . import TravelGameGlobals
 from toontown.toonbase import ToontownGlobals
 from .utils.scoring_context import ScoringContext
-from ..matchmaking.skill_profile_keys import MINIGAMES_GENERAL
+from ..matchmaking.skill_profile_keys import SkillProfileKey
 from ..matchmaking.skill_rating import OpenSkillMatch, OpenSkillMatchDeltaResults
 from ..toon.DistributedToonAI import DistributedToonAI
 
@@ -70,7 +70,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         What is the minigame going to store ELO/SR ratings under on the toons?
         This key CAN be dynamic, but it needs to be consistent with how you want to store skill.
         """
-        return MINIGAMES_GENERAL
+        return SkillProfileKey.MINIGAMES.value
 
     def addChildGameFSM(self, gameFSM):
         self.frameworkFSM.getStateNamed('frameworkGame').addChild(gameFSM)
@@ -401,11 +401,16 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         results = match.adjust_ratings()
 
         # Save all the data to the toons.
+        updates = []
         for av in self.getParticipantsNotSpectating():
             profile_update = match.new_player_data.get(av.getDoId(), None)
             if profile_update is not None:
                 av.addSkillProfile(profile_update)
+                updates.append(profile_update)
             av.d_syncSkillProfiles()
+
+        # Updates UD with SR rating cache for leaderboard tracking.
+        self.air.leaderboardManager.reportMatchToUd(updates, [[toon.getDoId(), toon.getName()] for toon in self.getParticipantsNotSpectating()])
 
         return results
 
@@ -418,7 +423,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
             self.notify.warning(f"post-openskill adjustment deltas: {[p for p in deltas.get_player_results().values()]}")
 
         points = self.context.get_total_points()
-        scoreList = [points.get(player, 0) for player in self.avIdList]
+        scoreList = [max(0, points.get(player, 0)) for player in self.avIdList]
 
         pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
         pm.generateWithRequired(self.zoneId)

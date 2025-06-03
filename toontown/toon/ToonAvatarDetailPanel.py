@@ -14,7 +14,7 @@ from toontown.toonbase.ToontownBattleGlobals import Tracks, Levels
 from .Experience import Experience
 from ..battle.GagTrackBarGUI import GagTrackBarGUI
 from ..matchmaking.rank import Rank
-from ..matchmaking.skill_profile_keys import CRANING_SOLOS, CRANING_CHAOS
+from ..matchmaking.skill_profile_keys import SkillProfileKey
 
 globalAvatarDetail = None
 
@@ -190,10 +190,10 @@ class ToonAvatarDetailPanel(DirectFrame):
 
                 # If we are in the same area, add their rank. This is temporary.
                 if self.avatar is not None:
-                    solos_profile = self.avatar.getSkillProfile(CRANING_SOLOS)
+                    solos_profile = self.avatar.getSkillProfile(SkillProfileKey.CRANING_SOLOS.value)
                     if solos_profile is not None:
                         text += f"\nSolos Rank: {Rank.get_from_skill_rating(solos_profile.skill_rating)} ({solos_profile.skill_rating})"
-                    ffa_profile = self.avatar.getSkillProfile(CRANING_CHAOS)
+                    ffa_profile = self.avatar.getSkillProfile(SkillProfileKey.CRANING_FFA.value)
                     if ffa_profile is not None:
                         text += f"\nFFA Rank: {Rank.get_from_skill_rating(ffa_profile.skill_rating)} ({ffa_profile.skill_rating})"
         else:
