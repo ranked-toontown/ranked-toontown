@@ -1,6 +1,8 @@
 import dataclasses
 from typing import Any
 
+STARTING_RATING = 1000
+
 
 @dataclasses.dataclass
 class PlayerSkillProfile:
@@ -10,15 +12,18 @@ class PlayerSkillProfile:
     """
     identifier: int  # A unique identifier to retrieve this profile from. Should be toon ID.
     key: str  # The "key" of this profile. Used to associate it with a gamemode or activity.
-    mu: float  # The estimation of the player's skill. Used for OpenSkill. Synonymous with "hidden MMR".
-    sigma: float  # The confidence of the player's skill. Used for OpenSkill.
+    mu: int  # The estimation of the player's skill. Used for OpenSkill. Synonymous with "hidden MMR".
+    sigma: int  # The confidence of the player's skill. Used for OpenSkill.
     skill_rating: int  # The front facing "SR" players see on their profiles. Directly mapped to rank.
+    wins: int  # The amount of wins in this category.
+    games_played: int  # The amount of total games played in this category.
+    placements_needed: int  # The amount of placements needed in order to get a rank to display.
 
     def to_astron(self) -> list[Any]:
         """
         Converts this instance to an astron struct.
         """
-        return [self.identifier, self.key, self.mu, self.sigma, self.skill_rating]
+        return [self.identifier, self.key, self.mu, self.sigma, self.skill_rating, self.wins, self.games_played, self.placements_needed]
 
     @classmethod
     def from_astron(cls, args: list[Any]):

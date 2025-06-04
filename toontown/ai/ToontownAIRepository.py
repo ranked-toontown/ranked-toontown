@@ -44,6 +44,7 @@ from toontown.hood.LawbotHQDataAI import LawbotHQDataAI
 from toontown.hood.MMHoodDataAI import MMHoodDataAI
 from toontown.hood.OZHoodDataAI import OZHoodDataAI
 from toontown.hood.TTHoodDataAI import TTHoodDataAI
+from toontown.matchmaking.LeaderboardManagerAI import LeaderboardManagerAI
 from toontown.minigame.MinigameCreatorAI import MinigameCreatorAI
 from toontown.parties.ToontownTimeManager import ToontownTimeManager
 from toontown.pets.PetManagerAI import PetManagerAI
@@ -117,6 +118,7 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.estateMgr = None
         self.magicWordManager = None
         self.deliveryManager = None
+        self.leaderboardManager: LeaderboardManagerAI | None = None
         self.archipelagoManager = None
         self.defaultAccessLevel = OTPGlobals.accessLevelValues.get('TTOFF_DEVELOPER')
 
@@ -292,6 +294,10 @@ class ToontownAIRepository(ToontownInternalRepository):
         # Generate our AP Manager...
         self.archipelagoManager = DistributedArchipelagoManagerAI(self)
         self.archipelagoManager.generateWithRequired(OTP_ZONE_ID_MANAGEMENT)
+
+        # Generate our leaderboard manager...
+        self.leaderboardManager = self.generateGlobalObject(OTP_DO_ID_LEADERBOARD_MANAGER,
+                                                         'LeaderboardManager')
 
         # Generate our delivery manager...
         self.deliveryManager = self.generateGlobalObject(OTP_DO_ID_TOONTOWN_DELIVERY_MANAGER,

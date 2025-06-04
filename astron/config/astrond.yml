@@ -44,6 +44,10 @@ uberdogs:
       id: 4707
       anonymous: false
 
+    - class: LeaderboardManager
+      id: 4708
+      anonymous: false
+
     - class: TTOffChatManager
       id: 4681
       anonymous: false

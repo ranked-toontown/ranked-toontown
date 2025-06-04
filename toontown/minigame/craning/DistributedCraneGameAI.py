@@ -15,7 +15,7 @@ from toontown.coghq.DistributedCashbotBossHeavyCraneAI import DistributedCashbot
 from toontown.coghq.DistributedCashbotBossSafeAI import DistributedCashbotBossSafeAI
 from toontown.coghq.DistributedCashbotBossSideCraneAI import DistributedCashbotBossSideCraneAI
 from toontown.coghq.DistributedCashbotBossTreasureAI import DistributedCashbotBossTreasureAI
-from toontown.matchmaking.skill_profile_keys import CRANING_SOLOS, CRANING_CHAOS
+from toontown.matchmaking.skill_profile_keys import SkillProfileKey
 from toontown.minigame.DistributedMinigameAI import DistributedMinigameAI
 from toontown.minigame.craning import CraneGameGlobals
 from toontown.minigame.craning.CraneGamePracticeCheatAI import CraneGamePracticeCheatAI
@@ -114,10 +114,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Is this a 1v1?
         if len(self.getParticipantsNotSpectating()) == 2:
-            return CRANING_SOLOS
+            return SkillProfileKey.CRANING_SOLOS.value
 
         # Otherwise, craning misc.
-        return CRANING_CHAOS
+        return SkillProfileKey.CRANING_FFA.value
 
     def generate(self):
         self.notify.debug("generate")

@@ -43,7 +43,7 @@ from . import ModuleListAI
 
 from ..archipelago.definitions.death_reason import DeathReason
 from ..matchmaking import skill_rating
-from ..matchmaking.player_skill_profile import PlayerSkillProfile
+from ..matchmaking.player_skill_profile import PlayerSkillProfile, STARTING_RATING
 from ..shtiker import CogPageGlobals
 from ..util.astron.AstronDict import AstronDict
 
@@ -4422,8 +4422,8 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
             return profile
 
         # Create a new default profile.
-        primitive = skill_rating.MODEL.rating(mu=20, name=str(self.doId))
-        profile = PlayerSkillProfile(self.getDoId(), key, primitive.mu, primitive.sigma, 600)
+        primitive = skill_rating.MODEL.rating(mu=int(STARTING_RATING), sigma=int(STARTING_RATING/3), name=str(self.doId))
+        profile = PlayerSkillProfile(self.getDoId(), key, primitive.mu, primitive.sigma, STARTING_RATING, 0, 0, 10)
         self.addSkillProfile(profile)
         return profile
 
@@ -4467,3 +4467,19 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
         self.b_setHat(hat, hatTex, 0)
         self.b_setGlasses(glasses, glassesTex, 0)
         self.d_setSystemMessage(0, "Updated your Accessories!")
+
+    def getNametagStyle(self):
+        return self.nametagStyle
+
+    def requestNametagStyle(self, nametagStyle):
+        """Handle client request to change nametag style"""
+        # Validate the nametag style value
+        if not isinstance(nametagStyle, int) or nametagStyle < 0 or nametagStyle > 255:
+            self.air.writeServerEvent('suspicious', self.doId,
+                                      'Toon tried to set invalid nametagStyle %s' % str(nametagStyle))
+            self.notify.warning('%s.requestNametagStyle(%s) -- invalid nametagStyle value' % (self, nametagStyle))
+            return
+        
+        # Apply the nametag style change
+        self.b_setNametagStyle(nametagStyle)
+        self.notify.info('%s.requestNametagStyle(%s) -- nametag style changed' % (self, nametagStyle))

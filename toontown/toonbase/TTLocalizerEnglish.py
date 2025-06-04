@@ -23,7 +23,20 @@ NametagFonts = ('phase_3/models/fonts/AnimGothic',
  'phase_3/models/fonts/Danger',
  'phase_3/models/fonts/Alie',
  'phase_3/models/fonts/OysterBar',
- 'phase_3/models/fonts/RedDogSaloon')
+ 'phase_3/models/fonts/RedDogSaloon',
+ 'phase_3/models/fonts/Righteous-Regular.ttf',
+ 'phase_3/models/fonts/Phattype.ttf',
+ 'phase_3/models/fonts/AnakPaud.ttf',
+ 'phase_3/models/fonts/Marimpa.ttf',
+ 'phase_3/models/fonts/Zodicat.otf',
+ 'phase_3/models/fonts/Bestime.otf',
+ 'phase_3/models/fonts/GratisNeue.otf',
+ 'phase_3/models/fonts/LovelySign.otf',
+ 'phase_3/models/fonts/Cleanow.ttf',
+ 'phase_3/models/fonts/SunsetFriday.otf',
+ 'phase_3/models/fonts/Sanggara.ttf',
+ 'phase_3/models/fonts/Amorlate.ttf'
+ )
 NametagFontNames = ('Member',
  'Shivering',
  'Wonky',
@@ -37,7 +50,20 @@ NametagFontNames = ('Member',
  'Action',
  'Poetic',
  'Boardwalk',
- 'Western')
+ 'Western',
+ 'Righteous',
+ 'Arrogant',
+ 'Anak',
+ 'Marimpa',
+ 'Zodicat',
+ 'Bestime',
+ 'Gratis',
+ 'Lovely',
+ 'Cleanow',
+ 'Sunset',
+ 'Sanggara',
+ 'Amorlate')
+
 NametagLabel = ' Nametag'
 UnpaidNameTag = 'Basic'
 GM_NAMES = ('TOON COUNCIL',
@@ -4231,6 +4257,7 @@ DateOfBirthEntryDefaultLabel = 'Date of Birth'
 AchievePageTitle = 'Achievements\n(Coming Soon)'
 PhotoPageTitle = 'Photo\n(Coming Soon)'
 BuildingPageTitle = 'Buildings\n(Coming Soon)'
+LeaderboardPageTitle = 'Leaderboard'
 InventoryPageTitle = 'Gags'
 InventoryPageDeleteTitle = 'Delete Gags'
 InventoryPageTrackFull = 'You have all the gags in the %s track. Your gags in this track are %s%% more effective!'
@@ -10049,3 +10076,11 @@ OptionFPSLimit = {
 
 OptionEnabled = "Enabled"
 OptionDisabled = "Disabled"
+
+# Nametag customization page
+NametagPageTitle = 'Nametag'
+NametagPageInstructions = 'Choose a font style for your nametag!\nClick on any font below to preview it, then click Apply to use it.'
+NametagPageApply = 'Apply'
+NametagPageReset = 'Reset to Basic'
+NametagPageApplied = 'Your nametag style has been updated!'
+NametagPageResetConfirm = 'Reset to basic nametag style.'

@@ -34,6 +34,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
          TTLocalizer.CheckPageTitle,
          TTLocalizer.LocationPageTitle,
          TTLocalizer.MapPageTitle,
+         TTLocalizer.LeaderboardPageTitle,
          TTLocalizer.InventoryPageTitle,
          TTLocalizer.QuestPageToonTasks,
          TTLocalizer.SuitPageTitle,
@@ -41,6 +42,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
          TTLocalizer.KartPageTitle,
          TTLocalizer.DisguisePageTitle,
          TTLocalizer.NPCFriendPageTitle,
+         TTLocalizer.NametagPageTitle,
          TTLocalizer.GardenPageTitle,
          TTLocalizer.GolfPageTitle,
          TTLocalizer.EventsPageName,
@@ -59,9 +61,9 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         self.entered = 1
         messenger.send('releaseDirector')
         messenger.send('stickerBookEntered')
+        base.render.setColorScale(.25, .25, .25, 1)
         base.playSfx(self.openSound)
         base.disableMouse()
-        base.render.hide()
         base.setBackgroundColor(0.05, 0.15, 0.4)
         base.setCellsAvailable([base.rightCells[0]], 0)
         self.oldMin2dAlpha = NametagGlobals.getMin2dAlpha()
@@ -86,10 +88,10 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             return
         self.entered = 0
         messenger.send('stickerBookExited')
+        base.render.setColorScale(1, 1, 1, 1)
         base.playSfx(self.closeSound)
         self.pages[self.currPageIndex].exit()
-        base.render.show()
-        setBlackBackground = 0
+        setBlackBackground = 1
         for obj in list(base.cr.doId2do.values()):
             if isinstance(obj, DistributedFireworkShow.DistributedFireworkShow) or isinstance(obj, DistributedPartyFireworksActivity.DistributedPartyFireworksActivity):
                 setBlackBackground = 1
@@ -98,9 +100,6 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             base.setBackgroundColor(Vec4(0, 0, 0, 1))
         else:
             base.setBackgroundColor(ToontownGlobals.DefaultBackgroundColor)
-        gsg = base.win.getGsg()
-        if gsg:
-            base.render.prepareScene(gsg)
         NametagGlobals.setMin2dAlpha(self.oldMin2dAlpha)
         NametagGlobals.setMax2dAlpha(self.oldMax2dAlpha)
         base.setCellsAvailable([base.rightCells[0]], 1)
@@ -269,6 +268,13 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             iconGeom.setTexture(cardTex, 1)
             iconScale = 0.22
             iconModels.detachNode()
+        elif pageName == TTLocalizer.NametagPageTitle:
+            iconModels = loader.loadModel('phase_3.5/models/gui/speedChatGui')
+            iconGeom = iconModels.find('**/emotionIcon')
+            if not iconGeom:
+                iconGeom = iconModels.find('**/switch1')  # Fallback icon
+            iconColor = Vec4(0.2, 0.8, 0.2, 1)  # Green color
+            iconModels.detachNode()
         elif pageName == TTLocalizer.KartPageTitle:
             iconModels = loader.loadModel('phase_3.5/models/gui/sos_textures')
             iconGeom = iconModels.find('**/kartIcon')
@@ -290,6 +296,11 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         elif pageName == TTLocalizer.SpellbookPageTitle:
             iconModels = loader.loadModel('phase_3.5/models/gui/sos_textures')
             iconGeom = iconModels.find('**/spellbookIcon')
+            iconModels.detachNode()
+        elif pageName == TTLocalizer.LeaderboardPageTitle:
+            iconModels = loader.loadModel('phase_3.5/models/gui/inventory_icons')
+            iconGeom = iconModels.find('**/inventory_ladder')
+            iconScale = 7.5
             iconModels.detachNode()
         if pageName == TTLocalizer.OptionsPageTitle:
             pageName = TTLocalizer.OptionsTabTitle

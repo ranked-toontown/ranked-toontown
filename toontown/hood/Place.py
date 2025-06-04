@@ -317,18 +317,21 @@ class Place(StateData.StateData, FriendsListManager.FriendsListManager):
         base.localAvatar.setTeleportAvailable(1)
         if page:
             base.localAvatar.book.setPage(page)
-        base.localAvatar.b_setAnimState('OpenBook', 1, self.enterStickerBookGUI)
+        base.localAvatar.b_setAnimState('OpenBook', 1, self.__enterBookAnimationCompleteCallback)
+        self.renderShtickerBookInterface()
         base.localAvatar.obscureMoveFurnitureButton(1)
 
-    def enterStickerBookGUI(self):
+    def renderShtickerBookInterface(self):
         base.localAvatar.collisionsOn()
-        base.localAvatar.book.showButton()
         base.localAvatar.book.enter()
-        base.localAvatar.setGuiConflict(1)
         base.localAvatar.startSleepWatch(self.__handleFallingAsleep)
+        self.enablePeriodTimer()
+
+    def __enterBookAnimationCompleteCallback(self):
+        base.localAvatar.book.showButton()
+        base.localAvatar.setGuiConflict(1)
         self.accept('bookDone', self.__handleBook)
         base.localAvatar.b_setAnimState('ReadBook', 1)
-        self.enablePeriodTimer()
 
     def __handleFallingAsleep(self, task):
         base.localAvatar.book.exit()

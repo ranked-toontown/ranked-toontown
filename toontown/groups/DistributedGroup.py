@@ -107,3 +107,7 @@ class DistributedGroup(DistributedObject, GroupBase):
         }
         playground.doneStatus = doneStatus
         playground.fsm.forceTransition('teleportOut', [doneStatus])
+
+        # This is a fallback just in case we manage to softlock our toon. The successful teleport will cancel this task.
+        # Eventually, we should fix this by freezing the toon in place, THEN making them teleport out.
+        taskMgr.doMethodLater(5, playground.forceImmediateTeleportOut, 'distributed-group-force-transition-fallback')

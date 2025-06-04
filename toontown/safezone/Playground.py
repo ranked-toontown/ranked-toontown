@@ -532,11 +532,19 @@ class Playground(BattlePlace):
     def enterTeleportOut(self, requestStatus):
         Place.Place.enterTeleportOut(self, requestStatus, self.__teleportOutDone)
 
+    def forceImmediateTeleportOut(self, requestStatus):
+        """
+        Used to immediately force a transition using a request. Should be used for debugging and as a fallback when
+        something goes wrong.
+        """
+        self.__teleportOutDone(requestStatus)
+
     def __teleportOutDone(self, requestStatus):
         teleportDebug(requestStatus, 'Playground.__teleportOutDone(%s)' % (requestStatus,))
         if hasattr(self, 'activityFsm'):
             self.activityFsm.requestFinalState()
 
+        taskMgr.remove('distributed-group-force-transition-fallback')
         if 'mode' in requestStatus and requestStatus['mode'] == 'minigame':
             messenger.send(self.doneEvent)
             return

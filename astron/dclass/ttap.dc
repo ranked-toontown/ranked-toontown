@@ -279,6 +279,7 @@ from toontown.parties import DistributedPartyValentineJukeboxActivity/AI
 from toontown.parties import DistributedPartyValentineJukebox40Activity/AI
 from toontown.friends import TTPlayerFriendsManager/UD
 from toontown.friends import OnlinePlayerManager/UD
+from toontown.matchmaking import LeaderboardManager/AI/UD
 from toontown.uberdog import TTSpeedchatRelay/UD
 from toontown.safezone import DistributedGolfKart/AI
 from toontown.safezone import DistributedPicnicBasket/AI
@@ -992,9 +993,12 @@ struct APItem {
 struct SkillProfile {
   uint32 avId;
   string key;
-  int32/1000 mu;
-  int32/1000 sigma;
+  int32 mu;
+  int32 sigma;
   int32 sr;
+  uint32 wins;
+  uint32 games;
+  uint8 placements;
 }
 
 
@@ -1163,6 +1167,7 @@ dclass DistributedToon : DistributedPlayer {
   forceLogoutWithNotify() ownrecv;
   setPinkSlips(uint8 = 0) required ownrecv db;
   setNametagStyle(uint8 = 0) broadcast required ram db;
+  requestNametagStyle(uint8) ownsend airecv;
   setMail(simpleMail []) ownrecv;
   setNumMailItems(uint32) airecv;
   setSimpleMailNotify(uint8) ownrecv airecv;
@@ -3637,6 +3642,25 @@ dclass OnlinePlayerManager : DistributedObject {
   setOnlineToons(OnlineToon[]);
   toonCameOnline(OnlineToon);
   toonWentOffline(uint32 doId);
+};
+
+struct NameMapping {
+  uint32 avId;
+  string name;
+};
+
+struct LeaderboardEntry {
+  uint16 ranking;
+  string name;
+  int32 sr;
+  uint32 wins;
+  uint32 games;
+};
+
+dclass LeaderboardManager : DistributedObject {
+    handleRankedMatchResultsAiToUd(SkillProfile[], NameMapping[]);
+    requestRankingsClientToUd(string, uint16, uint16) clsend airecv;
+    requestRankingsResponse(string, LeaderboardEntry[]);
 };
 
 dclass TTSpeedchatRelay : SpeedchatRelay {

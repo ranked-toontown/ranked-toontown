@@ -269,7 +269,7 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
             targetH = turnTask[0].getArgs()[0]
             taskMgr.remove(self.uniqueName('turnedToTarget'))
             taskMgr.remove(self.uniqueName('startingWalk'))
-            correctedH = (1 - (wakeTime - currentTime) / delayTime) * PythonUtil.reduceAngle((targetH - origH)) + origH
+            correctedH = (1 - (wakeTime - currentTime) / max(0.1, delayTime)) * PythonUtil.reduceAngle((targetH - origH)) + origH
             self.setH(correctedH)
 
         if taskMgr.getTasksNamed(self.uniqueName('reachedTarget')):

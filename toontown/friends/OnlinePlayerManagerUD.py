@@ -119,8 +119,11 @@ class OnlinePlayerManagerUD(DistributedObjectGlobalUD):
             ['setEmoteAccess', fields['setEmoteAccess'][0]],
             ['setClothesTopsList', fields['setClothesTopsList'][0]],
             ['setClothesBottomsList', fields['setClothesBottomsList'][0]],
-            ['setPetTrickPhrases', fields['setPetTrickPhrases'][0]]
+            ['setPetTrickPhrases', fields['setPetTrickPhrases'][0]],
         ]
+
+        if 'setSkillProfiles' in fields:
+            details.append(['setSkillProfiles', fields['setSkillProfiles'][0]])
 
         self.d_avatarDetailsResp(avId, fields['avId'], json.dumps(details))
 
