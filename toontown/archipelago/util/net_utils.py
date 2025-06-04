@@ -212,10 +212,10 @@ class JSONPartFormatter:
 
     COLOR_BLACK = (0, 0, 0, 1)
     COLOR_GRAY = (.5, .5, .5, 1)
-    COLOR_GUNMETAL = (.35, .35, .35, 1)
-    COLOR_SILVER = (.6, .6, .6, 1)
-    COLOR_BROWN = (.5, .3, .2, 1)
-    COLOR_GOLD = (.9, .75, .0, 1)
+    COLOR_GUNMETAL = (0.38, 0.38, 0.4, 1.0)
+    COLOR_SILVER = (0.75, 0.75, 0.75, 1.0)
+    COLOR_BROWN = (0.65, 0.4, 0.1, 1.0)
+    COLOR_GOLD = (0.9, 0.75, 0.0, 1.0)
     COLOR_RED = (.76, .35, .35, 1)
     COLOR_DEEP_RED = (1, 0, .25, 1)
     COLOR_GREEN = (0, 1, .5, 1)
@@ -224,12 +224,21 @@ class JSONPartFormatter:
     COLOR_MAGENTA = (.93, 0, .93, 1)
     COLOR_PURPLE = (.6, .05, 1, 1)
     COLOR_CYAN = (0, .93, .93, 1)
-    COLOR_LIGHT_BLUE = (0, .82, .7, 1)
+    COLOR_LIGHT_BLUE = (0.56, 0.69, 0.86, 1.0)
     COLOR_WHITE = (1, 1, 1, 1)
 
     COLOR_PLUM = (.69, .6, .93, 1)
     COLOR_SLATEBLUE = (0.13, 0.13, 1, 1)
     COLOR_SALMON = (.97, .5, .45, 1)
+
+    # Rank system colors
+    COLOR_PLASTIC_WHITE = (0.92, 0.92, 0.92, 1.0)
+    COLOR_PINK = (0.89, 0.64, 0.87, 1.0)
+    COLOR_ORANGE_GRADIENT = (0.85, 0.388, 0.0, 1.0)
+    COLOR_ROYAL_BLUE_GRADIENT = (0.192, 0.356, 0.494, 1.0)
+    COLOR_DEEP_RED_GRADIENT = (0.675, 0.0, 0.0, 1.0)
+    COLOR_PURPLE_GRADIENT = (0.431, 0.290, 0.570, 1.0)
+    COLOR_BLACK_GRADIENT = (0.225, 0.225, 0.225, 1.0)
 
     COLOR_MAP = {
         'black': COLOR_BLACK,
@@ -243,7 +252,14 @@ class JSONPartFormatter:
         'white': COLOR_WHITE,
         'plum': COLOR_PLUM,
         'slateblue': COLOR_SLATEBLUE,
-        'salmon': COLOR_SALMON
+        'salmon': COLOR_SALMON,
+        'plastic_white': COLOR_PLASTIC_WHITE,
+        'pink': COLOR_PINK,
+        'orange_gradient': COLOR_ORANGE_GRADIENT,
+        'royal_blue_gradient': COLOR_ROYAL_BLUE_GRADIENT,
+        'deep_red_gradient': COLOR_DEEP_RED_GRADIENT,
+        'purple_gradient': COLOR_PURPLE_GRADIENT,
+        'black_gradient': COLOR_BLACK_GRADIENT
     }
 
     def __init__(self, parts: typing.List[JSONMessagePart], client):

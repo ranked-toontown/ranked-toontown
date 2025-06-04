@@ -1,5 +1,5 @@
 from enum import Enum
-from toontown.archipelago.util.global_text_properties import get_raw_formatted_string
+from toontown.archipelago.util.global_text_properties import get_raw_formatted_string, get_gradient_formatted_string
 from toontown.archipelago.util.global_text_properties import MinimalJsonMessagePart as Component
 
 # How much SR does a player need to "promote" from one division to another? e.g. Diamond 1 -> Diamond 2
@@ -16,9 +16,9 @@ class RankTier(Enum):
     GOLD = "Gold"
     PLATINUM = "Platinum"
     DIAMOND = "Diamond"
+    INVESTOR = "Investor"
     EXECUTIVE = "Executive"
     PRESIDENT = "President"
-    TRANSCENDENT = "Transcendent"
 
 
 class Rank:
@@ -57,13 +57,13 @@ class Rank:
             case RankTier.PLATINUM:
                 return 'light_blue'
             case RankTier.DIAMOND:
-                return 'slateblue'
+                return 'pink'
+            case RankTier.INVESTOR:
+                return 'green_gradient'
             case RankTier.EXECUTIVE:
-                return 'red'
+                return 'deep_red_gradient'
             case RankTier.PRESIDENT:
-                return 'purple'
-            case RankTier.TRANSCENDENT:
-                return 'deep_red'
+                return 'purple_gradient'
 
         return 'black'
 
@@ -71,19 +71,36 @@ class Rank:
         """
         Returns a colored formatting of this rank. Looks the exact same as the raw string representation, but has color.
         """
-        return get_raw_formatted_string([
-            Component(message=self.__str__(), color=self.color())
-        ])
+        color = self.color()
+        rank_text = self.__str__()
+        
+        # Check if this is a gradient color
+        if color.endswith('_gradient'):
+            return get_gradient_formatted_string(rank_text, color)
+        else:
+            return get_raw_formatted_string([
+                Component(message=rank_text, color=color)
+            ])
 
     def colored_with_sr(self, sr: int) -> str:
         """
         Returns a colored formatting of this rank, including the SR number.
          Looks the exact same as the raw string representation, but has color.
         """
-        return get_raw_formatted_string([
-            Component(message=self.__str__(), color=self.color()),
-            Component(message=f" ({sr})", color='gunmetal')
-        ])
+        color = self.color()
+        rank_text = self.__str__()
+        
+        # Check if this is a gradient color
+        if color.endswith('_gradient'):
+            # For gradient ranks, apply gradient to rank text and regular color to SR
+            gradient_rank = get_gradient_formatted_string(rank_text, color)
+            sr_part = get_raw_formatted_string([Component(message=f" ({sr})", color='gunmetal')])
+            return gradient_rank + sr_part
+        else:
+            return get_raw_formatted_string([
+                Component(message=rank_text, color=color),
+                Component(message=f" ({sr})", color='gunmetal')
+            ])
 
     def __str__(self):
         return f"{self.tier.value} {self.__roman()}".strip()
@@ -145,23 +162,22 @@ class Rank:
             return cls(RankTier.DIAMOND, 2)
         if skill_rating < 1800:
             return cls(RankTier.DIAMOND, 3)
-
+            
         if skill_rating < 1900:
-            return cls(RankTier.EXECUTIVE, 1)
+            return cls(RankTier.INVESTOR, 1)
         if skill_rating < 2000:
-            return cls(RankTier.EXECUTIVE, 2)
+            return cls(RankTier.INVESTOR, 2)
         if skill_rating < 2100:
-            return cls(RankTier.EXECUTIVE, 3)
-
+            return cls(RankTier.INVESTOR, 3)
+        
         if skill_rating < 2200:
-            return cls(RankTier.PRESIDENT, 1)
-        if skill_rating < 2400:
-            return cls(RankTier.PRESIDENT, 2)
-        if skill_rating < 2700:
-            return cls(RankTier.PRESIDENT, 3)
-
-        # Overlords don't have a division.
-        return cls(RankTier.TRANSCENDENT, 0)
+            return cls(RankTier.EXECUTIVE, 1)
+        if skill_rating < 2350:
+            return cls(RankTier.EXECUTIVE, 2)
+        if skill_rating < 2500:
+            return cls(RankTier.EXECUTIVE, 3)
+        
+        return cls(RankTier.PRESIDENT, 0)
 
     def __eq__(self, other):
         return self.division == other.division and self.tier.value == other.tier.value
