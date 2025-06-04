@@ -12,6 +12,7 @@ from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.hood import ZoneUtil
 from toontown.toonbase.ToontownBattleGlobals import Tracks, Levels
 from .Experience import Experience
+from ..archipelago.util.global_text_properties import get_raw_formatted_string, MinimalJsonMessagePart
 from ..battle.GagTrackBarGUI import GagTrackBarGUI
 from ..matchmaking.rank import Rank
 from ..matchmaking.skill_profile_keys import SkillProfileKey
@@ -192,10 +193,12 @@ class ToonAvatarDetailPanel(DirectFrame):
                 if self.avatar is not None:
                     solos_profile = self.avatar.getSkillProfile(SkillProfileKey.CRANING_SOLOS.value)
                     if solos_profile is not None:
-                        text += f"\nSolos Rank: {Rank.get_from_skill_rating(solos_profile.skill_rating)} ({solos_profile.skill_rating})"
+                        rank = Rank.get_from_skill_rating(solos_profile.skill_rating)
+                        text += f"\nSolos Rank: {rank.colored_with_sr(solos_profile.skill_rating)}"
                     ffa_profile = self.avatar.getSkillProfile(SkillProfileKey.CRANING_FFA.value)
                     if ffa_profile is not None:
-                        text += f"\nFFA Rank: {Rank.get_from_skill_rating(ffa_profile.skill_rating)} ({ffa_profile.skill_rating})"
+                        rank = Rank.get_from_skill_rating(ffa_profile.skill_rating)
+                        text += f"\nFFA Rank: {rank.colored_with_sr(ffa_profile.skill_rating)}"
         else:
             text = TTLocalizer.AvatarDetailPanelOffline
         self.dataText['text'] = text

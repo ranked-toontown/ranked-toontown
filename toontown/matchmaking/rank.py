@@ -75,6 +75,16 @@ class Rank:
             Component(message=self.__str__(), color=self.color())
         ])
 
+    def colored_with_sr(self, sr: int) -> str:
+        """
+        Returns a colored formatting of this rank, including the SR number.
+         Looks the exact same as the raw string representation, but has color.
+        """
+        return get_raw_formatted_string([
+            Component(message=self.__str__(), color=self.color()),
+            Component(message=f" ({sr})", color='gunmetal')
+        ])
+
     def __str__(self):
         return f"{self.tier.value} {self.__roman()}".strip()
 
