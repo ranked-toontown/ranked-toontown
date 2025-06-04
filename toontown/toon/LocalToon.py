@@ -29,6 +29,7 @@ from toontown.shtiker import DisguisePage
 from toontown.shtiker import PhotoAlbumPage
 from toontown.shtiker import FishPage
 from toontown.shtiker import NPCFriendPage
+from toontown.shtiker import NametagPage
 from toontown.shtiker import EventsPage
 from toontown.shtiker import TIPPage
 from toontown.quest import QuestParser
@@ -279,6 +280,7 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         del self.questPage
         del self.suitPage
         del self.sosPage
+        del self.nametagPage
         del self.disguisePage
         del self.fishPage
         del self.gardenPage
@@ -371,6 +373,10 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         self.fishPage.setAvatar(self)
         self.fishPage.load()
         self.book.addPage(self.fishPage, pageName=TTLocalizer.FishPageTitle)
+        # Load nametag page - always available
+        self.nametagPage = NametagPage.NametagPage()
+        self.nametagPage.load()
+        self.book.addPage(self.nametagPage, pageName=TTLocalizer.NametagPageTitle)
         if self.disguisePageFlag:
             self.loadDisguisePages()
         if self.sosPageFlag:
@@ -2088,3 +2094,7 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.makeOverheadLaffMeter()
         else:
             self.destroyOverheadLaffMeter()
+
+    def d_requestNametagStyle(self, nametagStyle):
+        """Request nametag style change from server"""
+        self.sendUpdate('requestNametagStyle', [nametagStyle])

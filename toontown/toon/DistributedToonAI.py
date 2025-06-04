@@ -4467,3 +4467,19 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
         self.b_setHat(hat, hatTex, 0)
         self.b_setGlasses(glasses, glassesTex, 0)
         self.d_setSystemMessage(0, "Updated your Accessories!")
+
+    def getNametagStyle(self):
+        return self.nametagStyle
+
+    def requestNametagStyle(self, nametagStyle):
+        """Handle client request to change nametag style"""
+        # Validate the nametag style value
+        if not isinstance(nametagStyle, int) or nametagStyle < 0 or nametagStyle > 255:
+            self.air.writeServerEvent('suspicious', self.doId,
+                                      'Toon tried to set invalid nametagStyle %s' % str(nametagStyle))
+            self.notify.warning('%s.requestNametagStyle(%s) -- invalid nametagStyle value' % (self, nametagStyle))
+            return
+        
+        # Apply the nametag style change
+        self.b_setNametagStyle(nametagStyle)
+        self.notify.info('%s.requestNametagStyle(%s) -- nametag style changed' % (self, nametagStyle))

@@ -10076,3 +10076,11 @@ OptionFPSLimit = {
 
 OptionEnabled = "Enabled"
 OptionDisabled = "Disabled"
+
+# Nametag customization page
+NametagPageTitle = 'Nametag'
+NametagPageInstructions = 'Choose a font style for your nametag!\nClick on any font below to preview it, then click Apply to use it.'
+NametagPageApply = 'Apply'
+NametagPageReset = 'Reset to Basic'
+NametagPageApplied = 'Your nametag style has been updated!'
+NametagPageResetConfirm = 'Reset to basic nametag style.'

@@ -42,6 +42,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
          TTLocalizer.KartPageTitle,
          TTLocalizer.DisguisePageTitle,
          TTLocalizer.NPCFriendPageTitle,
+         TTLocalizer.NametagPageTitle,
          TTLocalizer.GardenPageTitle,
          TTLocalizer.GolfPageTitle,
          TTLocalizer.EventsPageName,
@@ -266,6 +267,13 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             cardTex.setMagfilter(Texture.FTLinear)
             iconGeom.setTexture(cardTex, 1)
             iconScale = 0.22
+            iconModels.detachNode()
+        elif pageName == TTLocalizer.NametagPageTitle:
+            iconModels = loader.loadModel('phase_3.5/models/gui/speedChatGui')
+            iconGeom = iconModels.find('**/emotionIcon')
+            if not iconGeom:
+                iconGeom = iconModels.find('**/switch1')  # Fallback icon
+            iconColor = Vec4(0.2, 0.8, 0.2, 1)  # Green color
             iconModels.detachNode()
         elif pageName == TTLocalizer.KartPageTitle:
             iconModels = loader.loadModel('phase_3.5/models/gui/sos_textures')
