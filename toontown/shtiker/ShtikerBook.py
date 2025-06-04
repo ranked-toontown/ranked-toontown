@@ -60,9 +60,9 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         self.entered = 1
         messenger.send('releaseDirector')
         messenger.send('stickerBookEntered')
+        base.render.setColorScale(.25, .25, .25, 1)
         base.playSfx(self.openSound)
         base.disableMouse()
-        base.render.hide()
         base.setBackgroundColor(0.05, 0.15, 0.4)
         base.setCellsAvailable([base.rightCells[0]], 0)
         self.oldMin2dAlpha = NametagGlobals.getMin2dAlpha()
@@ -87,10 +87,10 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             return
         self.entered = 0
         messenger.send('stickerBookExited')
+        base.render.setColorScale(1, 1, 1, 1)
         base.playSfx(self.closeSound)
         self.pages[self.currPageIndex].exit()
-        base.render.show()
-        setBlackBackground = 0
+        setBlackBackground = 1
         for obj in list(base.cr.doId2do.values()):
             if isinstance(obj, DistributedFireworkShow.DistributedFireworkShow) or isinstance(obj, DistributedPartyFireworksActivity.DistributedPartyFireworksActivity):
                 setBlackBackground = 1
@@ -99,9 +99,6 @@ class ShtikerBook(DirectFrame, StateData.StateData):
             base.setBackgroundColor(Vec4(0, 0, 0, 1))
         else:
             base.setBackgroundColor(ToontownGlobals.DefaultBackgroundColor)
-        gsg = base.win.getGsg()
-        if gsg:
-            base.render.prepareScene(gsg)
         NametagGlobals.setMin2dAlpha(self.oldMin2dAlpha)
         NametagGlobals.setMax2dAlpha(self.oldMax2dAlpha)
         base.setCellsAvailable([base.rightCells[0]], 1)
