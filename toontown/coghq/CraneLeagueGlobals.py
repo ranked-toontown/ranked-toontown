@@ -246,8 +246,6 @@ class CraneGameRuleset:
 
         self.MODIFIER_TIER_RANGE = (1, 3)  # todo Perhaps refactor this into the modifier class
 
-        self.ELEMENTAL_MASTERY = False
-
     # Called to update various list values constructed from instance attributes
     def update_lists(self):
         # Doesn't need to be modified, just used for math
@@ -1448,29 +1446,6 @@ class ModifierCFOCheatsEnabled(CFORulesetModifierBase):
 
     def apply(self, cfoRuleset):
         pass
-
-# (-) Elemental Mastery!
-# --------------------------------
-# - A mode for fun where Earth, Fire, Water, and Air elements are added to the game.
-class ModifierElementalMastery(CFORulesetModifierBase):
-    # The enum used by astron to know the type
-    MODIFIER_ENUM = 32
-    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
-
-    TITLE_COLOR = CFORulesetModifierBase.CYAN
-    DESCRIPTION_COLOR = CFORulesetModifierBase.GREEN
-
-    def getName(self):
-        return 'Elemental Mastery!'
-
-    def getDescription(self):
-        return f'There are %(color_start)sElemental Mastery%(color_end)s enabled!'
-
-    def getHeat(self):
-        return 0
-
-    def apply(self, cfoRuleset):
-        cfoRuleset.ELEMENTAL_MASTERY = True
 
 
 # Any implemented subclasses of CFORulesetModifierBase cannot go past this point
