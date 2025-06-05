@@ -31,6 +31,8 @@ from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORAN
 from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
+from toontown.minigame.statuseffects.DistributedStatusEffectSystem import DistributedStatusEffectSystem
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 from direct.gui.DirectGui import DGG, DirectFrame
 from direct.gui.DirectScrolledList import DirectScrolledList
 from direct.gui.DirectLabel import DirectLabel
@@ -86,6 +88,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.heatDisplay.hide()
         self.endVault = None
         self.statusIndicators = {}  # Dictionary to store status indicators for each toon
+        
+        # Status effect system will be set via setStatusEffectSystemId
+        self.statusEffectSystem = None
 
         self.warningSfx = None
 
@@ -1061,6 +1066,10 @@ class DistributedCraneGame(DistributedMinigame):
         self.heatDisplay.cleanup()
         self.heatDisplay = None
         self.boss = None
+        
+        # Cleanup status effect system
+        if hasattr(self, 'statusEffectSystem') and self.statusEffectSystem:
+            self.statusEffectSystem.cleanup()
 
     def exitCleanup(self):
         pass
@@ -1074,6 +1083,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.boss.game = self
         self.boss.prepareBossForBattle()
         self.boss.setRuleset(self.ruleset)
+    
+    def setStatusEffectSystemId(self, statusEffectSystemId: int) -> None:
+        self.statusEffectSystem = base.cr.getDo(statusEffectSystemId)
 
     def addScore(self, avId: int, score: int, reason: str):
 

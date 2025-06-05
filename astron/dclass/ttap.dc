@@ -72,6 +72,7 @@ from toontown.fishing import DistributedPondBingoManager/AI
 from toontown.safezone import DistributedFishingSpot/AI
 from toontown.estate import DistributedCannon/AI
 from toontown.estate import DistributedTarget/AI
+from toontown.minigame.statuseffects import DistributedStatusEffectSystem/AI
 from toontown.minigame import DistributedMinigame/AI
 from toontown.minigame import DistributedMinigameTemplate/AI
 from toontown.minigame import DistributedRaceGame/AI
@@ -1779,6 +1780,11 @@ dclass DistributedTarget : DistributedObject {
   setCurPinballScore(uint32, int32, int32) clsend airecv;
   setPinballHiScorer(string) broadcast ram;
   setPinballHiScore(int32) broadcast ram;
+};
+
+dclass DistributedStatusEffectSystem : DistributedObject {
+  applyStatusEffect(uint32, uint8) broadcast;
+  removeStatusEffect(uint32, uint8) broadcast;
 };
 
 dclass DistributedMinigame : DistributedObject {
@@ -3945,6 +3951,7 @@ dclass DistributedPieGame: DistributedMinigame {
 
 dclass DistributedCraneGame: DistributedMinigame {
   setBossCogId(uint32 doId) broadcast;
+  setStatusEffectSystemId(uint32 doId) broadcast;
   setRawRuleset(CraneLeagueRuleset) required broadcast ram;
   setModifiers(CraneLeagueModifier[]) broadcast ram;
   setToonSpawnpoints(uint8[]) broadcast ram;
