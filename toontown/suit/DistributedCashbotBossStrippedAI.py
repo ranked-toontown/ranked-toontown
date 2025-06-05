@@ -581,8 +581,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
                 'wasAttacking': hasattr(self, 'numAttacks') and self.numAttacks > 0
             }
         
-        # Set boss to a special frozen state (reuse dizzy for vulnerability to safes)
-        self.b_setAttackCode(ToontownGlobals.BossCogDizzy)
+        # Don't use dizzy state - just mark as frozen and stop actions
+        # The frozen state itself will handle safe vulnerability
         
         # Stop attacks and goon spawning
         self.stopAttacks()
@@ -618,4 +618,11 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         """Check if the boss is currently frozen"""
         frozenTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.FROZEN]
         return len(frozenTasks) > 0
+    
+    def isVulnerableToSafes(self):
+        """Check if the boss is vulnerable to safe damage (dizzy OR frozen)"""
+        from toontown.toonbase import ToontownGlobals
+        return (self.attackCode == ToontownGlobals.BossCogDizzy or 
+                self.attackCode == ToontownGlobals.BossCogDizzyNow or 
+                self.isFrozen())
 

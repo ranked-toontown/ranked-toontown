@@ -138,8 +138,9 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         # The client reports successfully striking the boss in the
         # head with this object.
         if self.boss.getBoss().heldObject == None:
-            if self.boss.getBoss().attackCode == ToontownGlobals.BossCogDizzy:
-                # While the boss is dizzy, a safe hitting him in the
+            # Check if boss is vulnerable to safes (dizzy OR frozen)
+            if hasattr(self.boss.getBoss(), 'isVulnerableToSafes') and self.boss.getBoss().isVulnerableToSafes():
+                # While the boss is dizzy or frozen, a safe hitting him in the
                 # head does lots of damage.
                 damage = int(impact * 50)
                 crane = simbase.air.doId2do.get(craneId)
