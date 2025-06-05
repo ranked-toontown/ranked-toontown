@@ -252,6 +252,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
     # Given a crane, the damage dealt from the crane, and the impact of the hit, should we stun the CFO?
     def considerStun(self, crane, damage, impact):
+        # If frozen, don't allow stunning (frozen acts like a stun state)
+        if self.isFrozen():
+            # Frozen boss can't be stunned further, just take damage
+            return False
 
         damage_stuns = damage >= self.ruleset.CFO_STUN_THRESHOLD
         is_sidecrane = isinstance(crane, DistributedCashbotBossSideCraneAI.DistributedCashbotBossSideCraneAI)
@@ -333,6 +337,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             taskMgr.remove(taskName)
         self.activeStatusEffectTasks.clear()
         self.statusEffectCounters.clear()
+        
+        # If frozen, unfreeze before cleanup
+        if self.isFrozen():
+            self.d_setFrozenState(False)
     
     def onStatusEffectApplied(self, statusEffect, appliedByAvId):
         """Called when a status effect is applied to this boss"""
@@ -341,6 +349,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.startBurnedEffect(appliedByAvId)
         elif statusEffect == StatusEffect.DRENCHED:
             self.startDrenchedEffect(appliedByAvId)
+        elif statusEffect == StatusEffect.FROZEN:
+            self.startFrozenEffect(appliedByAvId)
         # Add other status effects here as we implement them
     
     def onStatusEffectRemoved(self, statusEffect):
@@ -350,6 +360,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.stopOldestBurnedEffect()
         elif statusEffect == StatusEffect.DRENCHED:
             self.stopOldestDrenchedEffect()
+        elif statusEffect == StatusEffect.FROZEN:
+            self.stopOldestFrozenEffect()
         # Add other status effects here as we implement them
     
     def startBurnedEffect(self, appliedByAvId):
@@ -488,3 +500,122 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def d_setAnimationSpeed(self, speed):
         """Send animation speed change to clients"""
         self.sendUpdate('setAnimationSpeed', [speed])
+    
+    def startFrozenEffect(self, appliedByAvId):
+        """Start the FROZEN status effect - completely immobilizes the boss"""
+        # Create a unique task for this player's frozen effect
+        counter = self.statusEffectCounters.get(StatusEffect.FROZEN, 0)
+        self.statusEffectCounters[StatusEffect.FROZEN] = counter + 1
+        
+        taskName = self.uniqueName(f'frozenEffect-{appliedByAvId}-{counter}')
+        taskKey = (StatusEffect.FROZEN, appliedByAvId, counter)
+        self.activeStatusEffectTasks[taskKey] = taskName
+        
+        # End any existing stuns and transition to frozen state
+        self.endExistingStuns()
+        self.applyFrozenState()
+        
+        # Get duration from globals (10 seconds for FROZEN)
+        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+        duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.FROZEN, 10.0)
+        
+        # Set up cleanup task
+        frozenData = {
+            'appliedByAvId': appliedByAvId,
+            'taskKey': taskKey
+        }
+        
+        task = taskMgr.doMethodLater(duration, self.endFrozenEffect, taskName)
+        task.frozenData = frozenData
+    
+    def endFrozenEffect(self, task):
+        """End a specific FROZEN status effect"""
+        # Get the frozenData from the task itself
+        frozenData = task.frozenData
+        
+        self.cleanupFrozenTask(frozenData['taskKey'])
+        
+        # Check if this was the last frozen effect - if so, unfreeze
+        frozenTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.FROZEN]
+        if len(frozenTasks) == 0:
+            self.removeFrozenState()
+        
+        return task.done
+    
+    def cleanupFrozenTask(self, taskKey):
+        """Clean up a specific frozen task"""
+        if taskKey in self.activeStatusEffectTasks:
+            taskName = self.activeStatusEffectTasks[taskKey]
+            taskMgr.remove(taskName)
+            del self.activeStatusEffectTasks[taskKey]
+    
+    def stopOldestFrozenEffect(self):
+        """Stop the oldest FROZEN status effect when one is removed from the system"""
+        # Find the oldest frozen task and stop it
+        frozenTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.FROZEN]
+        if frozenTasks:
+            # Sort by counter (the third element) to get the oldest
+            oldestTask = min(frozenTasks, key=lambda x: x[2])
+            self.cleanupFrozenTask(oldestTask)
+            
+            # Check if this was the last frozen effect - if so, unfreeze
+            remainingFrozenTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.FROZEN]
+            if len(remainingFrozenTasks) == 0:
+                self.removeFrozenState()
+    
+    def endExistingStuns(self):
+        """End any existing stun effects when frozen is applied"""
+        from toontown.toonbase import ToontownGlobals
+        if self.attackCode == ToontownGlobals.BossCogDizzy or self.attackCode == ToontownGlobals.BossCogDizzyNow:
+            # End the stun
+            self.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
+    
+    def applyFrozenState(self):
+        """Apply the frozen state to the boss"""
+        from toontown.toonbase import ToontownGlobals
+        
+        # Store the previous state for recovery
+        if not hasattr(self, 'preFreezeBossState'):
+            self.preFreezeBossState = {
+                'attackCode': self.attackCode,
+                'wasAttacking': hasattr(self, 'numAttacks') and self.numAttacks > 0
+            }
+        
+        # Set boss to a special frozen state (reuse dizzy for vulnerability to safes)
+        self.b_setAttackCode(ToontownGlobals.BossCogDizzy)
+        
+        # Stop attacks and goon spawning
+        self.stopAttacks()
+        self.stopHelmets()
+        
+        # Freeze animations on client
+        self.d_setFrozenState(True)
+    
+    def removeFrozenState(self):
+        """Remove the frozen state from the boss"""
+        from toontown.toonbase import ToontownGlobals
+        
+        # Restore previous state
+        if hasattr(self, 'preFreezeBossState'):
+            # Unfreeze animations on client first
+            self.d_setFrozenState(False)
+            
+            # If the boss was attacking before being frozen, resume attacks
+            if self.preFreezeBossState.get('wasAttacking', False):
+                self.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
+                self.waitForNextAttack(2.0)  # Brief delay before resuming
+                self.waitForNextHelmet()
+            else:
+                self.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
+            
+            del self.preFreezeBossState
+    
+    def d_setFrozenState(self, frozen):
+        """Send frozen state change to clients"""
+        self.sendUpdate('setFrozenState', [frozen])
+    
+    def isFrozen(self):
+        """Check if the boss is currently frozen"""
+        frozenTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.FROZEN]
+        return len(frozenTasks) > 0
+

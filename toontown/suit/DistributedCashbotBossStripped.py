@@ -257,3 +257,43 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
             if hasattr(ival, 'ivals') and ival.ivals:
                 for child in ival.ivals:
                     self._applySpeedToInterval(child)
+    
+    def setFrozenState(self, frozen):
+        """Set the frozen state - completely freeze or unfreeze animations"""
+        if not hasattr(self, 'isFrozen'):
+            self.isFrozen = False
+        
+        if frozen and not self.isFrozen:
+            # Freeze the boss
+            self.isFrozen = True
+            
+            # Pause the current animation at its current frame
+            if hasattr(self, 'currentAnimIval') and self.currentAnimIval:
+                # Get the current time and pause the animation there
+                currentT = self.currentAnimIval.getT()
+                self.currentAnimIval.pause()
+                self.frozenAnimTime = currentT
+            # Boss is now frozen
+            
+        elif not frozen and self.isFrozen:
+            # Unfreeze the boss
+            self.isFrozen = False
+            
+            # Resume or restart animations
+            if hasattr(self, 'currentAnimIval') and self.currentAnimIval:
+                # Try to resume from where we left off
+                if hasattr(self, 'frozenAnimTime'):
+                    self.currentAnimIval.setT(self.frozenAnimTime)
+                    delattr(self, 'frozenAnimTime')
+                self.currentAnimIval.resume()
+            
+            # Clear frozen state
+    
+    def doAnimate(self, anim=None, now=0, queueNeutral=1, raised=None, forward=None, happy=None):
+        """Override to prevent animations when frozen"""
+        # If frozen, don't start new animations unless it's an 'unfreeze' command
+        if hasattr(self, 'isFrozen') and self.isFrozen:
+            return
+        
+        # Normal animation behavior when not frozen
+        return super().doAnimate(anim, now, queueNeutral, raised, forward, happy)
