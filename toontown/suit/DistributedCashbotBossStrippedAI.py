@@ -339,6 +339,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         if statusEffect == StatusEffect.BURNED:
             self.startBurnedEffect(appliedByAvId)
+        elif statusEffect == StatusEffect.DRENCHED:
+            self.startDrenchedEffect(appliedByAvId)
         # Add other status effects here as we implement them
     
     def onStatusEffectRemoved(self, statusEffect):
@@ -346,6 +348,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         if statusEffect == StatusEffect.BURNED:
             self.stopOldestBurnedEffect()
+        elif statusEffect == StatusEffect.DRENCHED:
+            self.stopOldestDrenchedEffect()
         # Add other status effects here as we implement them
     
     def startBurnedEffect(self, appliedByAvId):
@@ -409,3 +413,78 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             # Sort by counter (the third element) to get the oldest
             oldestTask = min(burnTasks, key=lambda x: x[2])
             self.cleanupBurnTask(oldestTask)
+    
+    def startDrenchedEffect(self, appliedByAvId):
+        """Start the DRENCHED status effect - slows boss animations"""
+        # Create a unique task for this player's drench effect
+        counter = self.statusEffectCounters.get(StatusEffect.DRENCHED, 0)
+        self.statusEffectCounters[StatusEffect.DRENCHED] = counter + 1
+        
+        taskName = self.uniqueName(f'drenchedEffect-{appliedByAvId}-{counter}')
+        taskKey = (StatusEffect.DRENCHED, appliedByAvId, counter)
+        self.activeStatusEffectTasks[taskKey] = taskName
+        
+        # Apply animation slowdown immediately
+        self.applyAnimationSlowdown()
+        
+        # Get duration from globals (8 seconds for DRENCHED)
+        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+        duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.DRENCHED, 8.0)
+        
+        # Set up cleanup task
+        drenchData = {
+            'appliedByAvId': appliedByAvId,
+            'taskKey': taskKey
+        }
+        
+        task = taskMgr.doMethodLater(duration, self.endDrenchedEffect, taskName)
+        task.drenchData = drenchData
+    
+    def endDrenchedEffect(self, task):
+        """End a specific DRENCHED status effect"""
+        # Get the drenchData from the task itself
+        drenchData = task.drenchData
+        
+        self.cleanupDrenchTask(drenchData['taskKey'])
+        
+        # Check if this was the last drench effect - if so, restore animation speed
+        drenchTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.DRENCHED]
+        if len(drenchTasks) == 0:
+            self.removeAnimationSlowdown()
+        
+        return task.done
+    
+    def cleanupDrenchTask(self, taskKey):
+        """Clean up a specific drench task"""
+        if taskKey in self.activeStatusEffectTasks:
+            taskName = self.activeStatusEffectTasks[taskKey]
+            taskMgr.remove(taskName)
+            del self.activeStatusEffectTasks[taskKey]
+    
+    def stopOldestDrenchedEffect(self):
+        """Stop the oldest DRENCHED status effect when one is removed from the system"""
+        # Find the oldest drench task and stop it
+        drenchTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.DRENCHED]
+        if drenchTasks:
+            # Sort by counter (the third element) to get the oldest
+            oldestTask = min(drenchTasks, key=lambda x: x[2])
+            self.cleanupDrenchTask(oldestTask)
+            
+            # Check if this was the last drench effect - if so, restore animation speed
+            remainingDrenchTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.DRENCHED]
+            if len(remainingDrenchTasks) == 0:
+                self.removeAnimationSlowdown()
+    
+    def applyAnimationSlowdown(self):
+        """Apply animation speed slowdown to the boss"""
+        # Send to client to slow down animations
+        self.d_setAnimationSpeed(0.5)  # 50% speed
+    
+    def removeAnimationSlowdown(self):
+        """Remove animation speed slowdown from the boss"""
+        # Send to client to restore normal animation speed
+        self.d_setAnimationSpeed(1.0)  # Normal speed
+    
+    def d_setAnimationSpeed(self, speed):
+        """Send animation speed change to clients"""
+        self.sendUpdate('setAnimationSpeed', [speed])

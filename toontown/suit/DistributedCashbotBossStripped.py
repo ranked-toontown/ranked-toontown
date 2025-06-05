@@ -211,3 +211,49 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
     def setRuleset(self, ruleset):
         self.ruleset = ruleset
         self.bossHealthBar.update(self.ruleset.CFO_MAX_HP - self.bossDamage, self.ruleset.CFO_MAX_HP)
+    
+    def setAnimationSpeed(self, speed):
+        """Set the animation playback speed for all boss animations"""
+        # Store the speed for future animations
+        if not hasattr(self, 'animationSpeed'):
+            self.animationSpeed = 1.0
+        self.animationSpeed = speed
+        
+        # Apply speed to current animation if one is playing
+        if hasattr(self, 'currentAnimIval') and self.currentAnimIval:
+            # Modify the playback rate of the current animation interval
+            self.currentAnimIval.setPlayRate(speed)
+    
+    def getAnim(self, anim):
+        """Override to apply animation speed to all animations"""
+        # Get the normal animation interval
+        ival = super().getAnim(anim)
+        
+        # Apply current animation speed if we have one
+        if hasattr(self, 'animationSpeed') and self.animationSpeed != 1.0:
+            self._applySpeedToInterval(ival)
+        
+        return ival
+    
+    def getAngryActorInterval(self, animName, **kw):
+        """Override to apply animation speed to angry animations"""
+        # Apply current animation speed to the keyword arguments
+        if hasattr(self, 'animationSpeed') and self.animationSpeed != 1.0:
+            kw['playRate'] = kw.get('playRate', 1.0) * self.animationSpeed
+        
+        # Call the parent method with modified kwargs
+        return super().getAngryActorInterval(animName, **kw)
+    
+    def _applySpeedToInterval(self, ival):
+        """Recursively apply animation speed to all ActorIntervals in a complex interval"""
+        from direct.interval.ActorInterval import ActorInterval
+        from direct.interval.MetaInterval import Sequence, Parallel
+        
+        if isinstance(ival, ActorInterval):
+            # Apply speed directly to ActorInterval
+            ival.setPlayRate(self.animationSpeed)
+        elif isinstance(ival, (Sequence, Parallel)):
+            # Access child intervals using the ivals attribute
+            if hasattr(ival, 'ivals') and ival.ivals:
+                for child in ival.ivals:
+                    self._applySpeedToInterval(child)

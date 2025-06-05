@@ -1331,6 +1331,7 @@ dclass DistributedSellbotBossStripped: DistributedBossCogStripped {
 dclass DistributedCashbotBossStripped: DistributedBossCogStripped {
   setBossDamage(uint32, uint32, uint32, bool, bool) broadcast ram;
   setAttackCode(uint8, uint32, uint32) broadcast;
+  setAnimationSpeed(int16/100) broadcast;
 };
 
 dclass DistributedLawbotBossStripped: DistributedBossCogStripped {
