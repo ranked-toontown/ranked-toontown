@@ -967,7 +967,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def getToonOutgoingMultiplier(self, avId):
         return 100
 
-    def recordHit(self, damage, impact=0, craneId=-1, objId=0, isGoon=False):
+    def recordHit(self, damage, impact=0, craneId=-1, objId=0, isGoon=False, isDOT=False):
 
         # Don't process a hit if we aren't in the play state.
         if self.gameFSM.getCurrentState().getName() != 'play':
@@ -985,21 +985,27 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 self.getToonOutgoingMultiplier(avId) / 100.0) + ' damage is now ' + str(damage)))
 
         # Record a successful hit in battle three.
-        self.boss.b_setBossDamage(self.boss.bossDamage + damage, avId=avId, objId=objId, isGoon=isGoon)
+        self.boss.b_setBossDamage(self.boss.bossDamage + damage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
 
-        # Award bonus points for hits with maximum impact
-        if impact == 1.0:
+        # Award bonus points for hits with maximum impact (but not for DOT)
+        if impact == 1.0 and not isDOT:
             self.addScore(avId, self.ruleset.POINTS_IMPACT, reason=CraneLeagueGlobals.ScoreReason.FULL_IMPACT)
         self.addScore(avId, damage)
 
-        comboTracker = self.comboTrackers[avId]
-        comboTracker.incrementCombo((comboTracker.combo + 1.0) / 10.0 * damage)
+        # DOT damage should not contribute to combos
+        if not isDOT:
+            comboTracker = self.comboTrackers[avId]
+            comboTracker.incrementCombo((comboTracker.combo + 1.0) / 10.0 * damage)
 
         # The CFO has been defeated, proceed to Victory state
         if self.boss.bossDamage >= self.ruleset.CFO_MAX_HP:
             self.addScore(avId, self.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
             self.toonsWon = True
             self.gameFSM.request('victory')
+            return
+
+        # DOT damage should not cause flinching, stunning, or helmet behavior
+        if isDOT:
             return
 
         # The CFO is already dizzy, OR the crane is None, so get outta here

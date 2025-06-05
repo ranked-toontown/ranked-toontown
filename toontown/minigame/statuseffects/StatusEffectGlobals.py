@@ -30,6 +30,17 @@ STATUS_EFFECT_COLORS = {
     StatusEffect.SHATTERED: (1.0, 1.0, 1.0, 1.0),   # White
 }
 
+# Status effect durations in seconds
+STATUS_EFFECT_DURATIONS = {
+    StatusEffect.BURNED: 5.0,
+    StatusEffect.DRENCHED: 8.0,
+    StatusEffect.WINDED: 6.0,
+    StatusEffect.GROUNDED: 7.0,
+    StatusEffect.EXPLODE: 3.0,
+    StatusEffect.FROZEN: 10.0,
+    StatusEffect.SHATTERED: 4.0,
+}
+
 # Status effects that can be applied to safes (basic elemental effects only)
 SAFE_ALLOWED_EFFECTS = {StatusEffect.BURNED, StatusEffect.DRENCHED, StatusEffect.WINDED, StatusEffect.GROUNDED}
 

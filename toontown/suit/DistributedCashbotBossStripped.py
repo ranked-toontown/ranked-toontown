@@ -84,15 +84,17 @@ class DistributedCashbotBossStripped(DistributedBossCogStripped):
         self.modifiers = modsToSet
         self.modifiers.sort(key=lambda m: m.MODIFIER_TYPE)
 
-    def setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
+    def setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
 
         if avId != base.localAvatar.doId or isGoon or (objId not in self.myHits):
             if bossDamage > self.bossDamage:
                 delta = bossDamage - self.bossDamage
-                self.flashRed()
+                
+                if not isDOT:
+                    self.flashRed()
 
                 # Animate the hit if the CFO should flinch
-                if self.ruleset.CFO_FLINCHES_ON_HIT:
+                if self.ruleset.CFO_FLINCHES_ON_HIT and not isDOT:
                     self.doAnimate('hit', now=1)
 
                 self.showHpText(-delta, scale=5)

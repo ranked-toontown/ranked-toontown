@@ -85,22 +85,30 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                     self.boss.statusEffectSystem.b_removeStatusEffect(targetId, effect)
                 if synergy is None:
                     return True
-                self.boss.statusEffectSystem.b_applyStatusEffect(targetId, synergy)
+                # For synergy effects, we could track who triggered the synergy, but for now use None
+                self.boss.statusEffectSystem.b_applyStatusEffect(targetId, synergy, None)
+                
+                # Get duration for synergy effect
+                from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+                duration = STATUS_EFFECT_DURATIONS.get(synergy, 5.0)
                 taskName = self.uniqueName(f'remove-effect-{targetId}-{synergy.value}-{self.doId}-{int(time.time() * 1000)}')
-                taskMgr.doMethodLater(5.0, self.__handleStatusEffectTimeout, taskName, extraArgs=[targetId, synergy])
+                taskMgr.doMethodLater(duration, self.__handleStatusEffectTimeout, taskName, extraArgs=[targetId, synergy])
                 return True
         return False
         
 
-    def handleStatusEffect(self, effect):
+    def handleStatusEffect(self, effect, appliedByAvId):
         bossId = self.boss.getBoss().doId
-        self.boss.statusEffectSystem.b_applyStatusEffect(bossId, effect)
+        self.boss.statusEffectSystem.b_applyStatusEffect(bossId, effect, appliedByAvId)
         taskName = self.uniqueName(f'remove-effect-{bossId}-{effect.value}-{self.doId}-{int(time.time() * 1000)}')
 
         if self.checkForSynergy(bossId):
             return
 
-        taskMgr.doMethodLater(5.0, self.__handleStatusEffectTimeout, taskName, extraArgs=[bossId, effect])
+        # Get duration from globals instead of hardcoded 5.0
+        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+        duration = STATUS_EFFECT_DURATIONS.get(effect, 5.0)
+        taskMgr.doMethodLater(duration, self.__handleStatusEffectTimeout, taskName, extraArgs=[bossId, effect])
 
     def hitBoss(self, impact, craneId):
         avId = self.air.getAvatarIdFromSender()
@@ -116,7 +124,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         effects = self.boss.statusEffectSystem.getStatusEffects(self.doId)
         if effects:
             for effect in effects:
-                self.handleStatusEffect(effect)
+                self.handleStatusEffect(effect, avId)
                 self.boss.statusEffectSystem.b_removeStatusEffect(self.doId, effect)
             
         if self.avoidHelmet or self == self.boss.getBoss().heldObject:

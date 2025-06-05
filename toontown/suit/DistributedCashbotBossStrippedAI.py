@@ -11,6 +11,7 @@ from toontown.coghq import DistributedCashbotBossSideCraneAI
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from .DistributedBossCogStrippedAI import DistributedBossCogStrippedAI
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 
 
 class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
@@ -41,6 +42,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         # The intentional safe helmet cooldowns. These are used to prevent safe helmet abuse.
         # Maps toon id -> next available safe helmet timestamp.
         self.safeHelmetCooldownsDict: dict[int, float] = {}
+        
+        # Status effect tracking - support multiple instances from different players
+        self.activeStatusEffectTasks = {}  # Maps (statusEffect, avId) -> taskName for cleanup
+        self.statusEffectCounters = {}  # Maps statusEffect -> counter for unique task naming
 
     def allowedToSafeHelmet(self, toonId: int) -> bool:
         if toonId not in self.safeHelmetCooldownsDict:
@@ -268,16 +273,16 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
         return False
 
-    def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
-        self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon)
+    def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
         self.setBossDamage(bossDamage)
 
     def setBossDamage(self, bossDamage):
         self.reportToonHealth()
         self.bossDamage = bossDamage
 
-    def d_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False):
-        self.sendUpdate('setBossDamage', [bossDamage, avId, objId, isGoon])
+    def d_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        self.sendUpdate('setBossDamage', [bossDamage, avId, objId, isGoon, isDOT])
 
     def waitForNextAttack(self, delayTime):
         DistributedBossCogStrippedAI.waitForNextAttack(self, delayTime)
@@ -312,6 +317,7 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.stopAttacks()
         self.stopHelmets()
         self.heldObject = None
+        self.cleanupStatusEffectTasks()
 
     def __restartCraneRoundTask(self, task):
         self.exitIntroduction()
@@ -320,3 +326,86 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
 
     def setObjectID(self, objId):
         self.objectId = objId
+    
+    def cleanupStatusEffectTasks(self):
+        """Clean up all active status effect tasks"""
+        for taskName in self.activeStatusEffectTasks.values():
+            taskMgr.remove(taskName)
+        self.activeStatusEffectTasks.clear()
+        self.statusEffectCounters.clear()
+    
+    def onStatusEffectApplied(self, statusEffect, appliedByAvId):
+        """Called when a status effect is applied to this boss"""
+        
+        if statusEffect == StatusEffect.BURNED:
+            self.startBurnedEffect(appliedByAvId)
+        # Add other status effects here as we implement them
+    
+    def onStatusEffectRemoved(self, statusEffect):
+        """Called when a status effect is removed from this boss"""
+        
+        if statusEffect == StatusEffect.BURNED:
+            self.stopOldestBurnedEffect()
+        # Add other status effects here as we implement them
+    
+    def startBurnedEffect(self, appliedByAvId):
+        """Start the BURNED status effect DOT"""
+        
+        # Create a unique task for this player's burn effect
+        # Get a counter for unique naming
+        counter = self.statusEffectCounters.get(StatusEffect.BURNED, 0)
+        self.statusEffectCounters[StatusEffect.BURNED] = counter + 1
+        
+        taskName = self.uniqueName(f'burnedDOT-{appliedByAvId}-{counter}')
+        taskKey = (StatusEffect.BURNED, appliedByAvId, counter)
+        self.activeStatusEffectTasks[taskKey] = taskName
+        
+        # Start the DOT task with player-specific data stored in the task
+        task = taskMgr.doMethodLater(0.5, self.doBurnTick, taskName)
+        task.burnData = {
+            'appliedByAvId': appliedByAvId,
+            'ticksRemaining': 10,
+            'taskKey': taskKey
+        }
+    
+    def doBurnTick(self, task):
+        """Apply one tick of burn damage"""
+        burnData = task.burnData
+        
+        if burnData['ticksRemaining'] <= 0:
+            # Clean up this specific burn effect
+            self.cleanupBurnTask(burnData['taskKey'])
+            return task.done
+        
+        # Apply 2 damage to the boss (marked as DOT to prevent flinching/combos)
+        damage = 3
+        appliedByAvId = burnData['appliedByAvId']
+        
+        # Use isDOT=True to prevent flinching and combo credit
+        self.game.recordHit(damage, impact=0, craneId=0, objId=0, isGoon=False, isDOT=True)
+        
+        burnData['ticksRemaining'] -= 1
+        
+        # Schedule next tick if we have more remaining
+        if burnData['ticksRemaining'] > 0:
+            return task.again
+        else:
+            # Clean up when done
+            self.cleanupBurnTask(burnData['taskKey'])
+            return task.done
+    
+    def cleanupBurnTask(self, taskKey):
+        """Clean up a specific burn task"""
+        if taskKey in self.activeStatusEffectTasks:
+            taskName = self.activeStatusEffectTasks[taskKey]
+            taskMgr.remove(taskName)
+            del self.activeStatusEffectTasks[taskKey]
+    
+    def stopOldestBurnedEffect(self):
+        """Stop the oldest BURNED status effect DOT when one is removed from the system"""
+        # Find the oldest burn task and stop it
+        burnTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.BURNED]
+        if burnTasks:
+            # Sort by counter (the third element) to get the oldest
+            oldestTask = min(burnTasks, key=lambda x: x[2])
+            self.cleanupBurnTask(oldestTask)

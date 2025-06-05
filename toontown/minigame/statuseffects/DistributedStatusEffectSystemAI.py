@@ -9,21 +9,32 @@ class DistributedStatusEffectSystemAI(DistributedObjectAI):
         self.game = game
         self.statusEffects = list(statusEffects)
         self.objectsWithStatusEffects = {}
+        self.effectAppliedBy = {}  # Maps (objectId, statusEffect) -> avId who applied it
 
     # DO Methods to apply status effects to targets
-    def b_applyStatusEffect(self, objectId, statusEffect):
+    def b_applyStatusEffect(self, objectId, statusEffect, appliedByAvId=None):
         if not self.game.ruleset.WANT_ELEMENTAL_MASTERY_MODE:
             return
-        self.applyStatusEffect(objectId, statusEffect)
+        self.applyStatusEffect(objectId, statusEffect, appliedByAvId)
         self.d_applyStatusEffect(objectId, statusEffect)
 
     def d_applyStatusEffect(self, objectId, statusEffect):
         self.sendUpdate("applyStatusEffect", [objectId, statusEffect.toAstron()])
 
-    def applyStatusEffect(self, objectId, statusEffect):
+    def applyStatusEffect(self, objectId, statusEffect, appliedByAvId=None):
         currentStatusEffects = self.objectsWithStatusEffects.get(objectId, [])
         currentStatusEffects.append(statusEffect)
         self.objectsWithStatusEffects[objectId] = currentStatusEffects
+        
+        # Track who applied this effect
+        if appliedByAvId is not None:
+            self.effectAppliedBy[(objectId, statusEffect)] = appliedByAvId
+        
+        # Notify the object if it has status effect handling methods
+        obj = self.air.getDo(objectId)
+        if obj and hasattr(obj, 'onStatusEffectApplied'):
+            obj.onStatusEffectApplied(statusEffect, appliedByAvId)
+        
         self.notify.warning(f'Applied status effect {statusEffect}. All status effects: {self.objectsWithStatusEffects[objectId]}')
 
     # DO Methods to remove status effects from targets
@@ -43,6 +54,16 @@ class DistributedStatusEffectSystemAI(DistributedObjectAI):
             self.objectsWithStatusEffects[objectId] = currentStatusEffects
             if len(currentStatusEffects) == 0:
                 del self.objectsWithStatusEffects[objectId]
+            
+            # Clean up the appliedBy tracking
+            effectKey = (objectId, statusEffect)
+            if effectKey in self.effectAppliedBy:
+                del self.effectAppliedBy[effectKey]
+            
+            # Notify the object if it has status effect handling methods
+            obj = self.air.getDo(objectId)
+            if obj and hasattr(obj, 'onStatusEffectRemoved'):
+                obj.onStatusEffectRemoved(statusEffect)
 
     # DO Methods to check if objects have status effects
     def hasStatusEffect(self, objectId, statusEffect):
@@ -65,3 +86,9 @@ class DistributedStatusEffectSystemAI(DistributedObjectAI):
         if not self.game.ruleset.WANT_ELEMENTAL_MASTERY_MODE:
             return
         return self.objectsWithStatusEffects.get(objectId, [])
+    
+    def getEffectAppliedBy(self, objectId, statusEffect):
+        """Get the avId of the player who applied this status effect"""
+        if not self.game.ruleset.WANT_ELEMENTAL_MASTERY_MODE:
+            return None
+        return self.effectAppliedBy.get((objectId, statusEffect))
