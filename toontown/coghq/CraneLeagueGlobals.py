@@ -138,6 +138,9 @@ class CraneGameRuleset:
         # Set to true to allow toons to "un-stun" the CFO by bumping into him.
         self.WANT_UNSTUNS = False
 
+        # Elemental Mastery Mode Modifier
+        self.WANT_ELEMENTAL_MASTERY_MODE = False
+
         self.HEAVY_CRANE_DAMAGE_MULTIPLIER = 1.25
 
         self.MIN_GOON_IMPACT = 0.1  # How much impact should a goon hit need to register?
@@ -1446,6 +1449,26 @@ class ModifierCFOCheatsEnabled(CFORulesetModifierBase):
 
     def apply(self, cfoRuleset):
         pass
+
+# (-) Elemental Mastery Mode
+# --------------------------------
+# - A mode for fun where Earth, Fire, Water, and Air elements are added to the game.
+class ModifierElementalMasteryMode(CFORulesetModifierBase):
+    # The enum used by astron to know the type
+    MODIFIER_ENUM = 32
+    MODIFIER_TYPE = CFORulesetModifierBase.SPECIAL
+
+    def getName(self):
+        return 'Elemental Mastery Mode!'
+
+    def getDescription(self):
+        return f'The CFO has %(color_start)snew Elemental tricks%(color_end)s up his sleeves!'
+    
+    def getHeat(self):
+        return 20
+    
+    def apply(self, cfoRuleset):
+        cfoRuleset.WANT_ELEMENTAL_MASTERY_MODE = True
 
 
 # Any implemented subclasses of CFORulesetModifierBase cannot go past this point

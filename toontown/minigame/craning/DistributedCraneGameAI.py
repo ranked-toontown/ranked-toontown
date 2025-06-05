@@ -23,7 +23,8 @@ from toontown.suit.DistributedCashbotBossGoonAI import DistributedCashbotBossGoo
 from toontown.suit.DistributedCashbotBossStrippedAI import DistributedCashbotBossStrippedAI
 from toontown.toon.DistributedToonAI import DistributedToonAI
 from toontown.toonbase import ToontownGlobals
-
+from toontown.minigame.statuseffects.DistributedStatusEffectSystemAI import DistributedStatusEffectSystemAI
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SAFE_ALLOWED_EFFECTS
 
 class DistributedCraneGameAI(DistributedMinigameAI):
     DESPERATION_MODE_ACTIVATE_THRESHOLD = 1800
@@ -105,6 +106,16 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
 
+        self.statusEffectSystem = DistributedStatusEffectSystemAI(self, air,
+            StatusEffect.BURNED, 
+            StatusEffect.DRENCHED, 
+            StatusEffect.WINDED, 
+            StatusEffect.GROUNDED, 
+            StatusEffect.EXPLODE, 
+            StatusEffect.FROZEN, 
+            StatusEffect.SHATTERED
+        )
+
     def isRanked(self) -> bool:
 
         # Todo: setting for this. We don't want EVERY game to be ranked.
@@ -140,7 +151,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.boss = DistributedCashbotBossStrippedAI(self.air, self)
         self.boss.generateWithRequired(self.zoneId)
+        self.statusEffectSystem.generateWithRequired(self.zoneId)
         self.d_setBossCogId()
+        self.d_setStatusEffectSystemId()
         self.boss.reparentTo(self.scene)
 
         # And some solids to keep the goons constrained to our room.
@@ -935,6 +948,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def d_setBossCogId(self) -> None:
         self.sendUpdate("setBossCogId", [self.boss.getDoId()])
+    
+    def d_setStatusEffectSystemId(self) -> None:
+        self.sendUpdate("setStatusEffectSystemId", [self.statusEffectSystem.getDoId()])
 
     def getBoss(self):
         return self.boss
@@ -1181,6 +1197,26 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.practiceCheatHandler.cheatIsEnabled():
             taskMgr.remove(self.uniqueName('times-up-task'))
             self.d_updateTimer()
+
+        if self.ruleset.WANT_ELEMENTAL_MASTERY_MODE:
+            self.startSafeEffectTask()
+
+    def __applyRandomSafeEffects(self, task=None):
+        """Apply random status effects to safes periodically"""
+        if random.random() < 0.9:  # 90% chance
+            for safe in self.safes:
+                if safe and not self.statusEffectSystem.isObjectStatusEffected(safe.getDoId()):
+                    statusEffect = random.choice(list(SAFE_ALLOWED_EFFECTS))
+                    self.statusEffectSystem.b_applyStatusEffect(safe.getDoId(), statusEffect)
+                    # Remove the effect after 10 seconds
+                    taskMgr.doMethodLater(10.0, lambda task, doId=safe.getDoId(), effect=statusEffect: self.statusEffectSystem.b_removeStatusEffect(doId, effect) or task.done, self.uniqueName(f'remove-effect-{safe.getDoId()}'))
+        return task.again
+
+    def startSafeEffectTask(self):
+        """Start the task that periodically applies effects to safes"""
+        taskName = self.uniqueName('safe-effects')
+        taskMgr.remove(taskName)
+        taskMgr.doMethodLater(10.0, self.__applyRandomSafeEffects, taskName)
 
     # Called when we actually run out of time, simply tell the clients we ran out of time then handle it later
     def __timesUp(self, task=None):

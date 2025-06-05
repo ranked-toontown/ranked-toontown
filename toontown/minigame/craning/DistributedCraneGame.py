@@ -32,7 +32,7 @@ from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
 from toontown.minigame.statuseffects.DistributedStatusEffectSystem import DistributedStatusEffectSystem
-from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SAFE_ALLOWED_EFFECTS
 from direct.gui.DirectGui import DGG, DirectFrame
 from direct.gui.DirectScrolledList import DirectScrolledList
 from direct.gui.DirectLabel import DirectLabel
