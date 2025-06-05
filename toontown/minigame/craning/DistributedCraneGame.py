@@ -568,7 +568,7 @@ class DistributedCraneGame(DistributedMinigame):
                   btnGeom.find('**/QuitBtn_DN'),
                   btnGeom.find('**/QuitBtn_RLVR')),
             geom_scale=(0.7, 1, 1),
-            pos=(-0.35, 0, 0.85),
+            pos=(-0.75, 0, 0.85),
             command=self.__handleParticipantsButton
         )
         self.participantsButton.hide()  # Participants button starts hidden
@@ -583,7 +583,7 @@ class DistributedCraneGame(DistributedMinigame):
                   btnGeom.find('**/QuitBtn_DN'),
                   btnGeom.find('**/QuitBtn_RLVR')),
             geom_scale=(0.7, 1, 1),
-            pos=(0.45, 0, 0.85),
+            pos=(-0.35, 0, 0.85),
             command=self.__handleBestOfButton
         )
         self.bestOfButton.hide()  # Best of button starts hidden
