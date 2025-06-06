@@ -336,6 +336,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         If an empty string was provided, this is an unranked game.
         """
         self.skillProfileKey = key
+        self.updatePlayerNametags()
 
     def updatePlayerNametags(self):
         """
