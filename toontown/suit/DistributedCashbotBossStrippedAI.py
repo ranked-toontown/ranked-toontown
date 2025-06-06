@@ -848,8 +848,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.game.recordHitWithAttribution(explosionDamage, appliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=False)
         
         # Destroy all goons in the room as part of the explosion
-        if hasattr(self, 'goons'):
-            goonsToDestroy = list(self.goons)  # Create a copy since goons will modify the list
+        if hasattr(self.game, 'goons') and self.game.goons:
+            goonsToDestroy = list(self.game.goons)  # Create a copy since goons will modify the list
             for goon in goonsToDestroy:
                 goon.b_destroyGoon()
         
