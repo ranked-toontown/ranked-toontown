@@ -130,12 +130,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def announceGenerate(self):
         self.notify.debug("announceGenerate")
 
-        # Todo: Not every crane game needs to be ranked. Add in an option to make a game unranked.
-        if len(self.getParticipants()) == 2:
-            self.b_setProfileSkillKey(SkillProfileKey.CRANING_SOLOS)
-        elif len(self.getParticipants()) >= 3:
-            self.b_setProfileSkillKey(SkillProfileKey.CRANING_FFA)
-
     def __makeBoss(self):
         self.__deleteBoss()
 
@@ -1169,6 +1163,12 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.__resetCraningObjects()
         self.setupRuleset()
         self.setupSpawnpoints()
+
+        # Todo: Not every crane game needs to be ranked. Add in an option to make a game unranked.
+        if len(self.getParticipants()) == 2:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_SOLOS)
+        elif len(self.getParticipants()) >= 3:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_FFA)
 
         # Send round info to clients if this is a best-of match
         if self.bestOfValue > 1:
