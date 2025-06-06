@@ -36,9 +36,9 @@ STATUS_EFFECT_DURATIONS = {
     StatusEffect.DRENCHED: 8.0,
     StatusEffect.WINDED: 6.0,
     StatusEffect.GROUNDED: 7.0,
-    StatusEffect.EXPLODE: 3.0,
+    StatusEffect.EXPLODE: 1.5,
     StatusEffect.FROZEN: 10.0,
-    StatusEffect.SHATTERED: 4.0,
+    StatusEffect.SHATTERED: 5.0,
 }
 
 # Status effects that can be applied to safes (basic elemental effects only)

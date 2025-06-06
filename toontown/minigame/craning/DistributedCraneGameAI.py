@@ -1038,6 +1038,61 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         todo: implement
         """
         pass
+    
+    def recordHitWithAttribution(self, damage, attributeToAvId, impact=0, craneId=-1, objId=0, isGoon=False, isDOT=False):
+        """
+        Record a hit with damage attributed to a specific avatar ID.
+        Used for status effects that deal damage on behalf of other players.
+        """
+        # Don't process a hit if we aren't in the play state.
+        if self.gameFSM.getCurrentState().getName() != 'play':
+            return
+
+        # Validate that the attributed player is in the game
+        if not self.validate(attributeToAvId, attributeToAvId in self.getParticipants(), 'recordHitWithAttribution to unknown avatar'):
+            return
+        
+        # Apply damage vulnerability if SHATTERED is active
+        if self.statusEffectSystem.hasStatusEffect(self.getBoss().doId, StatusEffect.SHATTERED):
+            damage += int(damage * 0.5)
+
+        # Record a successful hit in battle three.
+        self.boss.b_setBossDamage(self.boss.bossDamage + damage, avId=attributeToAvId, objId=objId, isGoon=isGoon, isDOT=isDOT)
+
+        # Award points for the damage (no impact bonus for attributed damage)
+        self.addScore(attributeToAvId, damage)
+
+        # DOT damage should not contribute to combos
+        if not isDOT:
+            comboTracker = self.comboTrackers[attributeToAvId]
+            comboTracker.incrementCombo((comboTracker.combo + 1.0) / 10.0 * damage)
+
+        # The CFO has been defeated, proceed to Victory state
+        if self.boss.bossDamage >= self.ruleset.CFO_MAX_HP:
+            self.addScore(attributeToAvId, self.ruleset.POINTS_KILLING_BLOW, CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
+            self.toonsWon = True
+            self.gameFSM.request('victory')
+            return
+
+        # DOT damage should not cause flinching, stunning, or helmet behavior
+        if isDOT:
+            return
+
+        # The CFO is already dizzy, OR there's no crane, so get outta here
+        if self.boss.attackCode == ToontownGlobals.BossCogDizzy:
+            return
+
+        self.boss.stopHelmets()
+
+        # For attributed damage, we don't handle stunning since there's no crane
+        if self.ruleset.CFO_FLINCHES_ON_HIT:
+            self.boss.b_setAttackCode(ToontownGlobals.BossCogNoAttack)
+
+        self.boss.waitForNextHelmet()
+
+        # Now at the very end, if we have momentum mechanic on add some damage multiplier
+        if self.ruleset.WANT_MOMENTUM_MECHANIC:
+            self.increaseToonOutgoingMultiplier(attributeToAvId, damage)
 
     def addScore(self, avId: int, amount: int, reason: CraneLeagueGlobals.ScoreReason = CraneLeagueGlobals.ScoreReason.DEFAULT):
 

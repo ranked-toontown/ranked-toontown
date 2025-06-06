@@ -6,7 +6,7 @@ from toontown.coghq.DistributedCashbotBossSideCraneAI import DistributedCashbotB
 from toontown.toonbase import ToontownGlobals
 from otp.otpbase import OTPGlobals
 from . import DistributedCashbotBossObjectAI
-from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SYNERGY_EFFECTS
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SYNERGY_EFFECTS, STATUS_EFFECT_DURATIONS
 import math
 import time
 
@@ -72,7 +72,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         self.notify.warning(f'Removing status effect {effect} from boss {doId} at time {time.time()}')
         self.boss.statusEffectSystem.b_removeStatusEffect(doId, effect)
 
-    def checkForSynergy(self, targetId) -> bool:
+    def checkForSynergy(self, targetId, triggeringAvId) -> bool:
         # Get current effects on the target
         currentEffects = self.boss.statusEffectSystem.getStatusEffects(targetId)
         if len(currentEffects) < 2:
@@ -81,15 +81,44 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         for pair, synergy in SYNERGY_EFFECTS.items():
             eff1, eff2 = pair
             if eff1 in currentEffects and eff2 in currentEffects:
+                # Capture DOT damage before removing effects (for explosion synergy)
+                capturedDotDamage = None
+                if synergy == StatusEffect.EXPLODE:
+                    # Get the boss object to access its burn data
+                    boss = self.air.getDo(targetId)
+                    if boss and hasattr(boss, 'burnDataTracking'):
+                        capturedDotDamage = {}
+                        self.notify.warning(f'Capturing DOT damage before synergy removal. Active burns: {list(boss.burnDataTracking.keys())}')
+                        # Check all active burn effects
+                        for taskKey, burnData in list(boss.burnDataTracking.items()):
+                            statusEffect, dotAppliedByAvId, burnCounter = taskKey
+                            if statusEffect == StatusEffect.BURNED:
+                                ticksRemaining = burnData['ticksRemaining']
+                                remainingDamage = ticksRemaining * 3  # 3 damage per tick
+                                self.notify.warning(f'Found burn: player {dotAppliedByAvId}, ticks {ticksRemaining}, damage {remainingDamage}')
+                                
+                                # Track damage by player
+                                if dotAppliedByAvId not in capturedDotDamage:
+                                    capturedDotDamage[dotAppliedByAvId] = 0
+                                capturedDotDamage[dotAppliedByAvId] += remainingDamage
+                        self.notify.warning(f'Captured DOT damage: {capturedDotDamage}')
+                
+                # Remove the synergy component effects
                 for effect in pair:
                     self.boss.statusEffectSystem.b_removeStatusEffect(targetId, effect)
                 if synergy is None:
                     return True
-                # For synergy effects, we could track who triggered the synergy, but for now use None
-                self.boss.statusEffectSystem.b_applyStatusEffect(targetId, synergy, None)
                 
-                # Get duration for synergy effect
-                from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+                # If this is an explosion and we captured DOT damage, pass it to the boss BEFORE applying the effect
+                if synergy == StatusEffect.EXPLODE and capturedDotDamage:
+                    boss = self.air.getDo(targetId)
+                    if boss and hasattr(boss, 'setCapturedDotDamageForExplosion'):
+                        self.notify.warning(f'Setting captured DOT damage on boss: {capturedDotDamage}')
+                        boss.setCapturedDotDamageForExplosion(capturedDotDamage)
+                
+                # Apply synergy effect with the triggering player as applier
+                self.boss.statusEffectSystem.b_applyStatusEffect(targetId, synergy, triggeringAvId)
+                
                 duration = STATUS_EFFECT_DURATIONS.get(synergy, 5.0)
                 taskName = self.uniqueName(f'remove-effect-{targetId}-{synergy.value}-{self.doId}-{int(time.time() * 1000)}')
                 taskMgr.doMethodLater(duration, self.__handleStatusEffectTimeout, taskName, extraArgs=[targetId, synergy])
@@ -102,7 +131,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         self.boss.statusEffectSystem.b_applyStatusEffect(bossId, effect, appliedByAvId)
         taskName = self.uniqueName(f'remove-effect-{bossId}-{effect.value}-{self.doId}-{int(time.time() * 1000)}')
 
-        if self.checkForSynergy(bossId):
+        if self.checkForSynergy(bossId, appliedByAvId):
             return
 
         # Get duration from globals instead of hardcoded 5.0

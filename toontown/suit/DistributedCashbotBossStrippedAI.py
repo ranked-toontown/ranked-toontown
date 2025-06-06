@@ -11,7 +11,7 @@ from toontown.coghq import DistributedCashbotBossSideCraneAI
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from .DistributedBossCogStrippedAI import DistributedBossCogStrippedAI
-from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, STATUS_EFFECT_DURATIONS
 
 
 class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
@@ -49,6 +49,12 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         # Damage vulnerability from SHATTERED status effect
         self.damageVulnerable = False
+        
+        # Burn damage tracking for explosion calculation
+        self.burnDataTracking = {}  # Maps taskKey -> {appliedByAvId, ticksRemaining}
+        
+        # Captured DOT damage for synergy explosions
+        self.capturedDotDamageForExplosion = None
 
     def allowedToSafeHelmet(self, toonId: int) -> bool:
         if toonId not in self.safeHelmetCooldownsDict:
@@ -340,6 +346,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             taskMgr.remove(taskName)
         self.activeStatusEffectTasks.clear()
         self.statusEffectCounters.clear()
+        self.burnDataTracking.clear()
+        self.capturedDotDamageForExplosion = None
         
         # If frozen, unfreeze before cleanup
         if self.isFrozen():
@@ -360,6 +368,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.startFrozenEffect(appliedByAvId)
         elif statusEffect == StatusEffect.SHATTERED:
             self.startShatteredEffect(appliedByAvId)
+        elif statusEffect == StatusEffect.EXPLODE:
+            self.startExplodeEffect(appliedByAvId)
         # Add other status effects here as we implement them
     
     def onStatusEffectRemoved(self, statusEffect):
@@ -373,6 +383,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.stopOldestFrozenEffect()
         elif statusEffect == StatusEffect.SHATTERED:
             self.stopOldestShatteredEffect()
+        elif statusEffect == StatusEffect.EXPLODE:
+            self.stopOldestExplodeEffect()
         # Add other status effects here as we implement them
     
     def startBurnedEffect(self, appliedByAvId):
@@ -387,6 +399,12 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         taskKey = (StatusEffect.BURNED, appliedByAvId, counter)
         self.activeStatusEffectTasks[taskKey] = taskName
         
+        # Store burn data for explosion calculation
+        self.burnDataTracking[taskKey] = {
+            'appliedByAvId': appliedByAvId,
+            'ticksRemaining': 10
+        }
+        
         # Start the DOT task with player-specific data stored in the task
         task = taskMgr.doMethodLater(0.5, self.doBurnTick, taskName)
         task.burnData = {
@@ -398,13 +416,19 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def doBurnTick(self, task):
         """Apply one tick of burn damage"""
         burnData = task.burnData
+        taskKey = burnData['taskKey']
+        
+        # Check if this burn effect has been removed/canceled
+        if taskKey not in self.burnDataTracking:
+            # This burn effect was removed, stop ticking
+            return task.done
         
         if burnData['ticksRemaining'] <= 0:
             # Clean up this specific burn effect
-            self.cleanupBurnTask(burnData['taskKey'])
+            self.cleanupBurnTask(taskKey)
             return task.done
         
-        # Apply 2 damage to the boss (marked as DOT to prevent flinching/combos)
+        # Apply 3 damage to the boss (marked as DOT to prevent flinching/combos)
         damage = 3
         appliedByAvId = burnData['appliedByAvId']
         
@@ -413,12 +437,16 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         burnData['ticksRemaining'] -= 1
         
+        # Update tracking data
+        if taskKey in self.burnDataTracking:
+            self.burnDataTracking[taskKey]['ticksRemaining'] = burnData['ticksRemaining']
+        
         # Schedule next tick if we have more remaining
         if burnData['ticksRemaining'] > 0:
             return task.again
         else:
             # Clean up when done
-            self.cleanupBurnTask(burnData['taskKey'])
+            self.cleanupBurnTask(taskKey)
             return task.done
     
     def cleanupBurnTask(self, taskKey):
@@ -427,6 +455,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             taskName = self.activeStatusEffectTasks[taskKey]
             taskMgr.remove(taskName)
             del self.activeStatusEffectTasks[taskKey]
+        
+        # Also clean up tracking data
+        if taskKey in self.burnDataTracking:
+            del self.burnDataTracking[taskKey]
     
     def stopOldestBurnedEffect(self):
         """Stop the oldest BURNED status effect DOT when one is removed from the system"""
@@ -451,7 +483,6 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.applyAnimationSlowdown()
         
         # Get duration from globals (8 seconds for DRENCHED)
-        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
         duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.DRENCHED, 8.0)
         
         # Set up cleanup task
@@ -527,7 +558,6 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.applyFrozenState()
         
         # Get duration from globals (10 seconds for FROZEN)
-        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
         duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.FROZEN, 10.0)
         
         # Set up cleanup task
@@ -655,7 +685,6 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         self.applyDamageVulnerability()
         
         # Get duration from globals (4 seconds for SHATTERED)
-        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
         duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.SHATTERED, 4.0)
         
         # Set up cleanup task
@@ -715,4 +744,138 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     def isVulnerableToDamage(self):
         """Return True if the boss takes increased damage (shattered)"""
         return getattr(self, 'damageVulnerable', False)
+    
+    def setCapturedDotDamageForExplosion(self, dotDamageByPlayer):
+        """Store captured DOT damage for use by explosion synergy"""
+        self.capturedDotDamageForExplosion = dotDamageByPlayer
+    
+    def startExplodeEffect(self, appliedByAvId):
+        """Start the EXPLODE status effect - detonates after delay dealing damage"""
+        # Create unique tasks for this player's explode effect
+        counter = self.statusEffectCounters.get(StatusEffect.EXPLODE, 0)
+        self.statusEffectCounters[StatusEffect.EXPLODE] = counter + 1
+        
+        # Use captured DOT damage if available (from synergy), otherwise capture it now
+        dotDamageByPlayer = {}
+        if self.capturedDotDamageForExplosion is not None:
+            # Use the pre-captured DOT damage from synergy
+            dotDamageByPlayer = self.capturedDotDamageForExplosion
+            self.capturedDotDamageForExplosion = None  # Clear it after use
+            self.notify.warning(f'Using pre-captured DOT damage from synergy: {dotDamageByPlayer}')
+        else:
+            self.notify.warning(f'No pre-captured DOT damage, capturing now. Active burns: {list(self.burnDataTracking.keys())}')
+            # Capture remaining DOT damage immediately before DOTs are removed
+            dotsToRemove = []  # List of (taskKey, appliedByAvId, remainingDamage) to remove
+            
+            # Check all active burn effects using our tracking data
+            for taskKey, burnData in list(self.burnDataTracking.items()):
+                statusEffect, dotAppliedByAvId, burnCounter = taskKey
+                
+                if statusEffect == StatusEffect.BURNED:
+                    ticksRemaining = burnData['ticksRemaining']
+                    remainingDamage = ticksRemaining * 3  # 3 damage per tick
+                    
+                    # Track damage by player
+                    if dotAppliedByAvId not in dotDamageByPlayer:
+                        dotDamageByPlayer[dotAppliedByAvId] = 0
+                    dotDamageByPlayer[dotAppliedByAvId] += remainingDamage
+                    
+                    # Mark for removal
+                    dotsToRemove.append((taskKey, dotAppliedByAvId, remainingDamage))
+            
+            # Remove all DOT effects (explosion will consume them)
+            for taskKey, dotAppliedByAvId, remainingDamage in dotsToRemove:
+                self.cleanupBurnTask(taskKey)
+        
+        # Task for DOT consumption at 0.75 seconds
+        dotTaskName = self.uniqueName(f'explodeDOT-{appliedByAvId}-{counter}')
+        dotTaskKey = (StatusEffect.EXPLODE, appliedByAvId, counter, 'DOT')
+        self.activeStatusEffectTasks[dotTaskKey] = dotTaskName
+        
+        # Task for base explosion damage at 1.5 seconds
+        explosionTaskName = self.uniqueName(f'explodeBase-{appliedByAvId}-{counter}')
+        explosionTaskKey = (StatusEffect.EXPLODE, appliedByAvId, counter, 'BASE')
+        self.activeStatusEffectTasks[explosionTaskKey] = explosionTaskName
+        
+        # Set up DOT consumption task (0.75 seconds)
+        dotData = {
+            'appliedByAvId': appliedByAvId,
+            'taskKey': dotTaskKey,
+            'capturedDotDamage': dotDamageByPlayer  # Store the captured DOT damage
+        }
+        
+        dotTask = taskMgr.doMethodLater(0.75, self.explodeDOTConsumption, dotTaskName)
+        dotTask.explodeData = dotData
+        
+        # Set up base explosion damage task (1.5 seconds)
+        explosionData = {
+            'appliedByAvId': appliedByAvId,
+            'taskKey': explosionTaskKey
+        }
+        
+        duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.EXPLODE, 1.5)
+        explosionTask = taskMgr.doMethodLater(duration, self.explodeBaseDamage, explosionTaskName)
+        explosionTask.explodeData = explosionData
+    
+    def explodeDOTConsumption(self, task):
+        """Apply DOT damage from the EXPLODE status effect"""
+        explodeData = task.explodeData
+        appliedByAvId = explodeData['appliedByAvId']
+        
+        # Use the captured DOT damage (calculated when explosion was created)
+        dotDamageByPlayer = explodeData['capturedDotDamage']
+        
+        # Deal remaining DOT damage (attributed to respective DOT appliers)
+        for dotAppliedByAvId, dotDamage in dotDamageByPlayer.items():
+            if dotDamage > 0:
+                self.game.recordHitWithAttribution(dotDamage, dotAppliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=True)
+        
+        # Clean up this DOT consumption task
+        self.cleanupExplodeTask(explodeData['taskKey'])
+        
+        return task.done
+    
+    def explodeBaseDamage(self, task):
+        """Deal base explosion damage from the EXPLODE status effect"""
+        explodeData = task.explodeData
+        appliedByAvId = explodeData['appliedByAvId']
+        
+        # Calculate total explosion damage
+        explosionDamage = 40  # Base explosion damage
+        
+        # Deal explosion damage (attributed to the explode applier)
+        if explosionDamage > 0:
+            self.game.recordHitWithAttribution(explosionDamage, appliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=True)
+        
+        # Clean up this explosion task
+        self.cleanupExplodeTask(explodeData['taskKey'])
+        
+        return task.done
+    
+    def cleanupExplodeTask(self, taskKey):
+        """Clean up a specific explode task"""
+        if taskKey in self.activeStatusEffectTasks:
+            taskName = self.activeStatusEffectTasks[taskKey]
+            taskMgr.remove(taskName)
+            del self.activeStatusEffectTasks[taskKey]
+    
+    def stopOldestExplodeEffect(self):
+        """Stop the oldest EXPLODE status effect when one is removed from the system"""
+        # Find all explode tasks (both DOT and BASE) and stop them
+        explodeTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.EXPLODE]
+        if explodeTasks:
+            # Group by counter to find matching DOT/BASE pairs
+            explodeGroups = {}
+            for taskKey in explodeTasks:
+                statusEffect, avId, counter = taskKey[:3]  # Get first 3 elements
+                if counter not in explodeGroups:
+                    explodeGroups[counter] = []
+                explodeGroups[counter].append(taskKey)
+            
+            # Get the oldest counter (smallest number)
+            oldestCounter = min(explodeGroups.keys())
+            
+            # Clean up all tasks for the oldest explosion
+            for taskKey in explodeGroups[oldestCounter]:
+                self.cleanupExplodeTask(taskKey)
 

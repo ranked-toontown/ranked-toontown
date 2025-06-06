@@ -950,7 +950,7 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         # Check if boss has WINDED status effect for increased velocity
         velocityMultiplier = 1.5  # Default multiplier
         if self.boss.getStatusEffectSystem().hasStatusEffect(obj.doId, StatusEffect.WINDED):
-            velocityMultiplier = 3.0  # 3x velocity when WINDED
+            velocityMultiplier = 2.5  # 2.5x velocity when WINDED
         
         obj.physicsObject.setVelocity(v * velocityMultiplier)
         
