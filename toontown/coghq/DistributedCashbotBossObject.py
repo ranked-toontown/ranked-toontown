@@ -12,6 +12,7 @@ from direct.task import Task
 from direct.task.TaskManagerGlobal import taskMgr
 import math
 import copy
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 smileyDoId = 1
 
 class DummyTaskClass:
@@ -245,6 +246,11 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
             
         damage = math.ceil(damage)
+        
+        # Apply SHATTERED damage vulnerability if active
+        if self.boss.getStatusEffectSystem().hasStatusEffect(self.boss.getBoss().doId, StatusEffect.SHATTERED):
+            vulnerabilityBonus = int(damage * 0.5)  # 50% bonus damage
+            damage += vulnerabilityBonus
 
         if damage <= 0:
             return

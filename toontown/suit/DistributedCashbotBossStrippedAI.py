@@ -46,6 +46,9 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         # Status effect tracking - support multiple instances from different players
         self.activeStatusEffectTasks = {}  # Maps (statusEffect, avId) -> taskName for cleanup
         self.statusEffectCounters = {}  # Maps statusEffect -> counter for unique task naming
+        
+        # Damage vulnerability from SHATTERED status effect
+        self.damageVulnerable = False
 
     def allowedToSafeHelmet(self, toonId: int) -> bool:
         if toonId not in self.safeHelmetCooldownsDict:
@@ -278,6 +281,13 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return False
 
     def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
+        # Apply damage vulnerability if SHATTERED is active
+        if self.isVulnerableToDamage():
+            originalDamage = bossDamage - self.bossDamage  # Calculate the damage dealt this hit
+            if originalDamage > 0:
+                vulnerabilityBonus = int(originalDamage * 0.25)  # 25% bonus damage
+                bossDamage += vulnerabilityBonus
+        
         self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
         self.setBossDamage(bossDamage)
 
@@ -341,6 +351,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         # If frozen, unfreeze before cleanup
         if self.isFrozen():
             self.d_setFrozenState(False)
+        
+        # If vulnerable to damage, remove vulnerability before cleanup
+        if self.isVulnerableToDamage():
+            self.removeDamageVulnerability()
     
     def onStatusEffectApplied(self, statusEffect, appliedByAvId):
         """Called when a status effect is applied to this boss"""
@@ -351,6 +365,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.startDrenchedEffect(appliedByAvId)
         elif statusEffect == StatusEffect.FROZEN:
             self.startFrozenEffect(appliedByAvId)
+        elif statusEffect == StatusEffect.SHATTERED:
+            self.startShatteredEffect(appliedByAvId)
         # Add other status effects here as we implement them
     
     def onStatusEffectRemoved(self, statusEffect):
@@ -362,6 +378,8 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             self.stopOldestDrenchedEffect()
         elif statusEffect == StatusEffect.FROZEN:
             self.stopOldestFrozenEffect()
+        elif statusEffect == StatusEffect.SHATTERED:
+            self.stopOldestShatteredEffect()
         # Add other status effects here as we implement them
     
     def startBurnedEffect(self, appliedByAvId):
@@ -625,4 +643,83 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return (self.attackCode == ToontownGlobals.BossCogDizzy or 
                 self.attackCode == ToontownGlobals.BossCogDizzyNow or 
                 self.isFrozen())
+    
+    def startShatteredEffect(self, appliedByAvId):
+        """Start the SHATTERED status effect - re-stuns boss and applies 25% damage vulnerability"""
+        # Create a unique task for this player's shattered effect
+        counter = self.statusEffectCounters.get(StatusEffect.SHATTERED, 0)
+        self.statusEffectCounters[StatusEffect.SHATTERED] = counter + 1
+        
+        taskName = self.uniqueName(f'shatteredEffect-{appliedByAvId}-{counter}')
+        taskKey = (StatusEffect.SHATTERED, appliedByAvId, counter)
+        self.activeStatusEffectTasks[taskKey] = taskName
+        
+        # Re-stun the boss (back to Dizzy)
+        from toontown.toonbase import ToontownGlobals
+        self.b_setAttackCode(ToontownGlobals.BossCogDizzy)
+        
+        # Apply damage vulnerability immediately
+        self.applyDamageVulnerability()
+        
+        # Get duration from globals (4 seconds for SHATTERED)
+        from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
+        duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.SHATTERED, 4.0)
+        
+        # Set up cleanup task
+        shatteredData = {
+            'appliedByAvId': appliedByAvId,
+            'taskKey': taskKey
+        }
+        
+        task = taskMgr.doMethodLater(duration, self.endShatteredEffect, taskName)
+        task.shatteredData = shatteredData
+    
+    def endShatteredEffect(self, task):
+        """End a specific SHATTERED status effect"""
+        # Get the shatteredData from the task itself
+        shatteredData = task.shatteredData
+        
+        self.cleanupShatteredTask(shatteredData['taskKey'])
+        
+        # Check if this was the last shattered effect - if so, remove vulnerability
+        shatteredTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.SHATTERED]
+        if len(shatteredTasks) == 0:
+            self.removeDamageVulnerability()
+        
+        return task.done
+    
+    def cleanupShatteredTask(self, taskKey):
+        """Clean up a specific shattered task"""
+        if taskKey in self.activeStatusEffectTasks:
+            taskName = self.activeStatusEffectTasks[taskKey]
+            taskMgr.remove(taskName)
+            del self.activeStatusEffectTasks[taskKey]
+    
+    def stopOldestShatteredEffect(self):
+        """Stop the oldest SHATTERED status effect when one is removed from the system"""
+        # Find the oldest shattered task and stop it
+        shatteredTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.SHATTERED]
+        if shatteredTasks:
+            # Sort by counter (the third element) to get the oldest
+            oldestTask = min(shatteredTasks, key=lambda x: x[2])
+            self.cleanupShatteredTask(oldestTask)
+            
+            # Check if this was the last shattered effect - if so, remove vulnerability
+            remainingShatteredTasks = [key for key in self.activeStatusEffectTasks.keys() if key[0] == StatusEffect.SHATTERED]
+            if len(remainingShatteredTasks) == 0:
+                self.removeDamageVulnerability()
+    
+    def applyDamageVulnerability(self):
+        """Apply 25% damage vulnerability to the boss"""
+        # Set the damage vulnerability flag
+        self.damageVulnerable = True
+    
+    def removeDamageVulnerability(self):
+        """Remove damage vulnerability from the boss"""
+        # Remove the damage vulnerability flag
+        self.damageVulnerable = False
+    
+    def isVulnerableToDamage(self):
+        """Return True if the boss takes increased damage (shattered)"""
+        return getattr(self, 'damageVulnerable', False)
 
