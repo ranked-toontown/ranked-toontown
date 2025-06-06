@@ -129,6 +129,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def announceGenerate(self):
         self.notify.debug("announceGenerate")
+        self.__updateSkillProfile()
 
     def __makeBoss(self):
         self.__deleteBoss()
@@ -1154,6 +1155,13 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def exitInactive(self):
         pass
 
+    def __updateSkillProfile(self):
+        # Todo: Not every crane game needs to be ranked. Add in an option to make a game unranked.
+        if len(self.getParticipantsNotSpectating()) == 2:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_SOLOS)
+        elif len(self.getParticipantsNotSpectating()) >= 3:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_FFA)
+
     def enterPrepare(self):
         self.notify.debug("enterPrepare")
         if not self.__bossExists():
@@ -1164,11 +1172,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.setupRuleset()
         self.setupSpawnpoints()
 
-        # Todo: Not every crane game needs to be ranked. Add in an option to make a game unranked.
-        if len(self.getParticipants()) == 2:
-            self.b_setProfileSkillKey(SkillProfileKey.CRANING_SOLOS)
-        elif len(self.getParticipants()) >= 3:
-            self.b_setProfileSkillKey(SkillProfileKey.CRANING_FFA)
+        self.__updateSkillProfile()
 
         # Send round info to clients if this is a best-of match
         if self.bestOfValue > 1:
@@ -1512,3 +1516,5 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.b_setSpectators(currentSpectators)
         # Broadcast the spot status change to all clients
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
+
+        self.__updateSkillProfile()
