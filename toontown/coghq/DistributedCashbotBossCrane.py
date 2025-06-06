@@ -18,6 +18,7 @@ from otp.otpbase import OTPGlobals
 from toontown.suit import DistributedCashbotBossGoon
 from toontown.coghq import DistributedCashbotBossSafe
 import random
+from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 
 class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
     """ This class represents a crane holding a magnet on a cable.
@@ -945,7 +946,13 @@ class DistributedCashbotBossCrane(DistributedObject.DistributedObject, FSM.FSM):
         
         p1 = self.bottomLink.node().getPhysicsObject()
         v = render.getRelativeVector(self.bottomLink, p1.getVelocity())
-        obj.physicsObject.setVelocity(v * 1.5)
+        
+        # Check if boss has WINDED status effect for increased velocity
+        velocityMultiplier = 1.5  # Default multiplier
+        if self.boss.getStatusEffectSystem().hasStatusEffect(obj.doId, StatusEffect.WINDED):
+            velocityMultiplier = 3.0  # 3x velocity when WINDED
+        
+        obj.physicsObject.setVelocity(v * velocityMultiplier)
         
         # This condition is just for sake of the publish, in case we
         # have gotten into some screwy state.  In the dev environment,

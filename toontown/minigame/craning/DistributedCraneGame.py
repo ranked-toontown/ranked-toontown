@@ -90,7 +90,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.statusIndicators = {}  # Dictionary to store status indicators for each toon
         
         # Status effect system will be set via setStatusEffectSystemId
-        self.statusEffectSystem = None
+        self.statusEffectSystem : DistributedStatusEffectSystem | None = None
 
         self.warningSfx = None
 
@@ -1083,6 +1083,9 @@ class DistributedCraneGame(DistributedMinigame):
         self.boss.game = self
         self.boss.prepareBossForBattle()
         self.boss.setRuleset(self.ruleset)
+
+    def getStatusEffectSystem(self) -> DistributedStatusEffectSystem | None:
+        return self.statusEffectSystem
     
     def setStatusEffectSystemId(self, statusEffectSystemId: int) -> None:
         self.statusEffectSystem = base.cr.getDo(statusEffectSystemId)

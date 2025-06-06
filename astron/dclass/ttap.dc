@@ -3952,8 +3952,8 @@ dclass DistributedPieGame: DistributedMinigame {
 };
 
 dclass DistributedCraneGame: DistributedMinigame {
-  setBossCogId(uint32 doId) broadcast;
-  setStatusEffectSystemId(uint32 doId) broadcast;
+  setBossCogId(uint32 doId) broadcast ram;
+  setStatusEffectSystemId(uint32 doId) broadcast ram;
   setRawRuleset(CraneLeagueRuleset) required broadcast ram;
   setModifiers(CraneLeagueModifier[]) broadcast ram;
   setToonSpawnpoints(uint8[]) broadcast ram;

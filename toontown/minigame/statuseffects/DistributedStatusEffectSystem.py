@@ -142,3 +142,6 @@ class DistributedStatusEffectSystem(DistributedObject):
                 effectText = self.activeEffectTexts[objectId][effect]
                 effectText.destroy()
         self.activeEffectTexts.clear()
+
+    def hasStatusEffect(self, objectId, statusEffect):
+        return statusEffect in self.effectStacks.get(objectId, {})
