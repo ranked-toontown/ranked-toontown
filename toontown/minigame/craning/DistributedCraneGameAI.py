@@ -977,12 +977,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         crane = simbase.air.doId2do.get(craneId)
         if not self.validate(avId, avId in self.getParticipants(), 'recordHit from unknown avatar'):
             return
-
-        # Momentum mechanic?
-        if self.ruleset.WANT_MOMENTUM_MECHANIC:
-            damage *= (self.getToonOutgoingMultiplier(avId) / 100.0)
-            print(('multiplying damage by ' + str(
-                self.getToonOutgoingMultiplier(avId) / 100.0) + ' damage is now ' + str(damage)))
+        
+        # Apply damage vulnerability if SHATTERED is active
+        if self.statusEffectSystem.hasStatusEffect(self.getBoss().doId, StatusEffect.SHATTERED):
+            damage += int(damage * 0.5)
 
         # Record a successful hit in battle three.
         self.boss.b_setBossDamage(self.boss.bossDamage + damage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)

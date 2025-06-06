@@ -281,13 +281,6 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return False
 
     def b_setBossDamage(self, bossDamage, avId=0, objId=0, isGoon=False, isDOT=False):
-        # Apply damage vulnerability if SHATTERED is active
-        if self.isVulnerableToDamage():
-            originalDamage = bossDamage - self.bossDamage  # Calculate the damage dealt this hit
-            if originalDamage > 0:
-                vulnerabilityBonus = int(originalDamage * 0.25)  # 25% bonus damage
-                bossDamage += vulnerabilityBonus
-        
         self.d_setBossDamage(bossDamage, avId=avId, objId=objId, isGoon=isGoon, isDOT=isDOT)
         self.setBossDamage(bossDamage)
 

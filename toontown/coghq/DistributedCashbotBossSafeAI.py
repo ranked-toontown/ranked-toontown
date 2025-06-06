@@ -121,8 +121,11 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         if self.state != 'Dropped' and self.state != 'Grabbed':
             return
         
+        damageMultiplier = 0.0
         effects = self.boss.statusEffectSystem.getStatusEffects(self.doId)
         if effects:
+            if StatusEffect.GROUNDED in effects:
+                damageMultiplier = 0.25
             for effect in effects:
                 self.handleStatusEffect(effect, avId)
                 self.boss.statusEffectSystem.b_removeStatusEffect(self.doId, effect)
@@ -143,6 +146,8 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 # While the boss is dizzy or frozen, a safe hitting him in the
                 # head does lots of damage.
                 damage = int(impact * 50)
+                damage += int(damage * damageMultiplier)
+
                 crane = simbase.air.doId2do.get(craneId)
                 
                 # Apply a multiplier if needed (heavy cranes)
