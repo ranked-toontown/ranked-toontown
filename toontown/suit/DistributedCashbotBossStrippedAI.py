@@ -824,9 +824,10 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         dotDamageByPlayer = explodeData['capturedDotDamage']
         
         # Deal remaining DOT damage (attributed to respective DOT appliers)
+        # Note: Even though this is consumed DOT damage, we want the CFO to flinch from explosion effects
         for dotAppliedByAvId, dotDamage in dotDamageByPlayer.items():
             if dotDamage > 0:
-                self.game.recordHitWithAttribution(dotDamage, dotAppliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=True)
+                self.game.recordHitWithAttribution(dotDamage, dotAppliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=False)
         
         # Clean up this DOT consumption task
         self.cleanupExplodeTask(explodeData['taskKey'])
@@ -842,8 +843,15 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         explosionDamage = 40  # Base explosion damage
         
         # Deal explosion damage (attributed to the explode applier)
+        # Note: We want the CFO to flinch from explosion damage
         if explosionDamage > 0:
-            self.game.recordHitWithAttribution(explosionDamage, appliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=True)
+            self.game.recordHitWithAttribution(explosionDamage, appliedByAvId, impact=0, craneId=0, objId=0, isGoon=False, isDOT=False)
+        
+        # Destroy all goons in the room as part of the explosion
+        if hasattr(self, 'goons'):
+            goonsToDestroy = list(self.goons)  # Create a copy since goons will modify the list
+            for goon in goonsToDestroy:
+                goon.b_destroyGoon()
         
         # Clean up this explosion task
         self.cleanupExplodeTask(explodeData['taskKey'])
