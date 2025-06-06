@@ -244,13 +244,18 @@ class DistributedCashbotBossObject(DistributedSmoothNode.DistributedSmoothNode, 
         damage = int(impact * 50)
         damage *= crane.getDamageMultiplier()
         damage *= self.boss.ruleset.SAFE_CFO_DAMAGE_MULTIPLIER
-            
-        damage = math.ceil(damage)
+        
+        # Apply GROUNDED damage multiplier if active on this safe
+        if self.boss.getStatusEffectSystem().hasStatusEffect(self.doId, StatusEffect.GROUNDED):
+            groundedBonus = int(damage * 0.25)
+            damage += groundedBonus
         
         # Apply SHATTERED damage vulnerability if active
         if self.boss.getStatusEffectSystem().hasStatusEffect(self.boss.getBoss().doId, StatusEffect.SHATTERED):
             vulnerabilityBonus = int(damage * 0.5)  # 50% bonus damage
             damage += vulnerabilityBonus
+
+        damage = int(damage)
 
         if damage <= 0:
             return
