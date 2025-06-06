@@ -696,7 +696,7 @@ class DistributedBossCogStripped(DistributedAvatar.DistributedAvatar, BossCog.Bo
             extraAnim = Sequence()
             if attackCode == ToontownGlobals.BossCogSlowDirectedAttack:
                 extraAnim = ActorInterval(self, neutral)
-            seq = Sequence(ParallelEndTogether(self.pelvis.hprInterval(1, VBase3(toToonH, 0, 0)), neutral1Anim),
+            seq = Sequence(Parallel(self.pelvis.hprInterval(1, VBase3(toToonH, 0, 0)), neutral1Anim),
                            extraAnim, Parallel(Sequence(Wait(0.19), gearTrack, Func(gearRoot.detachNode),
                                                         self.pelvis.hprInterval(0.2, VBase3(0, 0, 0))),
                                                Sequence(throwAnim, neutral2Anim)))

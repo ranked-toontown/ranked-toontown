@@ -58,19 +58,38 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         self.startingVotes = {}
         self.context = ScoringContext()
 
+        # The SR context to use for this minigame. If none, we assume this is not a ranked game.
+        self.skillProfileKey: SkillProfileKey | None = SkillProfileKey.MINIGAMES
+
     def isRanked(self) -> bool:
         """
         Is this minigame going to affect ELO/SR ratings upon completion?
         Override and set to True if you would like to automatically apply ranked calculations.
         """
-        return False
+        return self.skillProfileKey is not None
 
     def getSkillProfileKey(self) -> str:
         """
         What is the minigame going to store ELO/SR ratings under on the toons?
         This key CAN be dynamic, but it needs to be consistent with how you want to store skill.
         """
-        return SkillProfileKey.MINIGAMES.value
+        return self.skillProfileKey.value if self.skillProfileKey is not None else ''
+
+    def setProfileSkillKey(self, key: SkillProfileKey | None) -> None:
+        self.skillProfileKey = key
+
+    def b_setProfileSkillKey(self, key: SkillProfileKey):
+        self.setProfileSkillKey(key)
+        self.d_setSkillProfileKey(key)
+
+    def d_setSkillProfileKey(self, key: SkillProfileKey) -> None:
+        """
+        Updates the client on what skill profile key we are using given the context of the minigame.
+        Call at any time to sync the client. Sending an empty string will inform the client that the current
+        minigame is not going to be ranked. If self.isRanked() is False, an empty string will be automatically provided
+        assuming the game is unranked.
+        """
+        self.sendUpdate('setSkillProfileKey', [key.value if self.isRanked() else ''])
 
     def addChildGameFSM(self, gameFSM):
         self.frameworkFSM.getStateNamed('frameworkGame').addChild(gameFSM)
