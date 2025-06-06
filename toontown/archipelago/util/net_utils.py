@@ -216,7 +216,7 @@ class JSONPartFormatter:
     COLOR_SILVER = (0.75, 0.75, 0.75, 1.0)
     COLOR_BROWN = (0.65, 0.4, 0.1, 1.0)
     COLOR_GOLD = (0.9, 0.75, 0.0, 1.0)
-    COLOR_RED = (.76, .35, .35, 1)
+    COLOR_RED = (.85, .2, .2, 1)
     COLOR_DEEP_RED = (1, 0, .25, 1)
     COLOR_GREEN = (0, 1, .5, 1)
     COLOR_YELLOW = (.98, .98, .82, 1)
@@ -228,7 +228,7 @@ class JSONPartFormatter:
     COLOR_WHITE = (1, 1, 1, 1)
 
     COLOR_PLUM = (.69, .6, .93, 1)
-    COLOR_SLATEBLUE = (0.13, 0.13, 1, 1)
+    COLOR_SLATEBLUE = (0.2, 0.2, .9, 1)
     COLOR_SALMON = (.97, .5, .45, 1)
 
     # Rank system colors

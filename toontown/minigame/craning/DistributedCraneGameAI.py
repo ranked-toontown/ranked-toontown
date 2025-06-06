@@ -43,6 +43,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
     def __init__(self, air, minigameId):
         DistributedMinigameAI.__init__(self, air, minigameId)
+        self.setProfileSkillKey(None)  # By default, no ranked mode.
 
         self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
         self.modifiers = []  # A list of CFORulesetModifierBase instances
@@ -129,15 +130,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Todo: setting for this. We don't want EVERY game to be ranked.
         return len(self.getParticipantsNotSpectating()) > 1
 
-    def getSkillProfileKey(self) -> str:
-
-        # Is this a 1v1?
-        if len(self.getParticipantsNotSpectating()) == 2:
-            return SkillProfileKey.CRANING_SOLOS.value
-
-        # Otherwise, craning misc.
-        return SkillProfileKey.CRANING_FFA.value
-
     def generate(self):
         self.notify.debug("generate")
         self.__makeBoss()
@@ -146,13 +138,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def announceGenerate(self):
         self.notify.debug("announceGenerate")
 
-        # Until the proper setup is finished for coming into these, only the first toons are non spectators.
-        # Everyone else will be a spectator.
-        # When the group/party system is implemented, this can be deleted.
-        #spectators = []
-        #if len(self.getParticipants()) > 2:
-        #    spectators = self.getParticipants()[2:]
-        #self.b_setSpectators(spectators)
+        # Todo: Not every crane game needs to be ranked. Add in an option to make a game unranked.
+        if len(self.getParticipants()) == 2:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_SOLOS)
+        elif len(self.getParticipants()) >= 3:
+            self.b_setProfileSkillKey(SkillProfileKey.CRANING_FFA)
 
     def __makeBoss(self):
         self.__deleteBoss()
@@ -1787,3 +1777,4 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def __isCFOElementalStatusActive(self, elementType):
         """Check if the CFO has an active elemental status"""
         return elementType in self.cfoElementalStatus and self.cfoElementalStatus[elementType]
+

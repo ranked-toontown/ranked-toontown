@@ -18,6 +18,11 @@ from direct.showbase import PythonUtil
 from toontown.toon import TTEmote
 from otp.avatar import Emote
 from otp.distributed.TelemetryLimiter import RotationLimitToH, TLGatherAllAvs
+from ..archipelago.definitions import color_profile
+from ..archipelago.definitions.color_profile import ColorProfile
+from ..archipelago.util.global_text_properties import get_raw_formatted_string, MinimalJsonMessagePart
+from ..matchmaking.rank import Rank
+
 
 class DistributedMinigame(DistributedObject.DistributedObject):
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedMinigame')
@@ -60,6 +65,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.frameworkFSM.enterInitialState()
         self.startingVotes = {}
         self.metagameRound = -1
+        self.skillProfileKey = ''
         self._telemLimiter = None
         return
 
@@ -244,6 +250,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         Implicitly called from astron to sync the AI managed list of toons that are flagged as spectators.
         """
         self._spectators = avIds
+        self.updatePlayerNametags()
 
     def getSpectators(self) -> list[int]:
         """
@@ -313,6 +320,57 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         if trolleyZoneOverride != MinigameGlobals.NoTrolleyZoneOverride:
             self.trolleyZoneOverride = trolleyZoneOverride
 
+    def isRanked(self) -> bool:
+        return self.skillProfileKey != ''
+
+    def getSkillProfileKey(self) -> str:
+        """
+        What is the minigame going to store ELO/SR ratings under on the toons?
+        This key CAN be dynamic, but it needs to be consistent with how you want to store skill.
+        """
+        return self.skillProfileKey
+
+    def setSkillProfileKey(self, key: str) -> None:
+        """
+        Called from the AI. Informs us of what the skill profile is for this minigame.
+        If an empty string was provided, this is an unranked game.
+        """
+        self.skillProfileKey = key
+
+    def updatePlayerNametags(self):
+        """
+        Updates every player's nametag in the instance.
+        If this is a ranked game, we should also display their rank.
+        """
+
+        spectators = self.getSpectators()
+
+        # Apply the changes to everyone.
+        for toon in self.getParticipants():
+
+            # First, resolve the color of the toon's names we want to show. Red for enemies, Blue for us. Default to gray.
+            nameColor = 'gray'
+            colorProfile = color_profile.GRAY
+
+            # People who are playing should have their colors updated from gray.
+
+            if toon.getDoId() not in spectators:
+                nameColor = 'slateblue' if toon.getDoId() == base.localAvatar.getDoId() else 'red'
+                colorProfile = color_profile.BLUE if toon.getDoId() == base.localAvatar.getDoId() else color_profile.RED
+
+            name = get_raw_formatted_string([
+                MinimalJsonMessagePart(toon.getName(), color=nameColor),
+            ])
+
+            # If this is a ranked game, append the rank component.
+            if self.isRanked():
+                profile = toon.getSkillProfile(self.getSkillProfileKey())
+                rank = Rank.get_from_skill_rating(profile.skill_rating).colored() if profile else get_raw_formatted_string([MinimalJsonMessagePart("Unranked", color='gray')])
+                name += f"\n{rank}"
+
+            toon.setFancyNametag(name)
+            toon.setColorProfile(colorProfile)
+
     def setGameReady(self):
         if not self.hasLocalToon:
             return
@@ -325,6 +383,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
                 self.notify.warning('BASE: toon %s already left or has not yet arrived; waiting for server to abort the game' % avId)
                 return 1
 
+        self.updatePlayerNametags()
         for avId in self.remoteAvIdList:
             avatar = self.cr.doId2do[avId]
             event = avatar.uniqueName('disable')
@@ -419,6 +478,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.rulesPanel = MinigameRulesPanel.MinigameRulesPanel('MinigameRulesPanel', self.getTitle(), self.getInstructions(), self.rulesDoneEvent)
         self.rulesPanel.load()
         self.rulesPanel.enter()
+        self.updatePlayerNametags()
 
     def exitFrameworkRules(self):
         self.ignore(self.rulesDoneEvent)
@@ -530,3 +590,5 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def setMetagameRound(self, metagameRound):
         self.metagameRound = metagameRound
+
+

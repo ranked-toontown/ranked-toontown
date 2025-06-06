@@ -1788,6 +1788,7 @@ dclass DistributedMinigame : DistributedObject {
   setStartingVotes(uint16[]) broadcast ram required;
   setMetagameRound(int8) broadcast ram required;
   setDifficultyOverrides(int32, int32) broadcast ram required;
+  setSkillProfileKey(string) broadcast ram required;
   setAvatarJoined() airecv clsend;
   setAvatarReady() airecv clsend;
   setAvatarExited() airecv clsend;

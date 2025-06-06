@@ -4,6 +4,7 @@ from direct.distributed.ClockDelta import *
 from direct.distributed import DistributedObject
 from direct.directnotify import DirectNotifyGlobal
 from toontown.minigame import TravelGameGlobals
+from ..archipelago.definitions import color_profile
 from ..matchmaking.player_skill_profile import PlayerSkillProfile
 
 
@@ -111,6 +112,8 @@ class PurchaseManager(DistributedObject.DistributedObject):
         self.d_setInventory(base.localAvatar.inventory.makeNetString(), base.localAvatar.getMoney(), 0, laff=1)
 
     def setPurchaseExit(self):
+        base.localAvatar.setFancyNametag(base.localAvatar.getName())
+        base.localAvatar.setColorProfile(color_profile.GRAY)
         if self.hasLocalToon:
             self.ignore('boughtGag')
             self.ignore('boughtGagFast')
