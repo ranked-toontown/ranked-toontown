@@ -761,9 +761,7 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
             # Use the pre-captured DOT damage from synergy
             dotDamageByPlayer = self.capturedDotDamageForExplosion
             self.capturedDotDamageForExplosion = None  # Clear it after use
-            self.notify.warning(f'Using pre-captured DOT damage from synergy: {dotDamageByPlayer}')
         else:
-            self.notify.warning(f'No pre-captured DOT damage, capturing now. Active burns: {list(self.burnDataTracking.keys())}')
             # Capture remaining DOT damage immediately before DOTs are removed
             dotsToRemove = []  # List of (taskKey, appliedByAvId, remainingDamage) to remove
             

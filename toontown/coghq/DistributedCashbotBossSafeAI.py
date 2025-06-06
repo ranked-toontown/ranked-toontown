@@ -88,24 +88,30 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                     boss = self.air.getDo(targetId)
                     if boss and hasattr(boss, 'burnDataTracking'):
                         capturedDotDamage = {}
-                        self.notify.warning(f'Capturing DOT damage before synergy removal. Active burns: {list(boss.burnDataTracking.keys())}')
-                        # Check all active burn effects
+                        # Check ALL active burn effects (not just synergy components)
                         for taskKey, burnData in list(boss.burnDataTracking.items()):
                             statusEffect, dotAppliedByAvId, burnCounter = taskKey
                             if statusEffect == StatusEffect.BURNED:
                                 ticksRemaining = burnData['ticksRemaining']
                                 remainingDamage = ticksRemaining * 3  # 3 damage per tick
-                                self.notify.warning(f'Found burn: player {dotAppliedByAvId}, ticks {ticksRemaining}, damage {remainingDamage}')
                                 
                                 # Track damage by player
                                 if dotAppliedByAvId not in capturedDotDamage:
                                     capturedDotDamage[dotAppliedByAvId] = 0
                                 capturedDotDamage[dotAppliedByAvId] += remainingDamage
-                        self.notify.warning(f'Captured DOT damage: {capturedDotDamage}')
+                        
+                        # Remove ALL BURNED effects (explosion consumes all DOTs)
+                        burnsToRemove = [key for key in boss.burnDataTracking.keys() if key[0] == StatusEffect.BURNED]
+                        for taskKey in burnsToRemove:
+                            boss.cleanupBurnTask(taskKey)
+                            # Also remove from status effect system
+                            self.boss.statusEffectSystem.b_removeStatusEffect(targetId, StatusEffect.BURNED)
                 
-                # Remove the synergy component effects
+                # Remove the synergy component effects (but BURNED effects already removed above if explosion)
                 for effect in pair:
-                    self.boss.statusEffectSystem.b_removeStatusEffect(targetId, effect)
+                    if not (synergy == StatusEffect.EXPLODE and effect == StatusEffect.BURNED):
+                        # Don't remove BURNED again if we're doing explosion (already removed above)
+                        self.boss.statusEffectSystem.b_removeStatusEffect(targetId, effect)
                 if synergy is None:
                     return True
                 
@@ -113,7 +119,6 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 if synergy == StatusEffect.EXPLODE and capturedDotDamage:
                     boss = self.air.getDo(targetId)
                     if boss and hasattr(boss, 'setCapturedDotDamageForExplosion'):
-                        self.notify.warning(f'Setting captured DOT damage on boss: {capturedDotDamage}')
                         boss.setCapturedDotDamageForExplosion(capturedDotDamage)
                 
                 # Apply synergy effect with the triggering player as applier
