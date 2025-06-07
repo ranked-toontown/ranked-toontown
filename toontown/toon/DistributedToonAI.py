@@ -4422,8 +4422,7 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
             return profile
 
         # Create a new default profile.
-        primitive = skill_rating.MODEL.rating(mu=int(STARTING_RATING), sigma=int(STARTING_RATING/3), name=str(self.doId))
-        profile = PlayerSkillProfile(self.getDoId(), key, primitive.mu, primitive.sigma, STARTING_RATING, 0, 0, 10)
+        profile = PlayerSkillProfile.create_fresh(self.getDoId(), key)
         self.addSkillProfile(profile)
         return profile
 

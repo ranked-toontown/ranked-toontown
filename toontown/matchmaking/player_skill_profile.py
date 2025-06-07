@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import dataclasses
 from typing import Any
 
-STARTING_RATING = 1000
+
+from toontown.matchmaking.skill_globals import MODEL, RATING_CLASS, STARTING_RATING, STARTING_UNCERTAINTY
 
 
 @dataclasses.dataclass
@@ -19,6 +22,26 @@ class PlayerSkillProfile:
     games_played: int  # The amount of total games played in this category.
     placements_needed: int  # The amount of placements needed in order to get a rank to display.
 
+    def calculate_draw_prediction(self, other: PlayerSkillProfile) -> float:
+        """
+        Calculate the percentage that this player will draw with another. Can be used as a match quality metric.
+        In skill based matchmaking, we want the chance of a draw as close to 50 as possible.
+        """
+        return MODEL.predict_draw([[self.to_openskill_rating()], [other.to_openskill_rating()]])
+
+    def calculate_win_prediction(self, other: PlayerSkillProfile) -> float:
+        """
+        Calculate the percentage that this player will win against another. Can be used as a match quality metric.
+        In skill based matchmaking, we want the chance of a win as close to 50/50 as possible.
+        """
+        return MODEL.predict_win([[self.to_openskill_rating()], [other.to_openskill_rating()]])[0]
+
+    def to_openskill_rating(self) -> RATING_CLASS:
+        """
+        Converts this skill profile into an OpenSkill rating to be used with OpenSkill methods.
+        """
+        return MODEL.rating(mu=self.mu, sigma=self.sigma, name=str(self.identifier))
+
     def to_astron(self) -> list[Any]:
         """
         Converts this instance to an astron struct.
@@ -32,6 +55,23 @@ class PlayerSkillProfile:
         Identifier needs to be provided manually however, as astron does not store it. (Toon ID)
         """
         return cls(*args)
+
+    @classmethod
+    def create_fresh(cls, avId: int, key: str):
+        """
+        Creates a fresh skill profile. Call this if you find that a player is new!
+        """
+        rating = MODEL.rating(mu=STARTING_RATING, sigma=STARTING_UNCERTAINTY, name=str(avId))
+        return cls(
+            identifier=avId,
+            key=key,
+            mu=rating.mu,
+            sigma=rating.sigma,
+            skill_rating=STARTING_RATING,
+            wins=0,
+            games_played=0,
+            placements_needed=10
+        )
 
 
 class TeamSkillProfileCollection:

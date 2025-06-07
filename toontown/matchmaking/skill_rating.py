@@ -2,17 +2,13 @@ from copy import deepcopy
 from typing import Any
 
 from direct.directnotify import DirectNotifyGlobal
-from openskill.models import PlackettLuce, PlackettLuceRating
 
 from toontown.matchmaking.player_skill_profile import PlayerSkillProfile, TeamSkillProfileCollection
-from toontown.matchmaking.skill_rating_utils import interpolate_number
+from toontown.matchmaking.skill_globals import MODEL, BASE_SR_CHANGE, RATING_CLASS
+from toontown.matchmaking.skill_rating_modifier import SkillRatingModifier, HIDDEN_MMR_CONVERGENCE_MODIFIER, \
+    ONE_V_ONE_WIN_EXPECTANCY_MODIFIER, GENERAL_WIN_EXPECTANCY_MODIFIER
+from toontown.matchmaking.skill_rating_utils import interpolate_number, interpolate_float
 
-BASE_SR_CHANGE = 20
-
-# Define the model you want to use here.
-# You can view the different models available here: https://openskill.me/en/stable/manual.html#picking-models
-# You can also customize the inner workings on skill estimation, but the defaults are probably fine.
-MODEL = PlackettLuce()
 notify = DirectNotifyGlobal.directNotify.newCategory("OpenSkill")
 
 class OpenSkillMatchDeltaResults:
@@ -67,6 +63,7 @@ class OpenSkillMatch:
         # Represents current skill profiles, so you can easily query a single user's data.
         self.new_player_data: dict[int, PlayerSkillProfile] = {}
         self.teams: list[TeamSkillProfileCollection] = []
+        self.ranks: list[int] = []
 
     def __store_player(self, player: PlayerSkillProfile):
         """
@@ -99,7 +96,7 @@ class OpenSkillMatch:
         for player in team.as_list():
             self.__store_player(player)
 
-    def get_team_ranking(self, team) -> tuple[int, int]:
+    def get_team_ranking(self, team: TeamSkillProfileCollection) -> tuple[int, int]:
 
         sorted_teams = sorted(self.teams, key=lambda t: t.get_team_score(), reverse=True)
         rank = 1
@@ -123,26 +120,24 @@ class OpenSkillMatch:
         """
 
         # Construct the low level OpenSkill "match", where it is a 2D list of teams with players.
-        match: list[list[Any]] = []
-        ranks = []
+        match: list[list[RATING_CLASS]] = self.generate_openskill_match()
+
+        # Generate the rankings of all the teams so we can rate the match using it.
+        self.ranks = []
         for team in self.teams:
-            members = []
             rank, _ = self.get_team_ranking(team)
-            ranks.append(rank)
-            for player in team.as_list():
-                members.append(MODEL.rating(mu=player.mu, sigma=player.sigma, name=str(player.identifier)))
-            match.append(members)
+            self.ranks.append(rank)
 
         # Adjust OpenSkill ratings.
         weights = [t.generate_weight_list() for t in self.teams]
         results = MODEL.rate(
             match,
-            ranks=ranks,
+            ranks=self.ranks,
             weights=weights,
         )
 
         notify.warning(f"Generated match with the following teams: {match}")
-        notify.warning(f"the following ranks were used to rate: {ranks}")
+        notify.warning(f"the following ranks were used to rate: {self.ranks}")
         notify.warning(f"the following weights were used: {weights}")
         notify.warning(f"the following results were returned: {results}")
 
@@ -159,48 +154,104 @@ class OpenSkillMatch:
                 player.games_played += 1
                 player.placements_needed -= 1
                 player.placements_needed = max(0, player.placements_needed)
-                if ranks[i] == 1:
+                if self.ranks[i] == 1 and max(self.ranks) > 1:
                     player.wins += 1
-
 
         # Now, SR adjustment. SR is pretty artificial, and is meant to be a dopamine chaser.
         # SR should attempt to "equalize" on the player's mu rating, but it can be affected by a lot of things.
         # First give everyone the base SR adjustment of 20 for winning/losing. Note that this also scales for teams
         # who came in rankings that weren't last place if we are playing a multi team mode.
         # For example, 4 team mode means +20, +7, -7, -20
-        sr_adjustments = {}
+        sr_adjustments: dict[int, float] = {}
         for team in self.teams:
             rank, total_ranks = self.get_team_ranking(team)
             if total_ranks == 1:
                 t = .5
             else:
                 t = 1 -  (rank-1) / (total_ranks-1)
-            base_sr = interpolate_number(-BASE_SR_CHANGE, BASE_SR_CHANGE, t)
+            sr = interpolate_float(-BASE_SR_CHANGE, BASE_SR_CHANGE, t)
             for player in team.as_list():
-                sr_adjustments[player.identifier] = base_sr
+                sr_adjustments[player.identifier] = sr
 
         # Now we can apply modifiers for certain things.
-        # First, the most important, we need to apply "catchup" SR to equalize. This has nothing to do with the match.
+        # Based on the context of the match, determine what modifiers we want to add.
+        # We should always add hidden MMR convergence.
+        modifiers: list[SkillRatingModifier] = [HIDDEN_MMR_CONVERGENCE_MODIFIER]
+
+        # If this is a 1v1, we should add 1v1 win expectancy. Otherwise, use a more general tuned one.
+        if len(self.teams) == 2 and all([len(t.players) == 1 for t in self.teams]):
+            modifiers.append(ONE_V_ONE_WIN_EXPECTANCY_MODIFIER)
+        else:
+            modifiers.append(GENERAL_WIN_EXPECTANCY_MODIFIER)
+
+        # todo: more modifiers!!!
+
+        # Loop through every player. Calculate SR modifiers based on the context of the game.
         for player in self.old_player_data.values():
+            for modifier in modifiers:
+                # Overwrite SR value when modifier is applied.
+                sr_adjustments[player.identifier] = modifier.apply(self, player.identifier, sr_adjustments[player.identifier])
 
-            # If this person drew, don't even bother with this step.
-            if sr_adjustments[player.identifier] == 0:
-                continue
-
-            # How big is the gap? Rate this from -400-400.
-            gap = player.mu - player.skill_rating
-            # If gap is positive, that means they deserve higher SR, so we should apply a bonus.
-            if gap > 0:
-                sr_adjustments[player.identifier] += interpolate_number(0, 10, gap/500)
-            # Gap is negative, we need to slow them down as they are getting inflated/boosted.
-            else:
-                sr_adjustments[player.identifier] -= interpolate_number(0, 10, gap/-500)
-
-        # Todo: apply more modifiers, such as match mvp, underdog close game wins, penalize expected wins, etc.
-
-        # Now apply the sr_adjustments!
+        # Now that SR adjustments are fully calculated, actually apply them. Always round SR to use an integer as well.
         for player in self.new_player_data.values():
-            player.skill_rating += sr_adjustments[player.identifier]
+            sr_delta = sr_adjustments[player.identifier]
+            sr_delta = int(round(sr_delta))
+            player.skill_rating += sr_delta
 
         # We can now return results!
         return OpenSkillMatchDeltaResults.from_match(self)
+
+    def get_player_team(self, player: int) -> TeamSkillProfileCollection | None:
+        """
+        Gets the team that this player is on. Player parameter is the player's ID.
+        """
+        for team in self.teams:
+            if player in team.players:
+                return team
+        return None
+
+    def did_player_win(self, player):
+        """
+        Checks if the given player won. If the game was a draw, or they weren't first place, returns False.
+        Returns True if they came in first place and it wasn't a draw.
+        """
+        team = self.get_player_team(player)
+        if team is None:
+            return False
+
+        rank, total_ranks = self.get_team_ranking(team)
+        if total_ranks == 1:
+            return False
+
+        return rank <= 1
+
+    def generate_openskill_match(self) -> list[list[RATING_CLASS]]:
+        """
+        Generates the structure of what OpenSkill expects. A list of teams, where each team is a list of players.
+        """
+        match: list[list[Any]] = []
+        ranks = []
+        for team in self.teams:
+            members = []
+            rank, _ = self.get_team_ranking(team)
+            ranks.append(rank)
+            for player in team.as_list():
+                members.append(MODEL.rating(mu=player.mu, sigma=player.sigma, name=str(player.identifier)))
+            match.append(members)
+        return match
+
+    def generate_rank_predictions(self) -> list[tuple[int, float]]:
+        """
+        Returns the result of OpenSkill's rank predictions for this match for every team.
+        Returns a list of pairs of data. The first entry is the predicted rank, and the second entry is the probability
+        of that rank for every team. For example, if a team has a predicted rank of 1 with a high probability, then
+        they were expected to win this match by quite a large margin.
+        """
+        return MODEL.predict_rank(self.generate_openskill_match())
+
+    def get_actual_rankings(self) -> list[int]:
+        """
+        Returns the rankings of each team according to the outcome of this match.
+        The index of the team will match up to the index here.
+        """
+        return self.ranks
