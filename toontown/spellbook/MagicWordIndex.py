@@ -1932,6 +1932,12 @@ class EndCFO(MagicWord):
         context = craneGame.getScoringContext()
         _round = context.get_round(craneGame.currentRound)
         score = _round.get_score(invoker.doId)
+
+        # Ensure all participants at least have a point.
+        for toon in craneGame.getParticipantsNotSpectating():
+            if toon.getDoId() != invoker.doId:
+                craneGame.addScore(toon.getDoId(), 2000, reason=CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
+
         craneGame.addScore(invoker.doId, -score, reason=CraneLeagueGlobals.ScoreReason.FORFEIT)
         craneGame.gameFSM.request('victory')
         return f"Forfeiting crane round - {toon.getName()} will be placed in last place."
