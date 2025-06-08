@@ -1,6 +1,13 @@
 import yaml
 from pathlib import Path
 
+prompt = input("What you are about to do is going to alter the YAML database by **WIPING EVERYONE'S RANKED DATA.**"
+               " Are you sure you want to do this? If so, type CONFIRM and hit enter.")
+
+if prompt != "CONFIRM":
+    print("Cancelling script!")
+    exit(1)
+
 # Define the relative path to the directory
 yaml_dir = Path("../astron/databases/astrondb")
 key_to_remove = "setSkillProfiles"
