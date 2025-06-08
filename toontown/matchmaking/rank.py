@@ -121,60 +121,56 @@ class Rank:
         :return: The rank that represents this skill rating.
         """
 
-        if skill_rating < 100:
-            return cls(RankTier.IRON, 1)
-        if skill_rating < 200:
-            return cls(RankTier.IRON, 2)
-        if skill_rating < 300:
-            return cls(RankTier.IRON, 3)
+        if skill_rating < 0:
+            return cls(RankTier.IRON, 0)
 
-        if skill_rating < 400:
+        if skill_rating < 100:
             return cls(RankTier.BRONZE, 1)
-        if skill_rating < 500:
+        if skill_rating < 200:
             return cls(RankTier.BRONZE, 2)
-        if skill_rating < 600:
+        if skill_rating < 300:
             return cls(RankTier.BRONZE, 3)
 
-        if skill_rating < 700:
+        if skill_rating < 400:
             return cls(RankTier.SILVER, 1)
-        if skill_rating < 800:
+        if skill_rating < 500:
             return cls(RankTier.SILVER, 2)
-        if skill_rating < 900:
+        if skill_rating < 600:
             return cls(RankTier.SILVER, 3)
 
-        if skill_rating < 1000:
+        if skill_rating < 700:
             return cls(RankTier.GOLD, 1)
-        if skill_rating < 1100:
+        if skill_rating < 800:
             return cls(RankTier.GOLD, 2)
-        if skill_rating < 1200:
+        if skill_rating < 900:
             return cls(RankTier.GOLD, 3)
 
-        if skill_rating < 1300:
+        if skill_rating < 1000:
             return cls(RankTier.PLATINUM, 1)
-        if skill_rating < 1400:
+        if skill_rating < 1100:
             return cls(RankTier.PLATINUM, 2)
-        if skill_rating < 1500:
+        if skill_rating < 1200:
             return cls(RankTier.PLATINUM, 3)
 
-        if skill_rating < 1600:
+        if skill_rating < 1300:
             return cls(RankTier.DIAMOND, 1)
-        if skill_rating < 1700:
+        if skill_rating < 1400:
             return cls(RankTier.DIAMOND, 2)
-        if skill_rating < 1800:
+        if skill_rating < 1500:
             return cls(RankTier.DIAMOND, 3)
+
+        if skill_rating < 1600:
+            return cls(RankTier.INVESTOR, 1)
+        if skill_rating < 1700:
+            return cls(RankTier.INVESTOR, 2)
+        if skill_rating < 1800:
+            return cls(RankTier.INVESTOR, 3)
             
         if skill_rating < 1900:
-            return cls(RankTier.INVESTOR, 1)
-        if skill_rating < 2000:
-            return cls(RankTier.INVESTOR, 2)
-        if skill_rating < 2100:
-            return cls(RankTier.INVESTOR, 3)
-        
-        if skill_rating < 2200:
             return cls(RankTier.EXECUTIVE, 1)
-        if skill_rating < 2350:
+        if skill_rating < 2000:
             return cls(RankTier.EXECUTIVE, 2)
-        if skill_rating < 2500:
+        if skill_rating < 2100:
             return cls(RankTier.EXECUTIVE, 3)
         
         return cls(RankTier.PRESIDENT, 0)
