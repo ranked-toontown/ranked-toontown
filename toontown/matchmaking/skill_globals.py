@@ -18,5 +18,5 @@ MODEL = MODEL_CLASS()
 RATING_CLASS = PlackettLuceRating  # Update this to be whatever rating classes MODEL will return
 
 # A custom model to use specifically for 1v1 matches. 1v1s use a zero-sum ELO system for hidden MMR.
-ZERO_SUM_MODEL = ZeroSumEloModel(k_factor=32)
+ZERO_SUM_MODEL = ZeroSumEloModel(k_factor=50, max_elo_discrepancy=500)
 ZERO_SUM_RATING_CLASS = ZeroSumEloRating

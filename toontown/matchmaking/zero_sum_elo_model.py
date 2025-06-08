@@ -19,12 +19,16 @@ class ZeroSumEloModel:
 
     Notify = DirectNotifyGlobal.directNotify.newCategory("ZeroSumEloModel")
 
-    def __init__(self, k_factor: float = 32):
+    def __init__(self, k_factor: float = 32, max_elo_discrepancy: int = 400):
         """
         Initialize the zero-sum elo model. Optionally, you can specify a custom K-factor to use for ELO swings.
         In simple terms, the K-factor is the maximum amount of hidden MMR you can gain or lose in a match.
+        You can also tweak the elo discrepancy for maximum elo swings.
+        In simple terms, if it is set to 400 and a 2000 rated player loses to a 1600 rated player, they lose the full
+        amount of K-factor in terms of ELO for the winner to gain.
         """
         self.k_factor = k_factor
+        self.skill_discrepancy: int = max_elo_discrepancy
 
     def rating(self, mu: float, sigma: float, name: str) -> ZeroSumEloRating:
         """
@@ -38,7 +42,7 @@ class ZeroSumEloModel:
         """
         p1 = teams[0][0]
         p2 = teams[1][0]
-        p1_chance = 1.0 / (1.0 + pow(10, ((p2.mu - p1.mu) / 400)))
+        p1_chance = 1.0 / (1.0 + pow(10, ((p2.mu - p1.mu) / self.skill_discrepancy)))
         return [p1_chance, 1-p1_chance]
 
     def predict_rank(self, teams: List[List[ZeroSumEloRating]]) -> list[tuple[int, float]]:
