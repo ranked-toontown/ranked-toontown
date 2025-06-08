@@ -4,10 +4,11 @@ from typing import Any
 from direct.directnotify import DirectNotifyGlobal
 
 from toontown.matchmaking.player_skill_profile import PlayerSkillProfile, TeamSkillProfileCollection
-from toontown.matchmaking.skill_globals import MODEL, BASE_SR_CHANGE, RATING_CLASS
+from toontown.matchmaking.skill_globals import MODEL, BASE_SR_CHANGE, RATING_CLASS, MODEL_CLASS
 from toontown.matchmaking.skill_rating_modifier import SkillRatingModifier, HIDDEN_MMR_CONVERGENCE_MODIFIER, \
     ONE_V_ONE_WIN_EXPECTANCY_MODIFIER, GENERAL_WIN_EXPECTANCY_MODIFIER
 from toontown.matchmaking.skill_rating_utils import interpolate_number, interpolate_float
+from toontown.matchmaking.zero_sum_elo_model import ZeroSumEloModel
 
 notify = DirectNotifyGlobal.directNotify.newCategory("OpenSkill")
 
@@ -56,7 +57,9 @@ class OpenSkillMatchDeltaResults:
 
 class OpenSkillMatch:
 
-    def __init__(self):
+    def __init__(self, model: MODEL_CLASS | ZeroSumEloModel):
+
+        self.model: MODEL_CLASS | ZeroSumEloModel = model
 
         # Represents skill profiles that don't get affected by any changes, so you can observe changes afterward.
         self.old_player_data: dict[int, PlayerSkillProfile] = {}
@@ -98,7 +101,7 @@ class OpenSkillMatch:
 
     def get_team_ranking(self, team: TeamSkillProfileCollection) -> tuple[int, int]:
 
-        sorted_teams = sorted(self.teams, key=lambda t: t.get_team_score(), reverse=True)
+        sorted_teams = sorted(self.teams, key=lambda iter_team: iter_team.get_team_score(), reverse=True)
         rank = 1
         point_value = sorted_teams[0].get_team_score()
         found_team = 1
@@ -130,7 +133,7 @@ class OpenSkillMatch:
 
         # Adjust OpenSkill ratings.
         weights = [t.generate_weight_list() for t in self.teams]
-        results = MODEL.rate(
+        results = self.model.rate(
             match,
             ranks=self.ranks,
             weights=weights,
@@ -236,7 +239,7 @@ class OpenSkillMatch:
             rank, _ = self.get_team_ranking(team)
             ranks.append(rank)
             for player in team.as_list():
-                members.append(MODEL.rating(mu=player.mu, sigma=player.sigma, name=str(player.identifier)))
+                members.append(self.model.rating(mu=player.mu, sigma=player.sigma, name=str(player.identifier)))
             match.append(members)
         return match
 
@@ -247,7 +250,7 @@ class OpenSkillMatch:
         of that rank for every team. For example, if a team has a predicted rank of 1 with a high probability, then
         they were expected to win this match by quite a large margin.
         """
-        return MODEL.predict_rank(self.generate_openskill_match())
+        return self.model.predict_rank(self.generate_openskill_match())
 
     def get_actual_rankings(self) -> list[int]:
         """

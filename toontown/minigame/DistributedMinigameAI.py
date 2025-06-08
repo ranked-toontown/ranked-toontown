@@ -404,8 +404,10 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         for av in self.getParticipantsNotSpectating():
             profiles[av.getDoId()] = av.getOrCreateSkillProfile(self.getSkillProfileKey())
 
+        _model = self.skillProfileKey.get_model()
+
         # Create a match and add the players.
-        match = OpenSkillMatch()
+        match = OpenSkillMatch(_model)
         score_rankings = self.context.generate_score_rankings()
 
         # todo support teams. they are kind of hard to properly support until there is proper team support in trolley games.

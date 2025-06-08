@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import Any, ClassVar
 
-
-from toontown.matchmaking.skill_globals import MODEL, RATING_CLASS, STARTING_RATING, STARTING_UNCERTAINTY
+from toontown.matchmaking.skill_globals import MODEL, RATING_CLASS, STARTING_RATING, STARTING_UNCERTAINTY, \
+    ZERO_SUM_MODEL, MODEL_CLASS
+from toontown.matchmaking.skill_profile_keys import SkillProfileKey
+from toontown.matchmaking.zero_sum_elo_model import ZeroSumEloModel
 
 
 @dataclasses.dataclass
@@ -22,25 +24,28 @@ class PlayerSkillProfile:
     games_played: int  # The amount of total games played in this category.
     placements_needed: int  # The amount of placements needed in order to get a rank to display.
 
-    def calculate_draw_prediction(self, other: PlayerSkillProfile) -> float:
+    def _model(self) -> MODEL_CLASS | ZeroSumEloModel:
         """
-        Calculate the percentage that this player will draw with another. Can be used as a match quality metric.
-        In skill based matchmaking, we want the chance of a draw as close to 50 as possible.
+        Gets the model to use for this profile.
         """
-        return MODEL.predict_draw([[self.to_openskill_rating()], [other.to_openskill_rating()]])
+        profile_type = SkillProfileKey.from_value(self.key)
+        if profile_type is None:
+            return MODEL
+
+        return profile_type.get_model()
 
     def calculate_win_prediction(self, other: PlayerSkillProfile) -> float:
         """
         Calculate the percentage that this player will win against another. Can be used as a match quality metric.
         In skill based matchmaking, we want the chance of a win as close to 50/50 as possible.
         """
-        return MODEL.predict_win([[self.to_openskill_rating()], [other.to_openskill_rating()]])[0]
+        return self._model().predict_win([[self.to_openskill_rating()], [other.to_openskill_rating()]])[0]
 
     def to_openskill_rating(self) -> RATING_CLASS:
         """
         Converts this skill profile into an OpenSkill rating to be used with OpenSkill methods.
         """
-        return MODEL.rating(mu=self.mu, sigma=self.sigma, name=str(self.identifier))
+        return self._model().rating(mu=self.mu, sigma=self.sigma, name=str(self.identifier))
 
     def to_astron(self) -> list[Any]:
         """
@@ -61,12 +66,19 @@ class PlayerSkillProfile:
         """
         Creates a fresh skill profile. Call this if you find that a player is new!
         """
-        rating = MODEL.rating(mu=STARTING_RATING, sigma=STARTING_UNCERTAINTY, name=str(avId))
+
+        # Resolve a model override for the profile key.
+        key_inst = SkillProfileKey.from_value(key)
+        model = MODEL
+        if key_inst is not None:
+            model = key_inst.get_model()
+
+        rating = model.rating(mu=STARTING_RATING, sigma=STARTING_UNCERTAINTY, name=str(avId))
         return cls(
             identifier=avId,
             key=key,
-            mu=rating.mu,
-            sigma=rating.sigma,
+            mu=int(rating.mu),
+            sigma=int(rating.sigma),
             skill_rating=STARTING_RATING,
             wins=0,
             games_played=0,
