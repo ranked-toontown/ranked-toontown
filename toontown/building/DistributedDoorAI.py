@@ -104,15 +104,7 @@ class DistributedDoorAI(DistributedObjectAI.DistributedObjectAI):
         self.sendUpdateToAvatarId(avatarID, 'rejectEnter', [lockedVal])
 
     def avHasAccess(self, avatarID) -> bool:
-
-        if not self.isLockedDoor():
-            return True
-
-        av = self.air.doId2do.get(avatarID)
-        if not av:
-            return False
-
-        return True
+        return False
 
     def requestEnter(self):
         avatarID = self.air.getAvatarIdFromSender()
