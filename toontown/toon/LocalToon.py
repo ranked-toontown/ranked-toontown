@@ -275,15 +275,15 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         base.whiteList.unload()
         self.book.unload()
         del self.optionsPage
-        del self.mapPage
-        del self.invPage
-        del self.questPage
-        del self.suitPage
-        del self.sosPage
+        # del self.mapPage
+        # del self.invPage
+        # del self.questPage
+        # del self.suitPage
+        # del self.sosPage
         del self.nametagPage
-        del self.disguisePage
+        # del self.disguisePage
         del self.fishPage
-        del self.gardenPage
+        # del self.gardenPage
         del self.wordPage
         del self.book
         if base.wantKarts:
@@ -350,21 +350,21 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         self.optionsPage = OptionsPage.OptionsPage()
         self.optionsPage.load()
         self.book.addPage(self.optionsPage, pageName=TTLocalizer.OptionsPageTitle)
-        self.mapPage = MapPage.MapPage()
-        self.mapPage.load()
-        self.book.addPage(self.mapPage, pageName=TTLocalizer.MapPageTitle)
+        # self.mapPage = MapPage.MapPage()
+        # self.mapPage.load()
+        # self.book.addPage(self.mapPage, pageName=TTLocalizer.MapPageTitle)
         self.leaderboardPage = LeaderboardPage()
         self.leaderboardPage.load()
         self.book.addPage(self.leaderboardPage, pageName=TTLocalizer.LeaderboardPageTitle)
-        self.invPage = InventoryPage.InventoryPage()
-        self.invPage.load()
-        self.book.addPage(self.invPage, pageName=TTLocalizer.InventoryPageTitle)
-        self.questPage = QuestPage.QuestPage()
-        self.questPage.load()
-        self.book.addPage(self.questPage, pageName=TTLocalizer.QuestPageToonTasks)
-        self.suitPage = SuitPage.SuitPage()
-        self.suitPage.load()
-        self.book.addPage(self.suitPage, pageName=TTLocalizer.SuitPageTitle)
+        # self.invPage = InventoryPage.InventoryPage()
+        # self.invPage.load()
+        # self.book.addPage(self.invPage, pageName=TTLocalizer.InventoryPageTitle)
+        # self.questPage = QuestPage.QuestPage()
+        # self.questPage.load()
+        # self.book.addPage(self.questPage, pageName=TTLocalizer.QuestPageToonTasks)
+        # self.suitPage = SuitPage.SuitPage()
+        # self.suitPage.load()
+        # self.book.addPage(self.suitPage, pageName=TTLocalizer.SuitPageTitle)
         if base.config.GetBool('want-photo-album', 0):
             self.photoAlbumPage = PhotoAlbumPage.PhotoAlbumPage()
             self.photoAlbumPage.load()
@@ -377,19 +377,19 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
         self.nametagPage = NametagPage.NametagPage()
         self.nametagPage.load()
         self.book.addPage(self.nametagPage, pageName=TTLocalizer.NametagPageTitle)
-        if self.disguisePageFlag:
-            self.loadDisguisePages()
-        if self.sosPageFlag:
-            self.loadSosPages()
-        if self.gardenStarted:
-            self.loadGardenPages()
-        self.addGolfPage()
+        # if self.disguisePageFlag:
+        #     self.loadDisguisePages()
+        # if self.sosPageFlag:
+        #     self.loadSosPages()
+        # if self.gardenStarted:
+        #     self.loadGardenPages()
+        # self.addGolfPage()
         if WantNewsPage:
             self.addNewsPage()
         self.wordPage = WordPage.WordPage()
         self.wordPage.load()
         self.book.addPage(self.wordPage, pageName=TTLocalizer.SpellbookPageTitle)
-        self.book.setPage(self.mapPage, enterPage=False)
+        # self.book.setPage(self.mapPage, enterPage=False)
         self.laffMeter = LaffMeter.LaffMeter(self.style, self.hp, self.maxHp)
         self.laffMeter.setAvatar(self)
         self.laffMeter.setScale(0.075)
