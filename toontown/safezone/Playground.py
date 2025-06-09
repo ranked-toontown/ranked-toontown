@@ -544,7 +544,6 @@ class Playground(BattlePlace):
         if hasattr(self, 'activityFsm'):
             self.activityFsm.requestFinalState()
 
-        taskMgr.remove('distributed-group-force-transition-fallback')
         if 'mode' in requestStatus and requestStatus['mode'] == 'minigame':
             messenger.send(self.doneEvent)
             return
