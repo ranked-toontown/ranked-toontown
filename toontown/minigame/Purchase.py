@@ -181,6 +181,8 @@ class Purchase(PurchaseBase):
         taskMgr.remove('purchase-trans')
         taskMgr.remove('delayAdd')
         taskMgr.remove('delaySubtract')
+        self.ignore('space')
+        self.ignore('escape')
         self.collisionFloor.removeNode()
         del self.collisionFloor
         del self.countSound
