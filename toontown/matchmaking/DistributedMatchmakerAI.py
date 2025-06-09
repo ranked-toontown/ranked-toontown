@@ -110,12 +110,16 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         super().announceGenerate()
         self.Notify.debug(f"Generating!")
 
+        # Listen for toon logouts.
+        self.accept('avatarExited', self.__handleUnexpectedExit)
+
         # Start the matchmaking task.
         taskMgr.add(self.__matching_algorithm, self.uniqueName('matchmake_algorithm'))
 
     def delete(self):
         super().delete()
         self.queue.clear()
+        self.ignoreAll()
         taskMgr.remove(self.uniqueName('matchmake_algorithm'))
         self.Notify.debug(f"Deleting")
 
@@ -138,7 +142,6 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         self.queue.append(MatchmakingPlayer(av))
         return True
 
-
     """
     Astron methods
     """
@@ -149,6 +152,15 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
     """
     Private util methods
     """
+
+    def __handleUnexpectedExit(self, toon: DistributedToonAI):
+        """
+        Called when a toon logs out.
+        """
+        for player in list(self.queue):
+            if player.avatar.getDoId() == toon.getDoId():
+                self.Notify.debug(f"Removing {toon.getName()} from the queue since they logged out.")
+                self.queue.remove(player)
 
     def __send_players_to_match(self, matchup: tuple[MatchmakingPlayer, MatchmakingPlayer]) -> None:
         """
