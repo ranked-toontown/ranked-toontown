@@ -637,6 +637,9 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         task = taskMgr.doMethodLater(duration, self.endFrozenEffect, taskName)
         task.frozenData = frozenData
+
+        # Store the actual task object for better cleanup
+        self.activeTaskObjects[taskKey] = task
     
     def endFrozenEffect(self, task):
         """End a specific FROZEN status effect"""
@@ -653,11 +656,33 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return task.done
     
     def cleanupFrozenTask(self, taskKey):
-        """Clean up a specific frozen task"""
+        """Clean up a specific frozen task with better memory management"""
         if taskKey in self.activeStatusEffectTasks:
             taskName = self.activeStatusEffectTasks[taskKey]
-            taskMgr.remove(taskName)
+            
+            # Remove by task object first
+            taskObj = self.activeTaskObjects.get(taskKey)
+            if taskObj:
+                try:
+                    taskMgr.remove(taskObj)
+                except:
+                    # Task might already be removed, try by name
+                    try:
+                        taskMgr.remove(taskName)
+                    except:
+                        pass
+            else:
+                # Fallback to name-based removal
+                try:
+                    taskMgr.remove(taskName)
+                except:
+                    pass
+            
             del self.activeStatusEffectTasks[taskKey]
+        
+        # Clean up task object tracking
+        if taskKey in self.activeTaskObjects:
+            del self.activeTaskObjects[taskKey]
     
     def stopOldestFrozenEffect(self):
         """Stop the oldest FROZEN status effect when one is removed from the system"""
@@ -764,6 +789,9 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         
         task = taskMgr.doMethodLater(duration, self.endShatteredEffect, taskName)
         task.shatteredData = shatteredData
+
+        # Store the actual task object for better cleanup
+        self.activeTaskObjects[taskKey] = task
     
     def endShatteredEffect(self, task):
         """End a specific SHATTERED status effect"""
@@ -780,11 +808,33 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return task.done
     
     def cleanupShatteredTask(self, taskKey):
-        """Clean up a specific shattered task"""
+        """Clean up a specific shattered task with better memory management"""
         if taskKey in self.activeStatusEffectTasks:
             taskName = self.activeStatusEffectTasks[taskKey]
-            taskMgr.remove(taskName)
+            
+            # Remove by task object first
+            taskObj = self.activeTaskObjects.get(taskKey)
+            if taskObj:
+                try:
+                    taskMgr.remove(taskObj)
+                except:
+                    # Task might already be removed, try by name
+                    try:
+                        taskMgr.remove(taskName)
+                    except:
+                        pass
+            else:
+                # Fallback to name-based removal
+                try:
+                    taskMgr.remove(taskName)
+                except:
+                    pass
+            
             del self.activeStatusEffectTasks[taskKey]
+        
+        # Clean up task object tracking
+        if taskKey in self.activeTaskObjects:
+            del self.activeTaskObjects[taskKey]
     
     def stopOldestShatteredEffect(self):
         """Stop the oldest SHATTERED status effect when one is removed from the system"""
@@ -883,6 +933,11 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         duration = STATUS_EFFECT_DURATIONS.get(StatusEffect.EXPLODE, 1.5)
         explosionTask = taskMgr.doMethodLater(duration, self.explodeBaseDamage, explosionTaskName)
         explosionTask.explodeData = explosionData
+
+        # Store the actual task objects for better cleanup
+        self.activeTaskObjects[dotTaskKey] = dotTask
+        self.activeTaskObjects[explosionTaskKey] = explosionTask
+
     
     def explodeDOTConsumption(self, task):
         """Apply DOT damage from the EXPLODE status effect"""
@@ -928,11 +983,33 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
         return task.done
     
     def cleanupExplodeTask(self, taskKey):
-        """Clean up a specific explode task"""
+        """Clean up a specific explode task with better memory management"""
         if taskKey in self.activeStatusEffectTasks:
             taskName = self.activeStatusEffectTasks[taskKey]
-            taskMgr.remove(taskName)
+            
+            # Remove by task object first
+            taskObj = self.activeTaskObjects.get(taskKey)
+            if taskObj:
+                try:
+                    taskMgr.remove(taskObj)
+                except:
+                    # Task might already be removed, try by name
+                    try:
+                        taskMgr.remove(taskName)
+                    except:
+                        pass
+            else:
+                # Fallback to name-based removal
+                try:
+                    taskMgr.remove(taskName)
+                except:
+                    pass
+            
             del self.activeStatusEffectTasks[taskKey]
+        
+        # Clean up task object tracking
+        if taskKey in self.activeTaskObjects:
+            del self.activeTaskObjects[taskKey]
     
     def stopOldestExplodeEffect(self):
         """Stop the oldest EXPLODE status effect when one is removed from the system"""

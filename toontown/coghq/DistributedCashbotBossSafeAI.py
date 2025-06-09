@@ -45,6 +45,8 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         self.cQueue = CollisionHandlerQueue()
         self.cTrav.addCollider(self.safeToSafeNodePath, self.cQueue)
 
+        self._statusEffectTasks = []
+
     def announceGenerate(self):
         DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.announceGenerate(self)
 
@@ -69,6 +71,12 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
             return self.boss.ruleset.MIN_SAFE_IMPACT
         
     def __handleStatusEffectTimeout(self, doId, effect):
+        # Check if boss still exists before trying to access it
+        if not hasattr(self, 'boss') or self.boss is None:
+            return
+        if not hasattr(self.boss, 'statusEffectSystem') or self.boss.statusEffectSystem is None:
+            return
+        
         self.notify.warning(f'Removing status effect {effect} from boss {doId} at time {time.time()}')
         self.boss.statusEffectSystem.b_removeStatusEffect(doId, effect)
 
@@ -132,6 +140,12 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         
 
     def handleStatusEffect(self, effect, appliedByAvId):
+        # Check if boss still exists
+        if not hasattr(self, 'boss') or self.boss is None:
+            return
+        if not hasattr(self.boss, 'getBoss') or self.boss.getBoss() is None:
+            return
+        
         bossId = self.boss.getBoss().doId
         self.boss.statusEffectSystem.b_applyStatusEffect(bossId, effect, appliedByAvId)
         taskName = self.uniqueName(f'remove-effect-{bossId}-{effect.value}-{self.doId}-{int(time.time() * 1000)}')
@@ -142,7 +156,10 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
         # Get duration from globals instead of hardcoded 5.0
         from toontown.minigame.statuseffects.StatusEffectGlobals import STATUS_EFFECT_DURATIONS
         duration = STATUS_EFFECT_DURATIONS.get(effect, 5.0)
-        taskMgr.doMethodLater(duration, self.__handleStatusEffectTimeout, taskName, extraArgs=[bossId, effect])
+        
+        # Create and track the task
+        task = taskMgr.doMethodLater(duration, self.__handleStatusEffectTimeout, taskName, extraArgs=[bossId, effect])
+        self._statusEffectTasks.append(taskName)
 
     def hitBoss(self, impact, craneId):
         avId = self.air.getAvatarIdFromSender()
@@ -363,6 +380,14 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
 
     def cleanup(self):
         """Clean up collision system and node paths to prevent memory leaks"""
+        # Clean up status effect timeout tasks
+        for taskName in self._statusEffectTasks:
+            try:
+                taskMgr.remove(taskName)
+            except:
+                pass
+        self._statusEffectTasks.clear()
+        
         # Clean up collision system
         if hasattr(self, 'cTrav') and self.cTrav:
             self.cTrav.clearColliders()
