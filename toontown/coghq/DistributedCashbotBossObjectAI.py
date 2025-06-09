@@ -36,10 +36,6 @@ class DistributedCashbotBossObjectAI(DistributedSmoothNodeAI.DistributedSmoothNo
         
         self.setBroadcastStateChanges(True)
 
-    def cleanup(self):
-        self.detachNode()
-        self.stopWaitFree()
-
     def delete(self):
         self.cleanup()
         DistributedSmoothNodeAI.DistributedSmoothNodeAI.delete(self)
@@ -212,3 +208,18 @@ class DistributedCashbotBossObjectAI(DistributedSmoothNodeAI.DistributedSmoothNo
 
     def exitFree(self):
         pass
+
+    def cleanup(self):
+        """Clean up resources to prevent memory leaks"""
+        # Check if we're already detached before trying to detach
+        if not self.isEmpty():
+            self.detachNode()
+        self.stopWaitFree()
+        
+        # Break circular reference to boss
+        if hasattr(self, 'boss'):
+            self.boss = None
+
+    def delete(self):
+        self.cleanup()
+        DistributedSmoothNodeAI.DistributedSmoothNodeAI.delete(self)

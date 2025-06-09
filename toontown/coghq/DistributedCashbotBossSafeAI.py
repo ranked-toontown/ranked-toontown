@@ -360,3 +360,34 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
     def destroyedGoon(self):
         avId = self.air.getAvatarIdFromSender()
         self.boss.addScore(avId, self.boss.ruleset.POINTS_GOON_KILLED_BY_SAFE, reason=CraneLeagueGlobals.ScoreReason.GOON_KILL)
+
+    def cleanup(self):
+        """Clean up collision system and node paths to prevent memory leaks"""
+        # Clean up collision system
+        if hasattr(self, 'cTrav') and self.cTrav:
+            self.cTrav.clearColliders()
+            del self.cTrav
+        if hasattr(self, 'cQueue') and self.cQueue:
+            del self.cQueue
+        
+        # Clean up collision node paths - check both existence and not None
+        if hasattr(self, 'collisionNodePath') and self.collisionNodePath is not None:
+            self.collisionNodePath.removeNode()
+            self.collisionNodePath = None
+        if hasattr(self, 'safeToSafeNodePath') and self.safeToSafeNodePath is not None:
+            self.safeToSafeNodePath.removeNode()
+            self.safeToSafeNodePath = None
+        
+        # Clean up collision nodes
+        if hasattr(self, 'collisionNode'):
+            self.collisionNode = None
+        if hasattr(self, 'safeToSafeNode'):
+            self.safeToSafeNode = None
+        
+        # Call parent cleanup
+        DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.cleanup(self)
+
+    def delete(self):
+        # Clean up resources before deletion
+        self.cleanup()
+        DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.delete(self)

@@ -431,15 +431,21 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
     ### FSM States ###
 
     def enterOff(self):
-        self.tubeNodePath.stash()
-        self.feelerNodePath.stash()
+        # Check if NodePaths exist before trying to stash them
+        if hasattr(self, 'tubeNodePath') and self.tubeNodePath is not None:
+            self.tubeNodePath.stash()
+        if hasattr(self, 'feelerNodePath') and self.feelerNodePath is not None:
+            self.feelerNodePath.stash()
         taskMgr.remove(self.uniqueName('reachedTarget'))
         taskMgr.remove(self.uniqueName('turnedToTarget'))
         taskMgr.remove(self.uniqueName('startingWalk'))
 
     def exitOff(self):
-        self.tubeNodePath.unstash()
-        self.feelerNodePath.unstash()
+        # Check if NodePaths exist before trying to unstash them
+        if hasattr(self, 'tubeNodePath') and self.tubeNodePath is not None:
+            self.tubeNodePath.unstash()
+        if hasattr(self, 'feelerNodePath') and self.feelerNodePath is not None:
+            self.feelerNodePath.unstash()
 
     def enterGrabbed(self, avId, craneId):
         crane = simbase.air.doId2do.get(craneId)
@@ -597,3 +603,71 @@ class DistributedCashbotBossGoonAI(DistributedGoonAI.DistributedGoonAI, Distribu
         self.d_setXY(pos[0], pos[1])
         self.demand('Recovery')
         return Task.done
+    
+    def cleanup(self):
+        """Clean up collision system and node paths to prevent memory leaks"""
+        # Clean up collision system
+        if hasattr(self, 'cTrav') and self.cTrav:
+            self.cTrav.clearColliders()
+            del self.cTrav
+        if hasattr(self, 'cQueue') and self.cQueue:
+            del self.cQueue
+        
+        # Clear feelers list
+        if hasattr(self, 'feelers') and self.feelers:
+            self.feelers.clear()
+        
+        # Clean up collision nodes
+        if hasattr(self, 'tubeNode'):
+            self.tubeNode = None
+        
+        # Remove all tasks - use try/except to handle already removed tasks
+        try:
+            taskMgr.remove(self.uniqueName('reachedTarget'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('turnedToTarget'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('startingWalk'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('syncEmergePosition'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('recoverWalk'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('checkSafeCollisions'))
+        except:
+            pass
+        try:
+            taskMgr.remove(self.uniqueName('recoverFromFall'))
+        except:
+            pass
+
+    def cleanupNodePaths(self):
+        """Clean up node paths - called only when safe to do so (after FSM is done)"""
+        # Clean up node paths - check both existence and not None
+        if hasattr(self, 'tubeNodePath') and self.tubeNodePath is not None:
+            self.tubeNodePath.removeNode()
+            self.tubeNodePath = None
+        if hasattr(self, 'feelerNodePath') and self.feelerNodePath is not None:
+            self.feelerNodePath.removeNode()
+            self.feelerNodePath = None
+        if hasattr(self, 'safeDetectionFeelersPath') and self.safeDetectionFeelersPath is not None:
+            self.safeDetectionFeelersPath.removeNode()
+            self.safeDetectionFeelersPath = None
+
+    def delete(self):
+        # Clean up resources before deletion, but handle NodePaths carefully
+        self.cleanup()
+        # Clean up NodePaths only after FSM is done
+        self.cleanupNodePaths()
+        DistributedGoonAI.DistributedGoonAI.delete(self)
+        DistributedCashbotBossObjectAI.DistributedCashbotBossObjectAI.delete(self)

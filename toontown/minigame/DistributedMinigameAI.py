@@ -162,8 +162,23 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
 
     def delete(self):
         self.notify.debug('BASE: delete: deleting AI minigame object')
-        del self.frameworkFSM
+        
+        # Clean up combo trackers
+        if hasattr(self, 'comboTrackers'):
+            self.cleanupComboTrackers()
+        
+        # Clean up status effect system
+        if hasattr(self, 'statusEffectSystem') and self.statusEffectSystem:
+            self.statusEffectSystem.requestDelete()
+            self.statusEffectSystem = None
+        
+        # Ignore all events
         self.ignoreAll()
+        
+        # Clean up FSM
+        if hasattr(self, 'frameworkFSM'):
+            del self.frameworkFSM
+        
         DistributedObjectAI.DistributedObjectAI.delete(self)
 
     def isSinglePlayer(self):

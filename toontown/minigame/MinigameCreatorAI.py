@@ -1,5 +1,7 @@
 import random
 import traceback
+import time
+import weakref
 from dataclasses import dataclass
 
 from toontown.toonbase import ToontownGlobals
@@ -70,7 +72,11 @@ class MinigameCreatorAI:
     def __init__(self, air):
         self.air = air
         self.minigameZoneReferences = {}
-        self.minigameRequests = {}
+        self.minigameRequests = {}  # Now stores (minigameId, timestamp) tuples
+        
+        # Memory leak prevention
+        self._lastCleanupTime = time.time()
+        self._createdMinigames = weakref.WeakSet()
 
     def acquireMinigameZone(self, zoneId):
         if zoneId not in self.minigameZoneReferences:
@@ -156,6 +162,9 @@ class MinigameCreatorAI:
 
         mg.setMetagameRound(metagameRound)
         mg.generateWithRequired(minigameZone)
+        
+        # Track created minigame for memory monitoring
+        self._createdMinigames.add(mg)
         mg.b_setSpectators(spectatorIds)
 
         for avId in playerArray:
@@ -164,10 +173,27 @@ class MinigameCreatorAI:
                 self.air.questManager.toonPlayedMinigame(toon)
 
         return GeneratedMinigame(mg, minigameZone, mgId)
+    
+    def clearExpiredRequests(self):
+        """Clear expired minigame requests to prevent memory buildup"""
+        current_time = time.time()
+        # Clear requests older than 5 minutes
+        expired = [avId for avId, (minigameId, timestamp) in self.minigameRequests.items() 
+                  if current_time - timestamp > 300]
+        for avId in expired:
+            del self.minigameRequests[avId]
 
     def storeRequest(self, avId, minigameId):
-        self.minigameRequests[avId] = minigameId
+        """Store a minigame request with timestamp for cleanup"""
+        # Periodic cleanup
+        current_time = time.time()
+        if current_time - self._lastCleanupTime > 60:  # Cleanup every minute
+            self.clearExpiredRequests()
+            self._lastCleanupTime = current_time
+        
+        self.minigameRequests[avId] = (minigameId, current_time)
 
     def clearRequest(self, avId):
+        """Clear a specific minigame request"""
         if avId in self.minigameRequests:
             del self.minigameRequests[avId]

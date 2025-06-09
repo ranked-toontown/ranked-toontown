@@ -117,6 +117,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             StatusEffect.SHATTERED
         )
 
+        # Memory leak prevention - track event listeners and task names
+        self._deathListenerEvents = []
+        self._allTaskNames = set()
+
     def isRanked(self) -> bool:
 
         # Todo: setting for this. We don't want EVERY game to be ranked.
@@ -168,9 +172,46 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         return self.boss is not None
 
     # Disable is never called on the AI so we do not define one
+    def cleanup(self):
+        """Clean up all resources to prevent memory leaks"""
+        # Clean up event listeners
+        self.ignoreToonDeaths()
+        
+        # Clean up all tracked tasks
+        for taskName in self._allTaskNames:
+            taskMgr.remove(taskName)
+        self._allTaskNames.clear()
+        
+        # Clean up specific known tasks
+        taskMgr.remove(self.uniqueName('times-up-task'))
+        taskMgr.remove(self.uniqueName('post-times-up-task'))
+        taskMgr.remove(self.uniqueName('NextGoon'))
+        taskMgr.remove(self.uniqueName('safe-effects'))
+        taskMgr.remove(self.uniqueName('laff-drain-task'))
+        taskMgr.remove(self.uniqueName('craneGameVictory'))
+        taskMgr.remove(self.uniqueName('craneGameNextRound'))
+        taskMgr.remove(self.uniqueName('startNextRound'))
+        
+        # Clean up combo trackers
+        self.cleanupComboTrackers()
+        
+        # Clean up objects
+        self.__deleteCraningObjects()
+        self.__deleteBoss()
+        
+        # Clean up scene
+        if self.scene is not None:
+            self.scene.removeNode()
+            self.scene = None
+        
+        # Break circular references
+        if hasattr(self, 'practiceCheatHandler'):
+            self.practiceCheatHandler = None
 
     def delete(self):
         self.notify.debug("delete")
+        # Clean up all resources
+        self.cleanup()
         del self.gameFSM
         DistributedMinigameAI.delete(self)
 
@@ -396,11 +437,14 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     # Ignore toon death events. We don't need to worry about toons dying in specific scenarios
     # Such as turn based battles as BattleBase handles that for us.
     def ignoreToonDeaths(self):
-        for toon in self.getParticipants():
-            self.__ignoreToonDeath(toon)
+        for event in self._deathListenerEvents:
+            self.ignore(event)
+        self._deathListenerEvents.clear()
 
     def __listenForToonDeath(self, toon):
-        self.accept(toon.getGoneSadMessage(), self.toonDied, [toon])
+        event = toon.getGoneSadMessage()
+        self.accept(event, self.toonDied, [toon])
+        self._deathListenerEvents.append(event)
 
     def __ignoreToonDeath(self, avId):
         self.ignore(DistributedToonAI.getGoneSadMessageForAvId(avId))
@@ -770,6 +814,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
     def waitForNextGoon(self, delayTime):
         taskName = self.uniqueName('NextGoon')
         taskMgr.remove(taskName)
+        self._allTaskNames.add(taskName)
         taskMgr.doMethodLater(delayTime, self.doNextGoon, taskName)
 
     def stopGoons(self):
