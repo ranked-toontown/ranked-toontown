@@ -25,6 +25,7 @@ class DistributedGroupManager(DistributedObject):
         # Once we are in a group, we can actually properly render it.
         self.currentGroup: DistributedGroup | None = None
         self.currentInvite: GroupInvitee | None = None
+        self.ready_task = None  # A task that checks the state of our toon every so often. Helps with making sure we are properly ready.
 
     def generate(self):
         """
@@ -34,6 +35,7 @@ class DistributedGroupManager(DistributedObject):
         """
         super().generate()
         base.localAvatar.setGroupManager(self)
+        self.ready_task = taskMgr.add(self.__readyCheck, self.uniqueName('readycheck'))
 
     def delete(self):
         """
@@ -42,6 +44,7 @@ class DistributedGroupManager(DistributedObject):
         super().delete()
         base.localAvatar.setGroupManager(None)
         self.destroyCurrentInvitePanel()
+        taskMgr.remove(self.uniqueName('readycheck'))
 
     def destroyCurrentInvitePanel(self):
         if self.currentInvite is not None:
@@ -56,6 +59,16 @@ class DistributedGroupManager(DistributedObject):
             return None
 
         return self.cr.getDo(groupId)
+
+    def __readyCheck(self, task):
+        task.delayTime = 5
+
+        # If we are in a group, then tell the server we are ready. Continuously do this while we are ready to keep us in sync.
+        if self.getCurrentGroup() is not None:
+            if base.cr.playGame.getPlace() is not None and base.cr.playGame.getPlace().getState() == 'walk':
+                self.updateStatus(GroupGlobals.STATUS_READY)
+
+        return task.again
 
     """
     Methods called from the codebase.

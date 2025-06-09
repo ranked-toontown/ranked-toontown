@@ -85,7 +85,6 @@ class DistributedGroup(DistributedObject, GroupBase):
 
         formattedMembers: list[GroupMemberStruct] = []
         leader = None
-        weAreNotInThisGroup = self.__localToonInGroup()
 
         for entry in members:
             member = GroupMemberStruct.from_struct(entry)
@@ -95,14 +94,6 @@ class DistributedGroup(DistributedObject, GroupBase):
 
         super().setMembers(formattedMembers)
         self.setLeader(leader.avId if leader is not None else GroupBase.NoLeader)
-
-        # If we are a newcomer to this group, analyze the state of this group.
-        # If we are in the walk state, we are considered ready to go.
-        weJoined = not weAreNotInThisGroup and self.__localToonInGroup()
-        if weJoined:
-            if base.cr.playGame.getPlace() is not None and base.cr.playGame.getPlace().getState() == 'walk' and base.localAvatar.getGroupManager() is not None:
-                base.localAvatar.getGroupManager().updateStatus(GroupGlobals.STATUS_READY)
-
         self.render()
 
     def announce(self, message: str):
