@@ -44,6 +44,7 @@ from toontown.hood.LawbotHQDataAI import LawbotHQDataAI
 from toontown.hood.MMHoodDataAI import MMHoodDataAI
 from toontown.hood.OZHoodDataAI import OZHoodDataAI
 from toontown.hood.TTHoodDataAI import TTHoodDataAI
+from toontown.matchmaking.DistributedMatchmakerAI import DistributedMatchmakerAI
 from toontown.matchmaking.LeaderboardManagerAI import LeaderboardManagerAI
 from toontown.minigame.MinigameCreatorAI import MinigameCreatorAI
 from toontown.parties.ToontownTimeManager import ToontownTimeManager
@@ -119,6 +120,7 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.magicWordManager = None
         self.deliveryManager = None
         self.leaderboardManager: LeaderboardManagerAI | None = None
+        self.matchmaker: DistributedMatchmakerAI | None = None
         self.archipelagoManager = None
         self.defaultAccessLevel = OTPGlobals.accessLevelValues.get('TTOFF_DEVELOPER')
 
@@ -302,6 +304,8 @@ class ToontownAIRepository(ToontownInternalRepository):
         # Generate our delivery manager...
         self.deliveryManager = self.generateGlobalObject(OTP_DO_ID_TOONTOWN_DELIVERY_MANAGER,
                                                          'DistributedDeliveryManager')
+
+        self.matchmaker = self.generateGlobalObject(OTP_DO_ID_MATCHMAKER, 'DistributedMatchmaker')
 
 
     def createHood(self, hoodCtr, zoneId):

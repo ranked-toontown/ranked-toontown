@@ -1850,6 +1850,19 @@ class LeaveRace(MagicWord):
         messenger.send('leaveRace')
 
 
+class Queue(MagicWord):
+    desc = "Enters the matchmaking queue."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'TTOFF_DEVELOPER'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        success = simbase.air.matchmaker.addPlayerToQueue(toon)
+        if not success:
+            return f"{toon.getName()} was unable to join the queue. They are probably already in it."
+
+        return f"{toon.getName()} is now in the queue!"
+
+
 class ListRanks(MagicWord):
     aliases = ['ranks', 'rank', 'mmr', 'elo']
     desc = "List out the thresholds for all the ranks."
