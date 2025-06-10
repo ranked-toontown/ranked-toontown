@@ -154,6 +154,8 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.overtimeActive = False
 
+        self.asmr = False
+
     def getTitle(self):
         return TTLocalizer.CraneGameTitle
 
@@ -1584,3 +1586,6 @@ class DistributedCraneGame(DistributedMinigame):
         # The server will handle the transition to the next round automatically
         # We just need to clean up the victory state
         return Task.done
+
+    def setAsmr(self, asmr: bool):
+        self.asmr = asmr

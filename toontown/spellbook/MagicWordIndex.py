@@ -2194,6 +2194,25 @@ class DisableGoons(MagicWord):
         return "Disabled all Goons!"
 
 
+class AsmrMode(MagicWord):
+    aliases = ['asmr']
+    desc = "Enters ASMR mode where the SFX changes to ASMR sounds"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = "MODERATOR"
+
+    def handleWord(self, invoker, avId, toon, *args):
+        from toontown.minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
+        minigame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
+        if not minigame:
+            return "You aren't in a CFO!"
+
+        on_off = 'OFF' if minigame.asmr else f'ON'
+        message = f"ASMR Mode => {on_off}, you may have to restart crane round to hear changes"
+            
+        minigame.b_setAsmr(not minigame.asmr)
+        return message
+
+
 class SetCFOModifiers(MagicWord):
     aliases = ['cfomodifiers', 'cfomods']
     desc = "Dynamically tweak modifiers mid CFO"

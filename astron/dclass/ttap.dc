@@ -3975,6 +3975,7 @@ dclass DistributedCraneGame: DistributedMinigame {
   setOvertime(uint8 flag) broadcast ram;
   handleSpotStatusChanged(uint8 spotIndex, bool isPlayer) airecv clsend;
   updateSpotStatus(uint8 spotIndex, bool isPlayer) broadcast ram;
+  setAsmr(bool asmr) broadcast ram;
 };
 
 dclass DistributedScaleGame: DistributedMinigame {
