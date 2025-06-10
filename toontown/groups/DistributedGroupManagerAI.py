@@ -354,10 +354,7 @@ class DistributedGroupManagerAI(DistributedObjectAI):
             return
 
         # Is everyone ready?
-        notReady = 0
-        for member in group.getMembers():
-            if member.status == GroupGlobals.STATUS_UNREADY:
-                notReady += 1
+        notReady = group.getNumPlayersNotReady()
         if notReady > 0:
             group.announce(f"{requester.getName()} wants to start the activity but {notReady} toon{'s' if notReady > 1 else ''} {'are' if notReady > 1 else 'is'} not ready!")
             return

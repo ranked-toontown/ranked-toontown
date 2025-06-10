@@ -185,11 +185,12 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         repeating.
         """
         task.delayTime = DistributedMatchmakerAI.MATCHMAKING_AGGRESSIVENESS
-        self.Notify.debug(f"Running matchmaking algorithm. Next run is in {task.delayTime} seconds. There are {len(self.queue)} people queued.")
 
         # Nobody queueing? Don't do anything this run.
         if self.getNumPlayersInQueue() <= 0:
             return Task.again
+
+        self.Notify.debug(f"Running matchmaking algorithm. Next run is in {task.delayTime} seconds. There are {len(self.queue)} people queued.")
 
         # Keep a list of matchups we are sending to play a game.
         matchups: list[tuple[MatchmakingPlayer, MatchmakingPlayer]] = []

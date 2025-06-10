@@ -84,3 +84,10 @@ class DistributedGroupAI(DistributedObjectAI, GroupBase):
         """
         for avId in self.getMemberIds():
             self.sendUpdateToAvatarId(avId, 'setMinigameZone', [minigame.zone, minigame.gameId])
+
+    def getNumPlayersNotReady(self) -> int:
+        notReady = 0
+        for member in self.getMembers():
+            if member.status == GroupGlobals.STATUS_UNREADY:
+                notReady += 1
+        return notReady

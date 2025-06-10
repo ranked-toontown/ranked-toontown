@@ -191,6 +191,9 @@ class DistributedTrolley(DistributedObject.DistributedObject):
         self.sendUpdate('requestBoard', [])
 
     def fillSlot(self, index, avId):
+
+        self.notify.debug(f"fillSlot() Filling Slot {index} with {avId}")
+
         if avId == 0:
             return
 
@@ -204,8 +207,11 @@ class DistributedTrolley(DistributedObject.DistributedObject):
                 self.localToonOnBoard = 1
                 self.loader.place.trolley.fsm.request('boarded')
             else:
-                self.notify.warning("Can't board the trolley because it doesn't exist")
-                self.sendUpdate('requestExit')
+                # A trolley isn't defined yet. This means the server is forcing us on... Force a collision trigger.
+                self.loader.place.detectedTrolleyCollision()
+                self.fillSlot(index, avId)
+                return
+
         if avId in self.cr.doId2do:
             toon = self.cr.doId2do[avId]
             toon.stopSmooth()
@@ -239,6 +245,7 @@ class DistributedTrolley(DistributedObject.DistributedObject):
             toon.startSmooth()
 
     def emptySlot(self, index, avId):
+
         if avId == 0:
             return
 
