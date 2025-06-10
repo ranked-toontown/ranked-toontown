@@ -121,9 +121,8 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self._deathListenerEvents = []
         self._allTaskNames = set()
 
-        self.asmr = False
-
     def isRanked(self) -> bool:
+
         # Todo: setting for this. We don't want EVERY game to be ranked.
         return len(self.getParticipantsNotSpectating()) > 1
 
@@ -1564,13 +1563,3 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
 
         self.__updateSkillProfile()
-
-    def b_setAsmr(self, asmr: bool):
-        self.setAsmr(asmr)
-        self.d_setAsmr(asmr)
-
-    def d_setAsmr(self, asmr: bool):
-        self.sendUpdate('setAsmr', [asmr])
-
-    def setAsmr(self, asmr: bool):
-        self.asmr = asmr
