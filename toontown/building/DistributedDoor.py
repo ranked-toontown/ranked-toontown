@@ -298,11 +298,6 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
 
     def allowedToEnter(self, zoneId = None):
         allowed = False
-        if hasattr(base, 'ttAccess') and base.ttAccess:
-            if zoneId:
-                allowed = base.ttAccess.canAccess(zoneId)
-            else:
-                allowed = base.ttAccess.canAccess()
         return allowed
 
     def checkIsDoorHitTaskName(self):
@@ -325,16 +320,6 @@ class DistributedDoor(DistributedObject.DistributedObject, DelayDeletable):
 
     def doorTrigger(self, args = None):
         self.ignore(self.getEnterTriggerEvent())
-        if args == None:
-            self.enterDoor()
-        else:
-            self.currentDoorNp = NodePath(args.getIntoNodePath())
-            self.currentDoorVec = Vec3(args.getSurfaceNormal(self.currentDoorNp))
-            if self.isDoorHit():
-                self.enterDoor()
-            else:
-                self.accept(self.getExitTriggerEvent(), self.cancelCheckIsDoorHitTask)
-                taskMgr.add(self.checkIsDoorHitTask, self.checkIsDoorHitTaskName())
         return
 
     def avatarEnter(self, avatarID):

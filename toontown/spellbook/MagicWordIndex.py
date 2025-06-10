@@ -1840,6 +1840,22 @@ class MaxDoodle(MagicWord):
         pet.b_setTrickAptitudes([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return "Maxed your doodle!"
 
+class PrintMessenger(MagicWord):
+    desc = "Dumps messenger on the AI"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+
+    def handleWord(self, invoker, avId, toon, *args):
+        print(messenger)
+        return "Check AI logs"
+
+
+class PrintTaskManager(MagicWord):
+    desc = "Dumps taskmgr on the AI"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+
+    def handleWord(self, invoker, avId, toon, *args):
+        print(taskMgr)
+        return "Check AI logs"
 
 class LeaveRace(MagicWord):
     desc = "Leave the current race you are in."
@@ -1848,6 +1864,19 @@ class LeaveRace(MagicWord):
 
     def handleWord(self, invoker, avId, toon, *args):
         messenger.send('leaveRace')
+
+
+class Queue(MagicWord):
+    desc = "Enters the matchmaking queue."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'TTOFF_DEVELOPER'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        success = simbase.air.matchmaker.addPlayerToQueue(toon)
+        if not success:
+            return f"{toon.getName()} was unable to join the queue. They are probably already in it."
+
+        return f"{toon.getName()} is now in the queue!"
 
 
 class ListRanks(MagicWord):

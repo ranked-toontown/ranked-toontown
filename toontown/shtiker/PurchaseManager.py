@@ -15,6 +15,16 @@ class PurchaseManager(DistributedObject.DistributedObject):
         DistributedObject.DistributedObject.__init__(self, cr)
         self.playAgain = 0
         self.skillProfileDeltas: dict[int, PlayerSkillProfile] = {}
+        self.instaLeaveFlag: bool = False
+
+    def getInstantLeaveFlag(self) -> bool:
+        return self.instaLeaveFlag
+
+    def setInstantLeaveFlag(self, flag: bool):
+        self.instaLeaveFlag = flag
+
+    def shouldInstantlyLeave(self) -> bool:
+        return self.instaLeaveFlag
 
     def disable(self):
         DistributedObject.DistributedObject.disable(self)
@@ -67,21 +77,16 @@ class PurchaseManager(DistributedObject.DistributedObject):
             self.acceptOnce('purchasePlayAgain', self.playAgainHandler)
             self.acceptOnce('purchaseBackToToontown', self.backToToontownHandler)
             self.acceptOnce('purchaseTimeout', self.setPurchaseExit)
-            self.accept('boughtGag', self.__handleBoughtGag)
-            self.accept('boughtGagFast', self.__handleBoughtGagFast)
             base.cr.playGame.hood.fsm.request('purchase', [self.mpArray,
              self.moneyArray,
              self.playerIds,
              self.playerStates,
              remain,
-             self.metagameRound,
-             self.votesArray,
+             self.instaLeaveFlag,
              self.skillProfileDeltas])
 
     def calcHasLocalToon(self):
-        retval = base.localAvatar.doId not in self.newbieIds and base.localAvatar.doId in self.playerIds
-        if self.metagameRound > -1 and self.metagameRound < TravelGameGlobals.FinalMetagameRoundIndex:
-            retval = base.localAvatar.doId in self.playerIds
+        retval = base.localAvatar.doId in self.playerIds
         self.notify.debug('calcHasLocalToon returning %s' % retval)
         return retval
 
@@ -102,14 +107,8 @@ class PurchaseManager(DistributedObject.DistributedObject):
         self.sendUpdate('requestPlayAgain', [])
         self.playAgain = 1
 
-    def d_setInventory(self, invString, money, done, laff=0):
-        self.sendUpdate('setInventory', [invString, money, done, laff])
-
-    def __handleBoughtGag(self):
-        self.d_setInventory(base.localAvatar.inventory.makeNetString(), base.localAvatar.getMoney(), 0)
-
-    def __handleBoughtGagFast(self):
-        self.d_setInventory(base.localAvatar.inventory.makeNetString(), base.localAvatar.getMoney(), 0, laff=1)
+    def d_report(self):
+        self.sendUpdate('report')
 
     def setPurchaseExit(self):
         base.localAvatar.setFancyNametag(base.localAvatar.getName())
@@ -117,13 +116,5 @@ class PurchaseManager(DistributedObject.DistributedObject):
         if self.hasLocalToon:
             self.ignore('boughtGag')
             self.ignore('boughtGagFast')
-            self.d_setInventory(base.localAvatar.inventory.makeNetString(), base.localAvatar.getMoney(), 1)
+            self.d_report()
             messenger.send('purchaseOver', [self.playAgain])
-
-    def setMetagameRound(self, round):
-        self.notify.debug('setMetagameRound: %s' % (round,))
-        self.metagameRound = round
-
-    def setVotesArray(self, votesArray):
-        self.notify.debug('setVotesArray: %s' % votesArray)
-        self.votesArray = votesArray

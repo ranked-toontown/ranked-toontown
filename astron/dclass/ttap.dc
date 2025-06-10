@@ -280,6 +280,7 @@ from toontown.parties import DistributedPartyValentineJukeboxActivity/AI
 from toontown.parties import DistributedPartyValentineJukebox40Activity/AI
 from toontown.friends import TTPlayerFriendsManager/UD
 from toontown.friends import OnlinePlayerManager/UD
+from toontown.matchmaking import DistributedMatchmaker/AI
 from toontown.matchmaking import LeaderboardManager/AI/UD
 from toontown.uberdog import TTSpeedchatRelay/UD
 from toontown.safezone import DistributedGolfKart/AI
@@ -1790,17 +1791,15 @@ dclass DistributedStatusEffectSystem : DistributedObject {
 };
 
 dclass DistributedMinigame : DistributedObject {
+  setHost(uint32) broadcast ram required;
   setParticipants(uint32[]) broadcast ram required;
   setTrolleyZone(uint32) broadcast ram required;
-  setStartingVotes(uint16[]) broadcast ram required;
-  setMetagameRound(int8) broadcast ram required;
   setDifficultyOverrides(int32, int32) broadcast ram required;
   setSkillProfileKey(string) broadcast ram required;
   setAvatarJoined() airecv clsend;
   setAvatarReady() airecv clsend;
   setAvatarExited() airecv clsend;
   requestExit() airecv clsend;
-  requestSkip() airecv clsend;
   setGameReady() broadcast;
   setGameStart(int16) broadcast;
   setGameExit() broadcast;
@@ -2238,18 +2237,16 @@ dclass NewsManager : DistributedObject {
 };
 
 dclass PurchaseManager : DistributedObject {
+  setInstantLeaveFlag(bool) required broadcast ram;
   setPlayerIds(uint32[]) required broadcast ram;
-  setNewbieIds(uint32[]) required broadcast ram;
   setMinigamePoints(uint32[]) required broadcast ram;
   setPlayerMoney(uint32[]) required broadcast ram;
   setPlayerStates(uint8[]) required broadcast ram;
   setCountdown(int16) required broadcast ram;
-  setMetagameRound(int8) required broadcast ram;
-  setVotesArray(int16[]) required broadcast ram;
   setSkillProfileDeltas(SkillProfile[]) required broadcast ram;
   requestExit() airecv clsend;
   requestPlayAgain() airecv clsend;
-  setInventory(blob, int16, uint8, int8) airecv clsend;
+  report() airecv clsend;
   setPurchaseExit() broadcast;
 };
 
@@ -3651,6 +3648,12 @@ dclass OnlinePlayerManager : DistributedObject {
   setOnlineToons(OnlineToon[]);
   toonCameOnline(OnlineToon);
   toonWentOffline(uint32 doId);
+};
+
+dclass DistributedMatchmaker : DistributedObject {
+  requestQueueState(bool) airecv clsend;
+  setMatchmakingStatus(uint32, uint32);
+  setMinigameZone(uint32, uint16);
 };
 
 struct NameMapping {

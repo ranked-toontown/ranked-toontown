@@ -855,7 +855,7 @@ class DistributedCraneGame(DistributedMinigame):
     def __sendSpawnOrderUpdate(self):
         """Send the updated spawn order to the server"""
         # Only the leader can send spawn order updates
-        if self.avIdList[0] == base.localAvatar.doId:
+        if self.isLocalToonHost():
             # Send the updated spawn order to the AI
             self.sendUpdate('updateSpawnOrder', [self.toonSpawnpointOrder])
 
@@ -1274,8 +1274,8 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default
         self.rulesPanel.hide()
 
-        # Only show the play and participants buttons for the leader (first player in avIdList)
-        if self.avIdList[0] == base.localAvatar.doId:
+        # Only show the play and participants buttons for the leader
+        if self.isLocalToonHost():
             self.playButton.show()
             self.participantsButton.show()
             self.bestOfButton.show()
@@ -1287,7 +1287,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.setToonsToRulesPositions()
 
         # Only setup click detection for the leader
-        if self.avIdList[0] == base.localAvatar.doId:
+        if self.isLocalToonHost():
             # Make sure the click ray is using our spotlight bitmask
             self.clickRayNode.setFromCollideMask(self.spotlightBitMask)
             self.accept('mouse1', self.handleMouseClick)
@@ -1316,7 +1316,7 @@ class DistributedCraneGame(DistributedMinigame):
     def handleMouseClick(self):
         """Handle mouse clicks during the rules state to detect clicks on spotlights."""
         # Only the leader can click
-        if self.avIdList[0] != base.localAvatar.doId:
+        if not self.isLocalToonHost():
             return
         
         # Get the mouse position
@@ -1455,7 +1455,7 @@ class DistributedCraneGame(DistributedMinigame):
         floorNode.attachNewNode(floorGeomNode)
 
         # Add collision cylinder for clicking
-        if self.avIdList[0] == base.localAvatar.doId:  # Only leader gets collision
+        if self.isLocalToonHost():  # Only leader gets collision
             radius = 1  # Same radius as the spotlight
             collTube = CollisionTube(0, 0, 4, 0, 0, 1.2, radius)  # point1_x, point1_y, point1_z, point2_x, point2_y, point2_z, radius
             collNode = CollisionNode(f'spotlightSphere-{toon.doId}')  # Keep the same node name for consistency
@@ -1523,8 +1523,10 @@ class DistributedCraneGame(DistributedMinigame):
 
     def enterFrameworkWaitServerStart(self):
         self.notify.debug('BASE: enterFrameworkWaitServerStart')
-        if self.numPlayers > 1:
+        if self.numPlayers > 1 and self.hasHost():
             msg = "Waiting for Group Leader to start..."
+        elif self.numPlayers > 1:
+            msg = "The game will start shortly..."
         else:
             msg = TTLocalizer.MinigamePleaseWait
         self.waitingStartLabel['text'] = msg
@@ -1555,7 +1557,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
         
         # Send update to server if we're the leader
-        if self.avIdList[0] == base.localAvatar.doId:
+        if self.isLocalToonHost():
             self.sendUpdate('setBestOf', [self.bestOfValue])
 
     def setBestOf(self, value):
