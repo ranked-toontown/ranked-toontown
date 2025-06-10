@@ -7,8 +7,6 @@ from direct.fsm import ClassicFSM, State
 from direct.fsm import State
 from direct.task import Task
 from direct.directnotify import DirectNotifyGlobal
-from toontown.minigame import MinigameCreatorAI
-from toontown.quest import Quests
 from toontown.minigame import TrolleyHolidayMgrAI
 from toontown.minigame import TrolleyWeekendMgrAI
 from toontown.groups.DistributedGroupManagerAI import DistributedGroupManagerAI
@@ -339,8 +337,7 @@ class DistributedTrolleyAI(DistributedObjectAI.DistributedObjectAI):
                 if simbase.config.GetBool('metagame-min-2-players', 1) and len(playerArray) == 1:
                     metagameRound = -1
 
-            minigame = self.air.minigameMgr.createMinigame(playerArray, self.zoneId, newbieIds=[],
-                                                           startingVotes=startingVotes, metagameRound=metagameRound)
+            minigame = self.air.minigameMgr.createMinigame(playerArray, self.zoneId)
             for seatIndex in range(len(self.seats)):
                 avId = self.seats[seatIndex]
                 if avId:
