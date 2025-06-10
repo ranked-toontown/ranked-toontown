@@ -13,8 +13,9 @@ from toontown.minigame import MinigameGlobals
 class PurchaseManagerAI(DistributedObjectAI.DistributedObjectAI):
     notify = DirectNotifyGlobal.directNotify.newCategory('PurchaseManagerAI')
 
-    def __init__(self, air, playerArray, mpArray, previousMinigameId, trolleyZone, desiredNextGame = None, spectators=None, profileDeltas=None):
+    def __init__(self, air, playerArray, mpArray, previousMinigameId, trolleyZone, desiredNextGame = None, previousHost=None, spectators=None, profileDeltas=None):
         DistributedObjectAI.DistributedObjectAI.__init__(self, air)
+        self.previousHost = previousHost
         self.playerIds = copy.deepcopy(playerArray)
         self.minigamePoints = copy.deepcopy(mpArray)
         self.previousMinigameId = previousMinigameId
@@ -71,6 +72,12 @@ class PurchaseManagerAI(DistributedObjectAI.DistributedObjectAI):
         self.receivingInventory = 1
         self.receivingButtons = 1
         return
+
+    def getInstantLeaveFlag(self):
+        return self.previousHost is None or self.previousHost == 0
+
+    def d_setInstantLeaveFlag(self):
+        self.sendUpdate('setInstantLeaveFlag', [self.getInstantLeaveFlag()])
 
     def delete(self):
         taskMgr.remove(self.uniqueName('countdown-timer'))
@@ -218,7 +225,7 @@ class PurchaseManagerAI(DistributedObjectAI.DistributedObjectAI):
             for oldSpec in self.spectators:
                 if oldSpec in playAgainList:
                     newSpecList.append(oldSpec)
-            self.air.minigameMgr.createMinigame(playAgainList, self.trolleyZone, minigameZone=self.zoneId, previousGameId=self.previousMinigameId, desiredNextGame=self.desiredNextGame, spectatorIds=newSpecList)
+            self.air.minigameMgr.createMinigame(playAgainList, self.trolleyZone, minigameZone=self.zoneId, hostId=self.previousHost, previousGameId=self.previousMinigameId, desiredNextGame=self.desiredNextGame, spectatorIds=newSpecList)
         else:
             self.air.minigameMgr.releaseMinigameZone(self.zoneId)
         self.requestDelete()

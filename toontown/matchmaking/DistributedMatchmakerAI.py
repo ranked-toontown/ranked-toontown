@@ -171,7 +171,8 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         minigame: GeneratedMinigame = self.air.minigameMgr.createMinigame(
             [player.avatar.getDoId() for player in matchup],
             self.zoneId,
-            desiredNextGame=ToontownGlobals.CraneGameId
+            desiredNextGame=ToontownGlobals.CraneGameId,
+            hostId=None
         )
 
         # Send the players to the zone that are playing this match.

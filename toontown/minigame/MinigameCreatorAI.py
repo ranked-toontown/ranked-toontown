@@ -102,7 +102,9 @@ class MinigameCreatorAI:
 
         return choices
 
-    def createMinigame(self, playerArray, trolleyZone, minigameZone=None, previousGameId=ToontownGlobals.NoPreviousGameId, spectatorIds=None, desiredNextGame=None) -> GeneratedMinigame:
+    def createMinigame(self, playerArray, trolleyZone, minigameZone=None,
+                       previousGameId=ToontownGlobals.NoPreviousGameId, hostId=None,
+                       spectatorIds=None, desiredNextGame=None) -> GeneratedMinigame:
 
         if spectatorIds is None:
             spectatorIds = []
@@ -136,6 +138,8 @@ class MinigameCreatorAI:
 
         mg.setExpectedAvatars(playerArray)
         mg.setTrolleyZone(trolleyZone)
+        if hostId is not None:
+            mg.setHost(hostId)
         mg.generateWithRequired(minigameZone)
         mg.b_setSpectators(spectatorIds)
 

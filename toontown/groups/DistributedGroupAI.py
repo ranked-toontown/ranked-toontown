@@ -50,7 +50,7 @@ class DistributedGroupAI(DistributedObjectAI, GroupBase):
 
         self.announce("Activity starting...")
         self.activityStartCooldown = time.time() + 6
-        minigame = self.air.minigameMgr.createMinigame(self.getMemberIds(), self.zoneId, spectatorIds=self.getSpectators())
+        minigame = self.air.minigameMgr.createMinigame(self.getMemberIds(), self.zoneId, hostId=self.getLeader(), spectatorIds=self.getSpectators())
         self.d_setMinigameZone(minigame)
 
     """

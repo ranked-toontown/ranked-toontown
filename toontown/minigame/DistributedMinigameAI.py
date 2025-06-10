@@ -57,7 +57,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         """
         Checks if there is a host of this minigame that has elevated privileges.
         """
-        return self.host is not None and self.host is not 0
+        return self.host is not None and self.host != 0
 
     def getHost(self) -> int:
         """
@@ -71,6 +71,22 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         Updates the host of this match. You can set this to None/0 to make the host surrender their privileges.
         """
         self.host = avId
+        if self.host == 0:
+            self.host = None
+
+    def d_setHost(self, avId: int | None) -> None:
+        """
+        Tells the client that a certain avatar is considered the host. Can pass in 0 or None to clear.
+        """
+        self.sendUpdate('setHost', [avId if avId is not None else 0])
+
+    def b_setHost(self, avId: int | None) -> None:
+        """
+        Sets the host of this match. Can pass in 0 or None to clear.
+        Also tells the client that a certain avatar is considered the host. Can pass in 0 or None to clear.
+        """
+        self.setHost(avId)
+        self.d_setHost(avId)
 
     def isRanked(self) -> bool:
         """
@@ -167,6 +183,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         self.notify.debug('BASE: delete: deleting AI minigame object')
         del self.frameworkFSM
         self.ignoreAll()
+        taskMgr.remove(self.uniqueName('no-host-start-delay'))
         DistributedObjectAI.DistributedObjectAI.delete(self)
 
     def isSinglePlayer(self):
@@ -356,12 +373,21 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         del self.__barrier
 
     def enterFrameworkGame(self):
-        self.notify.debug('BASE: enterFrameworkGame')
-        self.gameStartTime = globalClock.getRealTime()
-        self.b_setGameStart(globalClockDelta.localToNetworkTime(self.gameStartTime))
+
+        def __start(_=None):
+            self.notify.debug('BASE: enterFrameworkGame')
+            self.gameStartTime = globalClock.getRealTime()
+            self.b_setGameStart(globalClockDelta.localToNetworkTime(self.gameStartTime))
+
+        # If there is no host, we should give them a few seconds to prepare so we don't jumpscare them.
+        # No host games only happen from queues, where the players will immediately ready up upon connecting.
+        if not self.hasHost():
+            taskMgr.doMethodLater(3, __start, self.uniqueName('no-host-start-delay'))
+        else:
+            __start()
 
     def exitFrameworkGame(self):
-        pass
+        taskMgr.remove(self.uniqueName('no-host-start-delay'))
 
     def enterFrameworkWaitClientsExit(self):
         self.notify.debug('BASE: enterFrameworkWaitClientsExit')
@@ -449,7 +475,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         points = self.context.get_total_points()
         scoreList = [max(0, points.get(player, 0)) for player in self.avIdList]
 
-        pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
+        pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, previousHost=self.getHost(), spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
         pm.generateWithRequired(self.zoneId)
 
     def exitFrameworkCleanup(self):

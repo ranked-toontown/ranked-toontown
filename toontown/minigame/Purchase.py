@@ -1,3 +1,4 @@
+from direct.interval.LerpInterval import LerpColorScaleInterval
 from direct.interval.MetaInterval import Sequence
 
 from libotp import *
@@ -34,6 +35,7 @@ class Purchase(PurchaseBase):
 
     def __init__(self, toon, pointsArray, playerMoney, ids, states, remain, doneEvent, skillProfileDeltas = None):
         PurchaseBase.__init__(self, toon, doneEvent)
+        self._instaLeave: bool = False
         self.ids = ids
         self.pointsArray = pointsArray
         self.playerMoney = playerMoney
@@ -49,6 +51,7 @@ class Purchase(PurchaseBase):
             skillProfileDeltas = []
         self.skillProfileDeltas = skillProfileDeltas
         self.skipHint = None
+        self.skipHintSeq = None
 
     def load(self):
         purchaseModels = loader.loadModel('phase_4/models/gui/purchase_gui')
@@ -173,7 +176,6 @@ class Purchase(PurchaseBase):
         taskMgr.remove('purchase-trans')
         taskMgr.remove('delayAdd')
         taskMgr.remove('delaySubtract')
-        self.ignore('space')
         self.ignore('escape')
         self.collisionFloor.removeNode()
         del self.collisionFloor
@@ -245,7 +247,9 @@ class Purchase(PurchaseBase):
         self.totalCounters = []
         self.rankAdjustments = []
         self.accept('purchaseStateChange', self.__handleStateChange)
-        self.skipHint = DirectLabel(parent=aspect2d, relief=None, text='Press SPACE to continue', pos=(0, 0, .75),text_shadow=(0, 0, 0, 1), text_fg=(1, 1, 1, 1), text_scale=.14, text_font=ToontownGlobals.getCompetitionFont())
+        self.skipHint = DirectLabel(parent=aspect2d, relief=None, text='Press ESC to continue...', pos=(0, 0, .75),text_shadow=(0, 0, 0, 1), text_fg=(1, 1, 1, 1), text_scale=.14, text_font=ToontownGlobals.getCompetitionFont())
+        self.skipHintSeq = Sequence(LerpColorScaleInterval(self.skipHint, 1, (1, 1, 1, .25), startColorScale=(1, 1, 1, 1), blendType='easeInOut'), LerpColorScaleInterval(self.skipHint, 1, (1, 1, 1, 1), startColorScale=(1, 1, 1, .25), blendType='easeInOut'))
+        self.skipHintSeq.loop()
         self.title.hide()
         self.bg.reparentTo(render)
         camera.reparentTo(render)
@@ -367,11 +371,15 @@ class Purchase(PurchaseBase):
 
         def reqPurchase(_=None):
             self.fsm.request('purchase')
+
+            # If this purchase instance doesn't allow playing again, immediately go back to the playground.
+            if self.shouldInstantlyLeave():
+                messenger.send('purchaseBackToToontown')
             return Task.done
 
         purchaseDelay = celebrateDelay + DELAY_AFTER_CELEBRATE
 
-        self.acceptOnce('space', reqPurchase)
+        # Listen for an ESC press to skip the results.
         self.acceptOnce('escape', reqPurchase)
 
         taskMgr.doMethodLater(purchaseDelay, reqPurchase, 'purchase-trans')
@@ -460,8 +468,6 @@ class Purchase(PurchaseBase):
         countDownTask.overMaxSound = self.overMaxSound
         countDownTask.lastSfxT = 0
 
-
-
         def delayAdd(state):
             state.counter.count += 1
             state.counter['text'] = str(state.counter.count)
@@ -472,12 +478,15 @@ class Purchase(PurchaseBase):
     def exitReward(self):
         self.ignore('purchaseStateChange')
         self.ignore('clientCleanup')
+        self.ignore('escape')
         taskMgr.remove('countUpTask')
         taskMgr.remove('countDownTask')
         taskMgr.remove('celebrate')
         taskMgr.remove('purchase-trans')
         taskMgr.remove('delayAdd')
         taskMgr.remove('delaySubtract')
+        self.skipHintSeq.finish()
+        self.skipHintSeq = None
         self.skipHint.destroy()
         for toon in self.toons:
             toon.detachNode()
@@ -510,8 +519,6 @@ class Purchase(PurchaseBase):
 
     def enterPurchase(self):
         PurchaseBase.enterPurchase(self)
-        self.ignore('space')
-        self.ignore('escape')
         self.toon.inventory.hide()
 
         self.accept('purchaseStateChange', self.__handleStateChange)
@@ -571,6 +578,12 @@ class Purchase(PurchaseBase):
 
     def __handleUnexpectedExit(self, avId):
         self.unexpectedExits.append(avId)
+
+    def shouldInstantlyLeave(self):
+        return self._instaLeave
+
+    def setShouldInstantlyLeave(self, flag: bool):
+        self._instaLeave = flag
 
 
 class PurchaseHeadFrame(DirectFrame):

@@ -15,6 +15,16 @@ class PurchaseManager(DistributedObject.DistributedObject):
         DistributedObject.DistributedObject.__init__(self, cr)
         self.playAgain = 0
         self.skillProfileDeltas: dict[int, PlayerSkillProfile] = {}
+        self.instaLeaveFlag: bool = False
+
+    def getInstantLeaveFlag(self) -> bool:
+        return self.instaLeaveFlag
+
+    def setInstantLeaveFlag(self, flag: bool):
+        self.instaLeaveFlag = flag
+
+    def shouldInstantlyLeave(self) -> bool:
+        return self.instaLeaveFlag
 
     def disable(self):
         DistributedObject.DistributedObject.disable(self)
@@ -72,6 +82,7 @@ class PurchaseManager(DistributedObject.DistributedObject):
              self.playerIds,
              self.playerStates,
              remain,
+             self.instaLeaveFlag,
              self.skillProfileDeltas])
 
     def calcHasLocalToon(self):

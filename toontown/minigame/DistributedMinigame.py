@@ -222,6 +222,12 @@ class DistributedMinigame(DistributedObject.DistributedObject):
     def getHost(self) -> int | None:
         return self.host
 
+    def isLocalToonHost(self) -> bool:
+        """
+        Returns True if our local toon is the host of this game.
+        """
+        return self.getHost() == base.localAvatar.getDoId()
+
     def getHostToon(self) -> DistributedToon | None:
         """
         Gets the host as a DistributedToon object. If the result is none, there either isn't a host or the toon
@@ -535,15 +541,12 @@ class DistributedMinigame(DistributedObject.DistributedObject):
             self.frameworkFSM.request('frameworkCleanup')
 
     def setGameExit(self):
-        print('setGameExit')
         if not self.hasLocalToon:
             return
         self.notify.debug('BASE: setGameExit: now safe to exit game')
         if self.frameworkFSM.getCurrentState().getName() != 'frameworkWaitServerFinish':
-            print('not waiting')
             self.__serverFinished = 1
         else:
-            print('waiting')
             self.frameworkFSM.request('frameworkCleanup')
 
     def exitFrameworkWaitServerFinish(self):
@@ -557,7 +560,6 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def enterFrameworkCleanup(self):
         self.notify.debug('BASE: enterFrameworkCleanup')
-        print('cleanup')
         for action in self.cleanupActions:
             action()
 

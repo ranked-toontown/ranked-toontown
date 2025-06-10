@@ -2237,6 +2237,7 @@ dclass NewsManager : DistributedObject {
 };
 
 dclass PurchaseManager : DistributedObject {
+  setInstantLeaveFlag(bool) required broadcast ram;
   setPlayerIds(uint32[]) required broadcast ram;
   setMinigamePoints(uint32[]) required broadcast ram;
   setPlayerMoney(uint32[]) required broadcast ram;
