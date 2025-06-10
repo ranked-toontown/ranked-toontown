@@ -3651,6 +3651,8 @@ dclass OnlinePlayerManager : DistributedObject {
 };
 
 dclass DistributedMatchmaker : DistributedObject {
+  requestQueueState(bool) airecv clsend;
+  setMatchmakingStatus(uint32, uint32);
   setMinigameZone(uint32, uint16);
 };
 

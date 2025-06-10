@@ -86,15 +86,23 @@ class DistributedGroupManagerAI(DistributedObjectAI):
 
     def __canJoinGroup(self, inviter: int, recipient: int) -> GroupOperationResult:
 
-        # First case, is this the same person?
-        if inviter == recipient:
-            return GroupOperationResult.IS_SAME_PERSON
-
         # Do both toons exist?
         inviterToon = self.air.getDo(inviter)
         recipientToon = self.air.getDo(recipient)
         if None in (inviterToon, recipientToon):
             return GroupOperationResult.NONEXISTENT_TOON
+
+        # Are we queueing?
+        if self.air.matchmaker.isPlayerInQueue(inviterToon):
+            return GroupOperationResult.SELF_QUEUE
+
+        # First case, is this the same person?
+        if inviter == recipient:
+            return GroupOperationResult.IS_SAME_PERSON
+
+        # Is the recipient queueing?
+        if self.air.matchmaker.isPlayerInQueue(recipientToon):
+            return GroupOperationResult.IN_QUEUE
 
         # Grab the groups of both members.
         inviterGroup = self.getGroup(inviterToon)

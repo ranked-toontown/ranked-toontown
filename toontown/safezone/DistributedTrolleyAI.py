@@ -165,7 +165,7 @@ class DistributedTrolleyAI(DistributedObjectAI.DistributedObjectAI):
                         return
 
             if self.air.matchmaker.isPlayerInQueue(av):
-                av.d_setSystemMessage("You can't enter the trolley while in queue!")
+                av.d_setSystemMessage(0, "You can't enter the trolley while in queue!")
                 self.rejectingBoardersHandler(*newArgs)
                 return
 

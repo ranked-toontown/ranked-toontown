@@ -1,7 +1,11 @@
+import time
+
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectGlobal import DistributedObjectGlobal
 from direct.gui.DirectLabel import DirectLabel
+from direct.task import Task
 
+from toontown.matchmaking.in_queue_panel import InQueuePanel
 from toontown.toonbase import ToontownGlobals
 
 
@@ -12,8 +16,9 @@ class DistributedMatchmaker(DistributedObjectGlobal):
 
     def __init__(self, cr):
         super().__init__(cr)
+        self.queue_panel: InQueuePanel | None = None
         self.text_update: DirectLabel | None = None
-        self.Notify.setDebug(True)
+        self.startedQueueAt = 0
 
     def announceGenerate(self):
         super().announceGenerate()
@@ -27,15 +32,66 @@ class DistributedMatchmaker(DistributedObjectGlobal):
         if self.text_update is not None:
             self.text_update.destroy()
             self.text_update = None
+        self.__cleanupQueuePanel()
 
     def __updateText(self, text: str, color: tuple[float, float, float, float]):
         if self.text_update is not None:
             self.text_update['text'] = text
             self.text_update['text_fg'] = color
 
+    def __update_queue_panel(self, _time: int = 0, queuePos: int = 0, totalQueueing: int = 0):
+        if self.queue_panel is None:
+            self.__renderQueuePanel()
+        self.queue_panel.update_time(_time)
+        if queuePos != 0 and totalQueueing != 0:
+            self.queue_panel.update_queue_status(queuePos, totalQueueing)
+
+    def __renderQueuePanel(self):
+        self.__cleanupQueuePanel()
+        self.queue_panel = InQueuePanel(parent=base.a2dTopRight, pos=(-.85, 0, -.15))
+        self.queue_panel.set_default_options()
+        self.queue_panel.bind_cancel(self.__handle_cancel_queue)
+        self.startedQueueAt = time.time()
+        taskMgr.add(self.__update_time_only, 'queue-timer-update-task')
+
+    def __cleanupQueuePanel(self):
+        if self.queue_panel is None:
+            return
+        taskMgr.remove('queue-timer-update-task')
+        self.queue_panel.destroy()
+        self.queue_panel = None
+
+    def __handle_cancel_queue(self):
+        self.d_requestQueueState(False)
+
+    def __update_time_only(self, task: Task.Task):
+        task.delayTime = 1
+        self.__update_queue_panel(_time=int(time.time() - self.startedQueueAt))
+        return task.again
+
     """
     Astron methods
     """
+
+    def d_requestQueueState(self, flag: bool):
+        """
+        Alerts the server that we want a specific queue state. If flag is true, we want to start queueing. If flag
+        is False, we want to stop queueing.
+        """
+        self.sendUpdate('requestQueueState', [flag])
+
+    def setMatchmakingStatus(self, position: int, total: int):
+        """
+        Called from the matchmaker on the AI. Tells us information about our spot in queue.
+        """
+        # If we send 0s for everything, this is the server telling us we are no longer in queue.
+        if sum([position, total]) == 0:
+            self.__cleanupQueuePanel()
+            self.startedQueueAt = 0
+            return
+
+        # Otherwise, we are in queue. We should render the panel.
+        self.__update_queue_panel(_time=int(time.time()-self.startedQueueAt), queuePos=position, totalQueueing=total)
 
     def setMinigameZone(self, minigameZone, minigameGameId):
 

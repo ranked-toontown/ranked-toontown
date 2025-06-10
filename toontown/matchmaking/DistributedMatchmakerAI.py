@@ -8,6 +8,7 @@ from direct.distributed.DistributedObjectAI import DistributedObjectAI
 from direct.distributed.DistributedObjectGlobalAI import DistributedObjectGlobalAI
 from direct.task import Task
 
+from toontown.groups.DistributedGroupManagerAI import DistributedGroupManagerAI
 from toontown.matchmaking.player_skill_profile import STARTING_RATING
 from toontown.matchmaking.skill_profile_keys import SkillProfileKey
 from toontown.minigame.MinigameCreatorAI import GeneratedMinigame
@@ -96,7 +97,6 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
 
     def __init__(self, air: ToontownAIRepository):
         DistributedObjectAI.__init__(self, air)
-        self.Notify.setDebug(True)
         self.air: ToontownAIRepository = air
 
         # The queue of players who are currently trying to find a match.
@@ -115,12 +115,14 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
 
         # Start the matchmaking task.
         taskMgr.add(self.__matching_algorithm, self.uniqueName('matchmake_algorithm'))
+        taskMgr.add(self.__queue_information_update, self.uniqueName('queue_information_update'))
 
     def delete(self):
         super().delete()
         self.queue.clear()
         self.ignoreAll()
         taskMgr.remove(self.uniqueName('matchmake_algorithm'))
+        taskMgr.remove(self.uniqueName('queue_information_update'))
         self.Notify.debug(f"Deleting")
 
     def isPlayerInQueue(self, av: DistributedToonAI) -> bool:
@@ -140,11 +142,56 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
 
         self.Notify.debug(f"Player {av.getName()}-{av.getDoId()} has been added to queue.")
         self.queue.append(MatchmakingPlayer(av))
+
+        _len = len(self.queue)
+        self.d_setMatchmakingStatus(av.getDoId(), _len, _len)
         return True
+
+    def removePlayerFromQueue(self, av: DistributedToonAI) -> bool:
+        found = False
+        for p in list(self.queue):
+            if p.avatar.getDoId() == av.getDoId():
+                self.queue.remove(p)
+                found = True
+        self.d_setMatchmakingStatus(av.getDoId(), 0, 0)
+        return found
+
+    def __isPlayerInGroup(self, av: DistributedToonAI) -> bool:
+        for groupManager in self.air.doFindAllInstances(DistributedGroupManagerAI):
+            group = groupManager.getGroup(av)
+            if group is not None:
+                return True
+        return False
 
     """
     Astron methods
     """
+
+    def requestQueueState(self, flag: bool):
+        """
+        Called from clients when they wish to join/leave the queue.
+        """
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.getDo(avId)
+        if av is None:
+            return
+
+        if not flag:
+            removed = self.removePlayerFromQueue(av)
+            if removed:
+                av.d_setSystemMessage(0, "Removed you from the queue!")
+        else:
+
+            if self.__isPlayerInGroup(av):
+                av.d_setSystemMessage(0, "You cannot join the queue if you are in a group!")
+                return
+
+            added = self.addPlayerToQueue(av)
+            if added:
+                av.d_setSystemMessage(0, "Now queueing up!")
+
+    def d_setMatchmakingStatus(self, avId: int, position: int, total: int):
+        self.sendUpdateToAvatarId(avId, 'setMatchmakingStatus', [position, total])
 
     def d_setMinigameZone(self, avId, minigame: GeneratedMinigame):
         self.sendUpdateToAvatarId(avId, 'setMinigameZone', [minigame.zone, minigame.gameId])
@@ -157,10 +204,10 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         """
         Called when a toon logs out.
         """
-        for player in list(self.queue):
-            if player.avatar.getDoId() == toon.getDoId():
-                self.Notify.debug(f"Removing {toon.getName()} from the queue since they logged out.")
-                self.queue.remove(player)
+
+        found = self.removePlayerFromQueue(toon)
+        if found:
+            self.Notify.debug(f"Removing {toon.getName()} from the queue if they were in it since they logged out.")
 
     def __send_players_to_match(self, matchup: tuple[MatchmakingPlayer, MatchmakingPlayer]) -> None:
         """
@@ -178,6 +225,7 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         # Send the players to the zone that are playing this match.
         for player in matchup:
             self.d_setMinigameZone(player.avatar.getDoId(), minigame)
+            self.d_setMatchmakingStatus(player.avatar.getDoId(), 0, 0)
 
     def __matching_algorithm(self, task: Task.Task) -> int:
         """
@@ -249,26 +297,12 @@ class DistributedMatchmakerAI(DistributedObjectGlobalAI):
         return Task.again
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def __queue_information_update(self, task: Task.Task):
+        """
+        Loops every so often to keep everyone in queue synced with information about the queue.
+        """
+        task.delayTime = 3
+        total = len(self.queue)
+        for index, player in enumerate(self.queue):
+            self.d_setMatchmakingStatus(player.avatar.getDoId(), index+1, total)
+        return task.again
