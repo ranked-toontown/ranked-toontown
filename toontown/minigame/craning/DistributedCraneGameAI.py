@@ -167,6 +167,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.__bossExists():
             self.boss.cleanupBossBattle()
             self.boss.requestDelete()
+            self.boss.removeNode()
             self.statusEffectSystem.requestDelete()
         self.boss = None
         self.statusEffectSystem = None

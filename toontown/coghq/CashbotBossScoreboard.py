@@ -232,7 +232,7 @@ class CashbotBossScoreboardToonRow(DirectObject):
                                            text_align=TextNode.ABoxedCenter, text_scale=.09, pos=(self.FIRST_PLACE_TEXT_X + .15, 0, 0), text_font=ToontownGlobals.getCompetitionFont())
         
         self.combo_text = DirectLabel(parent=self.frame, relief=None, text='x' + '0', text_shadow=(0, 0, 0, 1), text_fg=CYAN, text_align=TextNode.ACenter,
-                                       scale=.055, pos=(self.FIRST_PLACE_HEAD_X + .1, 0, +.055), text_font=ToontownGlobals.getCompetitionFont())
+                                       text_scale=.055, pos=(self.FIRST_PLACE_HEAD_X + .1, 0, +.055), text_font=ToontownGlobals.getCompetitionFont())
         self.sad_text = DirectLabel(parent=self.frame, relief=None, text='SAD!', text_shadow=(0, 0, 0, 1), text_fg=RED, text_align=TextNode.ACenter,
                                      text_scale=.065, pos=(self.FIRST_PLACE_HEAD_X, 0, 0), hpr=(0, 0, -15), text_font=ToontownGlobals.getCompetitionFont())
 
