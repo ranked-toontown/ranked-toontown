@@ -107,15 +107,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
 
-        self.statusEffectSystem = DistributedStatusEffectSystemAI(self, air,
-            StatusEffect.BURNED, 
-            StatusEffect.DRENCHED, 
-            StatusEffect.WINDED, 
-            StatusEffect.GROUNDED, 
-            StatusEffect.EXPLODE, 
-            StatusEffect.FROZEN, 
-            StatusEffect.SHATTERED
-        )
+        self.statusEffectSystem: DistributedStatusEffectSystemAI | None = None
 
         # Memory leak prevention - track event listeners and task names
         self._deathListenerEvents = []
@@ -140,6 +132,15 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.boss = DistributedCashbotBossStrippedAI(self.air, self)
         self.boss.generateWithRequired(self.zoneId)
+        self.statusEffectSystem = DistributedStatusEffectSystemAI(self, self.air,
+                                        StatusEffect.BURNED,
+                                        StatusEffect.DRENCHED,
+                                        StatusEffect.WINDED,
+                                        StatusEffect.GROUNDED,
+                                        StatusEffect.EXPLODE,
+                                        StatusEffect.FROZEN,
+                                        StatusEffect.SHATTERED
+                                        )
         self.statusEffectSystem.generateWithRequired(self.zoneId)
         self.d_setBossCogId()
         self.d_setStatusEffectSystemId()
@@ -166,7 +167,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.__bossExists():
             self.boss.cleanupBossBattle()
             self.boss.requestDelete()
+            self.statusEffectSystem.requestDelete()
         self.boss = None
+        self.statusEffectSystem = None
 
     def __bossExists(self) -> bool:
         return self.boss is not None
