@@ -1,20 +1,17 @@
+from direct.directnotify import DirectNotifyGlobal
+from direct.gui import DirectGuiGlobals as DGG
 from direct.interval.LerpInterval import LerpColorScaleInterval
 from direct.interval.MetaInterval import Sequence
+from direct.task.Task import Task
 
 from libotp import *
-from .PurchaseBase import *
-from direct.task.Task import Task
-from toontown.toon import ToonHead
-from toontown.toonbase import ToontownTimer
-from direct.gui import DirectGuiGlobals as DGG
-from direct.directnotify import DirectNotifyGlobal
-from direct.showbase.PythonUtil import Functor
-from toontown.minigame import TravelGameGlobals
 from toontown.distributed import DelayDelete
+from toontown.toon import ToonHead
 from toontown.toonbase import ToontownGlobals
-from . import MinigameGlobals
-from ..archipelago.util.global_text_properties import get_raw_formatted_string
+from toontown.toonbase import ToontownTimer
+from .PurchaseBase import *
 from ..archipelago.util.global_text_properties import MinimalJsonMessagePart as Component
+from ..archipelago.util.global_text_properties import get_raw_formatted_string
 from ..matchmaking.rank import Rank
 
 COUNT_UP_RATE = 0.15
@@ -52,6 +49,11 @@ class Purchase(PurchaseBase):
         self.skillProfileDeltas = skillProfileDeltas
         self.skipHint = None
         self.skipHintSeq = None
+        self.toons = []
+        self.toonsKeep = []
+        self.counters = []
+        self.totalCounters = []
+        self.rankAdjustments = []
 
     def load(self):
         purchaseModels = loader.loadModel('phase_4/models/gui/purchase_gui')
