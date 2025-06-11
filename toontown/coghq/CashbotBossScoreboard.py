@@ -224,28 +224,28 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.toon_head.setPos(self.FIRST_PLACE_HEAD_X, 0, self.FIRST_PLACE_HEAD_Y)
         self.toon_head.setH(180)
         self.toon_head.startBlink()
-        self.points_text = OnscreenText(parent=self.frame, text=str(self.points), style=3, fg=WHITE,
-                                        align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X, 0), font=ToontownGlobals.getCompetitionFont())
+        self.points_text = DirectLabel(parent=self.frame, relief=None, text=str(self.points), text_shadow=(0, 0, 0, 1), text_fg=WHITE,
+                                        text_align=TextNode.ABoxedCenter, text_scale=.09, pos=(self.FIRST_PLACE_TEXT_X, 0, 0), text_font=ToontownGlobals.getCompetitionFont())
         
         # Add round wins text (positioned between Pts and expandable stats)
-        self.round_wins_text = OnscreenText(parent=self.frame, text=str(self.roundWins), style=3, fg=WHITE,
-                                           align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X + .15, 0), font=ToontownGlobals.getCompetitionFont())
+        self.round_wins_text = DirectLabel(parent=self.frame, relief=None, text=str(self.roundWins), text_shadow=(0, 0, 0, 1), text_fg=WHITE,
+                                           text_align=TextNode.ABoxedCenter, text_scale=.09, pos=(self.FIRST_PLACE_TEXT_X + .15, 0, 0), text_font=ToontownGlobals.getCompetitionFont())
         
-        self.combo_text = OnscreenText(parent=self.frame, text='x' + '0', style=3, fg=CYAN, align=TextNode.ACenter,
-                                       scale=.055, pos=(self.FIRST_PLACE_HEAD_X + .1, +.055), font=ToontownGlobals.getCompetitionFont())
-        self.sad_text = OnscreenText(parent=self.frame, text='SAD!', style=3, fg=RED, align=TextNode.ACenter,
-                                     scale=.065, pos=(self.FIRST_PLACE_HEAD_X, 0), roll=-15, font=ToontownGlobals.getCompetitionFont())
+        self.combo_text = DirectLabel(parent=self.frame, relief=None, text='x' + '0', text_shadow=(0, 0, 0, 1), text_fg=CYAN, text_align=TextNode.ACenter,
+                                       scale=.055, pos=(self.FIRST_PLACE_HEAD_X + .1, 0, +.055), text_font=ToontownGlobals.getCompetitionFont())
+        self.sad_text = DirectLabel(parent=self.frame, relief=None, text='SAD!', text_shadow=(0, 0, 0, 1), text_fg=RED, text_align=TextNode.ACenter,
+                                     text_scale=.065, pos=(self.FIRST_PLACE_HEAD_X, 0, 0), hpr=(0, 0, -15), text_font=ToontownGlobals.getCompetitionFont())
 
         # Adjust extra stats position to make room for Wins column
-        self.extra_stats_text = OnscreenText(parent=self.frame, text='', style=3, fg=WHITE, align=TextNode.ABoxedCenter, scale=.09, pos=(self.FIRST_PLACE_TEXT_X+.62, 0), font=ToontownGlobals.getCompetitionFont())
+        self.extra_stats_text = DirectLabel(parent=self.frame , relief=None, text='', text_shadow=(0, 0, 0, 1), text_fg=WHITE, text_align=TextNode.ABoxedCenter, text_scale=.09, pos=(self.FIRST_PLACE_TEXT_X+.62, 0, 0), text_font=ToontownGlobals.getCompetitionFont())
 
 
         self.combo_text.hide()
         self.sad_text.hide()
         if self.avId == base.localAvatar.doId:
-            self.points_text['fg'] = GOLD
-            self.round_wins_text['fg'] = GOLD
-            self.extra_stats_text['fg'] = GOLD
+            self.points_text['text_fg'] = GOLD
+            self.round_wins_text['text_fg'] = GOLD
+            self.extra_stats_text['text_fg'] = GOLD
 
         self.extra_stats_text.hide()
         # Round wins are always visible in best-of matches, will be hidden in single round matches
@@ -470,29 +470,25 @@ class CashbotBossScoreboardToonRow(DirectObject):
         self.toon_head.cleanup()
         self.toon_head.removeNode()
         del self.toon_head
-        self.points_text.cleanup()
+        self.points_text.destroy()
         self.points_text.removeNode()
         del self.points_text
-        self.round_wins_text.cleanup()
+        self.round_wins_text.destroy()
         self.round_wins_text.removeNode()
         del self.round_wins_text
-        self.combo_text.cleanup()
+        self.combo_text.destroy()
         self.combo_text.removeNode()
         del self.combo_text
         taskMgr.remove('sadtimer-' + str(self.avId))
-        self.sad_text.cleanup()
+        self.sad_text.destroy()
         self.sad_text.removeNode()
         del self.sad_text
         self.toon_head_button.destroy()
         self.toon_head_button.removeNode()
         del self.toon_head_button
-        self.extra_stats_text.cleanup()
+        self.extra_stats_text.destroy()
         self.extra_stats_text.removeNode()
         del self.extra_stats_text
-        if hasattr(self, 'roundWinsText'):
-            self.roundWinsText.cleanup()
-            self.roundWinsText.removeNode()
-            del self.roundWinsText
         del self.ruleset
         self.frame.destroy()
         self.frame.removeNode()
@@ -725,7 +721,7 @@ class CashbotBossScoreboard(DirectObject):
             row.combo_text.hide()
             return
 
-        row.combo_text['fg'] = CYAN
+        row.combo_text['text_fg'] = CYAN
         row.combo_text.show()
 
         Parallel(
