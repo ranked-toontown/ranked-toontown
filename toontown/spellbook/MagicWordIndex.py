@@ -1944,10 +1944,11 @@ class EndCFO(MagicWord):
         context = craneGame.getScoringContext()
         _round = context.get_round(craneGame.currentRound)
         score = _round.get_score(invoker.doId)
+        num_players = len(craneGame.getParticipantsNotSpectating())
 
         # Ensure all participants at least have a point.
         for toon in craneGame.getParticipantsNotSpectating():
-            if toon.getDoId() != invoker.doId:
+            if toon.getDoId() != invoker.doId or num_players == 1:
                 craneGame.addScore(toon.getDoId(), 2000, reason=CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
 
         craneGame.addScore(invoker.doId, -score, reason=CraneLeagueGlobals.ScoreReason.FORFEIT)
