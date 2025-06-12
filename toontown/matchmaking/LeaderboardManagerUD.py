@@ -1,5 +1,6 @@
 import copy
 import json
+from typing import Any
 
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectGlobalUD import DistributedObjectGlobalUD
@@ -36,6 +37,9 @@ class LeaderboardManagerUD(DistributedObjectGlobalUD):
                 self.air.dbInterface.queryObject(self.air.dbId, activePlayer, self.__database_callback, dclass=_dclass, fieldNames=('setName', 'setSkillProfiles',))
 
         taskMgr.doMethodLater(10, self.__refresh_task, 'leaderboard-refresh-task')
+
+    def getCachedLeaderboardResults(self) -> dict[str, dict[int, list[Any]]]:
+        return self.__sr_cache
 
     def handleRankedMatchResultsAiToUd(self, results, nameMap):
         """

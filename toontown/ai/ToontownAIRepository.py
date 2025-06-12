@@ -4,7 +4,7 @@ from typing import Dict
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.PyDatagram import *
 from panda3d.core import *
-from toontown.dna.DNAParser import loadDNAFileAI, DNAStorage, DNAGroup, DNAVisGroup
+from toontown.dna.DNAParser import loadDNAFileAI, DNAStorage, DNAGroup
 
 from otp.ai.AIZoneData import AIZoneDataStore
 from otp.ai.TimeManagerAI import TimeManagerAI
@@ -15,7 +15,6 @@ from toontown.ai.DistributedPolarPlaceEffectMgrAI import DistributedPolarPlaceEf
 from toontown.ai.DistributedResistanceEmoteMgrAI import DistributedResistanceEmoteMgrAI
 from toontown.ai.HolidayManagerAI import HolidayManagerAI
 from toontown.ai.NewsManagerAI import NewsManagerAI
-from toontown.ai.WelcomeValleyManagerAI import WelcomeValleyManagerAI
 from toontown.archipelago.distributed.DistributedArchipelagoManagerAI import DistributedArchipelagoManagerAI
 from toontown.building.DistributedTrophyMgrAI import DistributedTrophyMgrAI
 from toontown.catalog.CatalogManagerAI import CatalogManagerAI
@@ -50,7 +49,6 @@ from toontown.parties.ToontownTimeManager import ToontownTimeManager
 from toontown.pets.PetManagerAI import PetManagerAI
 from toontown.quest.QuestManagerAI import QuestManagerAI
 from toontown.racing import RaceGlobals
-from toontown.racing.DistributedLeaderBoardAI import DistributedLeaderBoardAI
 from toontown.racing.DistributedRacePadAI import DistributedRacePadAI
 from toontown.racing.DistributedStartingBlockAI import DistributedStartingBlockAI, DistributedViewingBlockAI
 from toontown.racing.DistributedViewPadAI import DistributedViewPadAI
@@ -60,10 +58,11 @@ from toontown.shtiker.CogPageManagerAI import CogPageManagerAI
 from toontown.spellbook.TTOffMagicWordManagerAI import TTOffMagicWordManagerAI
 from toontown.suit.SuitInvasionManagerAI import SuitInvasionManagerAI
 from toontown.toon import NPCToons
-from toontown.toonbase import ToontownGlobals, TTLocalizer
+from toontown.toonbase import ToontownGlobals
 from toontown.tutorial.TutorialManagerAI import TutorialManagerAI
 from toontown.uberdog.DistributedInGameNewsMgrAI import DistributedInGameNewsMgrAI
 from toontown.uberdog.DistributedPartyManagerAI import DistributedPartyManagerAI
+from toontown.api.ApiManagerAI import ApiManagerAI
 
 
 class ToontownAIRepository(ToontownInternalRepository):
@@ -119,6 +118,7 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.magicWordManager = None
         self.deliveryManager = None
         self.leaderboardManager: LeaderboardManagerAI | None = None
+        self.apiManager: ApiManagerAI | None = None
         self.archipelagoManager = None
         self.defaultAccessLevel = OTPGlobals.accessLevelValues.get('TTOFF_DEVELOPER')
 
@@ -303,6 +303,10 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.deliveryManager = self.generateGlobalObject(OTP_DO_ID_TOONTOWN_DELIVERY_MANAGER,
                                                          'DistributedDeliveryManager')
 
+        # Generate our API manager...
+        self.apiManager = self.generateGlobalObject(OTP_DO_ID_API_MANAGER,
+                                                         'ApiManager')
+
 
     def createHood(self, hoodCtr, zoneId):
         # Bossbot HQ doesn't use DNA, so we skip over that.
@@ -421,9 +425,11 @@ class ToontownAIRepository(ToontownInternalRepository):
 
     def incrementPopulation(self):
         self.districtStats.b_setAvatarCount(self.districtStats.getAvatarCount() + 1)
+        self.apiManager.d_postDistrictStats()
 
     def decrementPopulation(self):
         self.districtStats.b_setAvatarCount(self.districtStats.getAvatarCount() - 1)
+        self.apiManager.d_postDistrictStats()
 
     def getAvatarExitEvent(self, avId):
         return 'distObjDelete-%d' % avId

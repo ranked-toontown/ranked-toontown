@@ -281,6 +281,7 @@ from toontown.parties import DistributedPartyValentineJukebox40Activity/AI
 from toontown.friends import TTPlayerFriendsManager/UD
 from toontown.friends import OnlinePlayerManager/UD
 from toontown.matchmaking import LeaderboardManager/AI/UD
+from toontown.api import ApiManager/AI/UD
 from toontown.uberdog import TTSpeedchatRelay/UD
 from toontown.safezone import DistributedGolfKart/AI
 from toontown.safezone import DistributedPicnicBasket/AI
@@ -3670,6 +3671,18 @@ dclass LeaderboardManager : DistributedObject {
     handleRankedMatchResultsAiToUd(SkillProfile[], NameMapping[]);
     requestRankingsClientToUd(string, uint16, uint16) clsend airecv;
     requestRankingsResponse(string, LeaderboardEntry[]);
+};
+
+struct DistrictInformation {
+  uint32 doId;
+  string name;
+  int32 population;
+};
+
+dclass ApiManager : DistributedObject {
+  queryDistrictStatsUdToAi();
+  postDistrictStatsAiToUd(DistrictInformation);
+  districtShutdownAiToUd(uint32);
 };
 
 dclass TTSpeedchatRelay : SpeedchatRelay {
