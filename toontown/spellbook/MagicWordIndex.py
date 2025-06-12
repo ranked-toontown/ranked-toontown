@@ -1928,23 +1928,6 @@ class RestartPieRound(MagicWord):
         boss.b_setState('BattleThree')
         return "Restarting Pie Round"
 
-
-class HitCFO(MagicWord):
-    desc = "Hits the CFO."
-    execLocation = MagicWordConfig.EXEC_LOC_SERVER
-    arguments = [("damage", int, False, 0)]
-    accessLevel = 'USER'
-
-    def handleWord(self, invoker, avId, toon, *args):
-        dmg = args[0]
-        from ..minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
-        craneGame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
-        if craneGame is None:
-            return "You aren't in a crane round!"
-
-        craneGame.recordHit(dmg, impact=1)
-
-
 class EndCFO(MagicWord):
     aliases = ['end', 'finish', 'forfeit', 'ff']
     desc = "Ends the C.F.O. and forfeits, putting you in last place."
