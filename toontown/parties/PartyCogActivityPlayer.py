@@ -1,5 +1,5 @@
 import math
-from direct.showbase.PythonUtil import bound, lerp
+from otp.otpbase.PythonUtil import bound, lerp
 from direct.task.Task import Task
 from direct.interval.MetaInterval import Sequence, Parallel
 from direct.interval.FunctionInterval import Func, Wait

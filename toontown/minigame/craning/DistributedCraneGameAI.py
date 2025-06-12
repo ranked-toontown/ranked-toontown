@@ -4,7 +4,7 @@ from operator import itemgetter
 
 from direct.fsm import ClassicFSM
 from direct.fsm import State
-from direct.showbase.PythonUtil import clamp
+from otp.otpbase.PythonUtil import clamp
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, CollisionPolygon, CollisionBox, NodePath, Vec3, Point3
 from toontown.coghq import CraneLeagueGlobals

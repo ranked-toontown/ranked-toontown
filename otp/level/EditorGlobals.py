@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import uniqueElements
+from otp.otpbase.PythonUtil import uniqueElements
 EditTargetPostName = 'inGameEditTarget'
 EntIdRange = 10000
 username2entIdBase = {'darren': 1 * EntIdRange,

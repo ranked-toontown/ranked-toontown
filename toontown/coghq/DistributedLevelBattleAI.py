@@ -5,7 +5,7 @@ from direct.fsm import State
 from direct.fsm import ClassicFSM
 from toontown.battle.BattleBase import *
 from . import CogDisguiseGlobals
-from direct.showbase.PythonUtil import addListsByValue
+from otp.otpbase.PythonUtil import addListsByValue
 
 class DistributedLevelBattleAI(DistributedBattleAI.DistributedBattleAI):
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedLevelBattleAI')

@@ -9,7 +9,7 @@ from direct.interval.IntervalGlobal import ivalMgr
 from direct.distributed.PyDatagramIterator import PyDatagramIterator
 
 from direct.fsm import State
-from direct.showbase.PythonUtil import Functor, ScratchPad
+from otp.otpbase.PythonUtil import Functor, ScratchPad
 
 from libotp.nametag.WhisperGlobals import WhisperType
 from otp.avatar import Avatar

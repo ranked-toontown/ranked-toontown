@@ -11,7 +11,7 @@ from direct.interval.FunctionInterval import Func, Wait
 from direct.interval.LerpInterval import LerpPosHprInterval
 from direct.interval.MetaInterval import Parallel, Sequence
 from direct.showbase.MessengerGlobal import messenger
-from direct.showbase.PythonUtil import reduceAngle
+from otp.otpbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
     VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube, TextNode, Vec4

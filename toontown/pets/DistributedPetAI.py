@@ -15,7 +15,7 @@ from toontown.toon import DistributedToonAI
 import random
 import time
 
-from direct.showbase.PythonUtil import StackTrace
+from otp.otpbase.PythonUtil import StackTrace
 
 
 class DistributedPetAI(DistributedSmoothNodeAI.DistributedSmoothNodeAI, PetLookerAI.PetLookerAI, PetBase.PetBase):

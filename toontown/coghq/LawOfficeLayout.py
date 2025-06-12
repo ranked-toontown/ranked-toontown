@@ -1,8 +1,8 @@
 from direct.directnotify import DirectNotifyGlobal
-from direct.showbase.PythonUtil import invertDictLossless
+from otp.otpbase.PythonUtil import invertDictLossless
 from toontown.coghq import MintRoomSpecs
 from toontown.toonbase import ToontownGlobals
-from direct.showbase.PythonUtil import normalDistrib, lerp
+from otp.otpbase.PythonUtil import normalDistrib, lerp
 
 from toontown.coghq import LawOffice_Spec_Tier0_a
 from toontown.coghq import LawOffice_Spec_Tier0_b

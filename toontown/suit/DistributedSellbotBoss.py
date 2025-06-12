@@ -3,7 +3,7 @@ from libotp import *
 from direct.interval.IntervalGlobal import *
 from toontown.battle.BattleProps import *
 from direct.distributed.ClockDelta import *
-from direct.showbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import Functor
 from direct.gui.DirectGui import *
 from direct.fsm import FSM
 from direct.fsm import ClassicFSM, State

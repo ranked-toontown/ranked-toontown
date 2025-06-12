@@ -1,6 +1,6 @@
 from panda3d.core import HashVal
 from direct.directnotify import DirectNotifyGlobal
-from direct.showbase.PythonUtil import list2dict, uniqueElements
+from otp.otpbase.PythonUtil import list2dict, uniqueElements
 import string
 from . import LevelConstants
 import types

@@ -1,6 +1,6 @@
 from direct.interval.IntervalGlobal import LerpFunctionInterval
 from direct.gui.DirectGui import DirectLabel, DirectFrame, DGG
-from direct.showbase.PythonUtil import bound as clamp
+from otp.otpbase.PythonUtil import bound as clamp
 from panda3d.core import TextNode, NodePath
 from toontown.toonbase import ToontownGlobals
 from . import CogdoUtil

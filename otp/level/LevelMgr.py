@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import Functor
 from . import LevelMgrBase
 
 class LevelMgr(LevelMgrBase.LevelMgrBase):

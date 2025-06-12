@@ -1,5 +1,5 @@
 from panda3d.core import *
-from direct.showbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import Functor
 from otp.otpbase.PythonUtil import PriorityCallbacks
 from direct.task import Task
 from toontown.distributed.ToontownMsgTypes import *

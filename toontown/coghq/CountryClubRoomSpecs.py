@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import invertDict
+from otp.otpbase.PythonUtil import invertDict
 from toontown.toonbase import ToontownGlobals
 from toontown.coghq import BossbotCountryClubFairwayRoom_Battle00_Cogs
 from toontown.coghq import BossbotCountryClubMazeRoom_Battle00_Cogs

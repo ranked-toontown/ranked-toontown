@@ -19,7 +19,7 @@ from toontown.effects.Sparks import Sparks
 from direct.interval.ProjectileInterval import *
 from toontown.battle.BattleProps import *
 import random
-from direct.showbase.PythonUtil import randFloat
+from otp.otpbase.PythonUtil import randFloat
 from direct.task.Task import Task
 import math
 iceTurnFactor = 0.25

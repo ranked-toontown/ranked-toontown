@@ -1,6 +1,6 @@
 from direct.distributed.ClockDelta import *
 from panda3d.core import *
-from direct.showbase.PythonUtil import Functor, sameElements, list2dict, uniqueElements
+from otp.otpbase.PythonUtil import Functor, sameElements, list2dict, uniqueElements
 from direct.interval.IntervalGlobal import *
 
 from toontown.archipelago.definitions.death_reason import DeathReason

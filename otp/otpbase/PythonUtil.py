@@ -1,6 +1,8 @@
 
 """Undocumented Module"""
 
+from direct.showbase.PythonUtil import *
+
 __all__ = ['enumerate', 'unique', 'indent', 'nonRepeatingRandomList',
 'writeFsmTree', 'StackTrace', 'traceFunctionCall', 'traceParentCall',
 'printThisCall', 'tron', 'trace', 'troff', 'getClassLineage', 'pdir',

@@ -9,7 +9,7 @@ from direct.task.TaskProfiler import TaskProfiler
 from otp.avatar import Avatar
 import string
 from direct.showbase import PythonUtil
-from direct.showbase.PythonUtil import Functor, DelayedCall, ScratchPad
+from otp.otpbase.PythonUtil import Functor, DelayedCall, ScratchPad
 from otp.otpbase import OTPGlobals
 from direct.distributed.ClockDelta import *
 from direct.showutil.TexViewer import TexViewer

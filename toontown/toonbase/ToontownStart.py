@@ -2,18 +2,18 @@ import sys
 
 from panda3d.core import *
 
-if __debug__:
-    if len(sys.argv) == 2 and sys.argv[1] == '--dummy':
-        loadPrcFile('config/common.prc')
-        loadPrcFile('config/development.prc')
+#if __debug__:
+#    if len(sys.argv) == 2 and sys.argv[1] == '--dummy':
+loadPrcFile('config/common.prc')
+loadPrcFile('config/development.prc')
 
-        # The VirtualFileSystem, which has already initialized, doesn't see the mount
-        # directives in the config(s) yet. We have to force it to load those manually:
-        vfs = VirtualFileSystem.getGlobalPtr()
-        mounts = ConfigVariableList('vfs-mount')
-        for mount in mounts:
-            mountFile, mountPoint = (mount.split(' ', 2) + [None, None, None])[:2]
-            vfs.mount(Filename(mountFile), Filename(mountPoint), 0)
+# The VirtualFileSystem, which has already initialized, doesn't see the mount
+# directives in the config(s) yet. We have to force it to load those manually:
+vfs = VirtualFileSystem.getGlobalPtr()
+mounts = ConfigVariableList('vfs-mount')
+for mount in mounts:
+    mountFile, mountPoint = (mount.split(' ', 2) + [None, None, None])[:2]
+    vfs.mount(Filename(mountFile), Filename(mountPoint), 0)
 
 import builtins
 
