@@ -98,6 +98,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Add our game ClassicFSM to the framework ClassicFSM
         self.addChildGameFSM(self.gameFSM)
+        
+        # Track safe effect tasks
+        self.safeEffectTasks = set()
 
         # State tracking related to the overtime mechanic.
         self.overtimeWillHappen = False  # Setting this to True will cause the CFO to enter "overtime" mode when time runs out.
@@ -185,6 +188,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         for taskName in self._allTaskNames:
             taskMgr.remove(taskName)
         self._allTaskNames.clear()
+        
+        # Clean up safe effect tasks
+        for taskName in self.safeEffectTasks:
+            taskMgr.remove(taskName)
+        self.safeEffectTasks.clear()
         
         # Clean up specific known tasks
         taskMgr.remove(self.uniqueName('times-up-task'))
@@ -1310,9 +1318,29 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 if safe and not self.statusEffectSystem.isObjectStatusEffected(safe.getDoId()):
                     statusEffect = random.choice(list(SAFE_ALLOWED_EFFECTS))
                     self.statusEffectSystem.b_applyStatusEffect(safe.getDoId(), statusEffect)
+                    # Store the safe's doId before creating the task
+                    safeDoId = safe.getDoId()
+                    # Create task name
+                    taskName = self.uniqueName(f'remove-effect-{safeDoId}')
                     # Remove the effect after 10 seconds
-                    taskMgr.doMethodLater(10.0, lambda task, doId=safe.getDoId(), effect=statusEffect: self.statusEffectSystem.b_removeStatusEffect(doId, effect) or task.done, self.uniqueName(f'remove-effect-{safe.getDoId()}'))
+                    taskMgr.doMethodLater(10.0, lambda task, doId=safeDoId, effect=statusEffect: self.__removeSafeEffect(doId, effect) or task.done, taskName)
+                    # Track the task
+                    self.safeEffectTasks.add(taskName)
         return task.again
+
+    def __removeSafeEffect(self, doId, effect):
+        """Safely remove a status effect from a safe, handling the case where the safe no longer exists"""
+        if not hasattr(self, 'statusEffectSystem') or not self.statusEffectSystem:
+            return True
+            
+        # Check if the safe still exists
+        safe = self.air.doId2do.get(doId)
+        if not safe:
+            return True
+            
+        # Remove the effect
+        self.statusEffectSystem.b_removeStatusEffect(doId, effect)
+        return True
 
     def startSafeEffectTask(self):
         """Start the task that periodically applies effects to safes"""
