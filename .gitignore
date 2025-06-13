@@ -37,3 +37,4 @@ apworld/toontown.apworld
 launch/windows/PPYTHON_PATH
 dedicated_server_settings.json
 sr_leaderboard_cache.json
+launch/docker/database/
