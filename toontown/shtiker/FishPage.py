@@ -51,7 +51,7 @@ class FishPage(ShtikerPage.ShtikerPage):
         trophyCase.find('glass1').reparentTo(trophyCase, -1)
         trophyCase.find('shelf').reparentTo(trophyCase, -1)
         self.trophyCase = trophyCase
-        self.title = DirectLabel(parent=self, relief=None, text='', text_scale=0.1, pos=(0, 0, 0.65))
+        self.title = DirectLabel(parent=self, relief=None, text='', text_scale=0.12, pos=(0, 0, 0.61))
         normalColor = (1, 1, 1, 1)
         clickColor = (0.8, 0.8, 0, 1)
         rolloverColor = (0.15, 0.82, 1.0, 1)

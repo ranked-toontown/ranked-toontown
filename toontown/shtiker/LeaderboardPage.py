@@ -86,7 +86,7 @@ class LeaderboardPage(ShtikerPage):
                   gui.find('**/CrtATn_R_Arrow_RLVR'),
                   gui.find('**/CrtATn_R_Arrow_UP'))
 
-        self.title = DirectLabel(parent=self, relief=None, text=TTLocalizer.LeaderboardPageTitle, text_scale=0.12, textMayChange=1, pos=(0, 0, 0.62), text_font=ToontownGlobals.getCompetitionFont())
+        self.title = DirectLabel(parent=self, relief=None, text=TTLocalizer.LeaderboardPageTitle, text_scale=0.12, textMayChange=1, pos=(0, 0, 0.61), text_font=ToontownGlobals.getCompetitionFont())
         self._mode_previous_button = DirectButton(
                 parent=self, relief=None, pos=(-.55, 0, .45),
                 text="Previous",
