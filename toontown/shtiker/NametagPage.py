@@ -32,8 +32,8 @@ class NametagPage(ShtikerPage):
             parent=self,
             relief=None,
             text=TTLocalizer.NametagPageTitle,
-            text_scale=0.12,
-            pos=(0, 0, 0.61),
+            text_scale=0.14,
+            pos=(0, 0, 0.59),
             text_fg=(0.05, 0.14, 0.4, 1),
             text_font=ToontownGlobals.getSignFont()
         )
