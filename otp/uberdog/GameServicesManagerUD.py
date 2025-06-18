@@ -907,6 +907,11 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         taskMgr.doMethodLater(5 * 60, self.__timeoutAuthenticationProcess, f"discord-auth-timeout-{sender}", extraArgs=[sender])  # Expire this process after 5 min.
         self.notify.debug(f"Authentication session will time out in 5 minutes.")
 
+        # If we are not using OAuth2, we can simply just tell the user we are using normal logins.
+        if self.authenticationScheme == AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN:
+            self.sendUpdateToChannel(sender, 'setAuthScheme',[self.authenticationScheme, uuid, ''])
+            return
+
         # This operation starts in a floating limbo state, while we wait for the user to authenticate.
         self.connection2fsm[sender] = DiscordAuthenticateOperation(self, sender, str(uuid), self._clientId, self._clientSecret, self._clientRedirect)
         self.connection2fsm[sender].request('Start')
@@ -950,7 +955,7 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
 
         if self.authenticationScheme != AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN:
             # If this fires, this is low-key suspicious. We gave them the authentication scheme. Why are they trying to
-            # log in using their own play token when they told them we aren't using them?
+            # log in using their own play token when we told them we aren't using them?
             self.killConnection(sender, "Authentication failed. Are your files out of date?")
             return
 
