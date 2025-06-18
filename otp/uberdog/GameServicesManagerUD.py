@@ -826,6 +826,7 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         self._clientId = environ.get('DISCORD_APP_CLIENT_ID', None)
         self._clientSecret = environ.get('DISCORD_APP_CLIENT_SECRET', None)
         self._clientRedirect = environ.get('DISCORD_APP_CLIENT_REDIRECT', None)
+        self._playtokenStrategy = environ.get('DISCORD_PLAYTOKENSTRATEGY', 'FILESYSTEM')
         self.connection2fsm = {}
         self.account2fsm = {}
         self.accountDb = None
@@ -880,10 +881,17 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         # Instantiate the account database interface.
         # If we have Mongo credentials set, we can assume we want to use MongoDB. Otherwise, just use Dev DB.
         credentials = self.__findMongoCredentials()
-        if None in credentials:
-            self.accountDb = DeveloperAccountDb(self)
+        if self._playtokenStrategy == 'MONGODB':
+            prefix = ''
+            if credentials[0]:
+                prefix += credentials[0]
+            if credentials[1]:
+                prefix += ':' + credentials[1]
+            if None not in credentials:
+                prefix += '@'
+            self.accountDb = MongoAccountDb(self, f"mongodb://{prefix}db:27017/astrondb")
         else:
-            self.accountDb = MongoAccountDb(self, f"mongodb://{credentials[0]}:{credentials[1]}@db:27017/astrondb")
+            self.accountDb = DeveloperAccountDb(self)
 
     def requestAuthScheme(self):
         """
