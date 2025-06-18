@@ -4,6 +4,7 @@ import dbm.dumb
 from direct.directnotify import DirectNotifyGlobal
 
 from otp.uberdog.persistence.AccountDbBase import AccountDbBase
+from otp.uberdog.persistence.AccountLookupResult import AccountLookupResult
 
 
 class DeveloperAccountDb(AccountDbBase):
@@ -26,22 +27,19 @@ class DeveloperAccountDb(AccountDbBase):
         # Check if this play token exists in the dbm:
         if str(playToken) not in self.dbm:
             # It is not, so we'll associate them with a brand new account object.
-            callback({'success': True,
-                      'accountId': 0,
-                      'databaseId': playToken,
-                      'accessLevel': "TTOFF_DEVELOPER"})
+            callback(AccountLookupResult(
+                success=True,
+                accountId=0,
+                databaseId=playToken,
+                accessLevel='TTOFF_DEVELOPER',
+            ))
         else:
             def handleAccount(dclass, fields):
                 if dclass != self.gameServicesManager.air.dclassesByName['AccountUD']:
-                    result = {'success': False,
-                              'reason': 'Your account object (%s) was not found in the database!' % dclass}
+                    result = AccountLookupResult(success=False, reason='Your account object (%s) was not found in the database!' % dclass)
                 else:
                     # We already have an account object, so we'll just return what we have.
-                    result = {'success': True,
-                              'accountId': int(self.dbm[playToken]),
-                              'databaseId': playToken,
-                              'accessLevel': fields.get('ACCESS_LEVEL', 'NO_ACCESS')}
-
+                    result = AccountLookupResult(success=True, accountId=int(self.dbm[playToken]), databaseId=playToken, accessLevel=fields.get('ACCESS_LEVEL', 'NO_ACCESS'))
                 callback(result)
 
             self.gameServicesManager.air.dbInterface.queryObject(self.gameServicesManager.air.dbId,
