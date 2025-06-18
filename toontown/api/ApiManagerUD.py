@@ -75,7 +75,7 @@ class ApiManagerUD(DistributedObjectGlobalUD):
     """
     Public API inner workings
     """
-    def __start_public_api(self, host="127.0.0.1", port=8080):
+    def __start_public_api(self, host="0.0.0.0", port=8080):
 
         if self.__public_api_running:
             self.Notify.Warning(f"Tried to start public API when it is already running! Aborting...")
