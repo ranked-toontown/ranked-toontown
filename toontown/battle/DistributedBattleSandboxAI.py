@@ -25,8 +25,6 @@ class DistributedBattleSandboxAI(DistributedBattleBaseAI):
         self.minLevel: int = 50
         self.maxLevel: int = 50
 
-        self.notify.setDebug(True)
-
     def __generateSuit(self) -> DistributedSuitAI:
         suit = DistributedSuitAI(self.air, None)
 

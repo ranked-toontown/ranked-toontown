@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from direct.stdpy import threading
 
+from otp.uberdog.authentication import AuthenticationGlobals
 from toontown.api.district_information import DistrictInformation
 
 if typing.TYPE_CHECKING:
@@ -29,7 +30,6 @@ class ApiManagerUD(DistributedObjectGlobalUD):
 
     def __init__(self, air: ToontownUberRepository):
         super().__init__(air)
-        self.Notify.setDebug(True)
 
         self.districts: dict[int, DistrictInformation] = {}
 
@@ -111,6 +111,21 @@ class ApiManagerUD(DistributedObjectGlobalUD):
                 total_pop += district.population
             response["totalPopulation"] = total_pop
             return response
+
+        @self.public_api.get("/auth/discord/callback")
+        def auth(code: str = None, state: str = None):
+            """
+            Called via discord authentication redirect. This will fire every time someone tries to login.
+            We need to let our backend know that someone is trying to login using the given code and state.
+            """
+
+            # If this was a bogus API call, don't even bother.
+            if None in [code, state]:
+                return
+
+            # Broadcast an event that our authentication services can intercept. You can honestly think of this as a username and password event :p
+            ctx = AuthenticationGlobals.DiscordAuthenticationEventContext(code=code, session=state)
+            messenger.send(ctx.AUTH_EVENT_IDENTIFIER, [ctx])
 
     def __public_api_shutdown_callback(self):
         self.Notify.debug("Public API shutting down...")

@@ -197,6 +197,7 @@ class CreateAvatarOperation(GameOperation):
     def __handleRetrieve(self, dclass, fields):
         if dclass != self.gameServicesManager.air.dclassesByName['AccountUD']:
             # This is not an account object! Kill the connection.
+            self.notify.warning(f"Failed to query avatars for {self.target}! Dclass mismatch {dclass} is not AccountUD")
             self.demand('Kill', 'Your account object (%s) was not found in the database!' % dclass)
             return
 

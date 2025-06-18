@@ -1,6 +1,9 @@
-import dbm
-import dbm.dumb
-import sys
+import typing
+
+import uuid as uuidlib
+from os import environ
+
+import requests
 import time
 from datetime import datetime
 
@@ -9,78 +12,18 @@ from direct.distributed.DistributedObjectGlobalUD import DistributedObjectGlobal
 from direct.distributed.PyDatagram import *
 from direct.fsm.FSM import FSM
 
+from otp.astron.MsgTypes import *
 from otp.distributed import OtpDoGlobals
 from otp.otpbase import OTPGlobals
 
-# Do not delete this import even though it says it is unused!!!
-# It defines some globals that we need to work.
-from direct.distributed.MsgTypes import *
 
+from otp.uberdog.authentication import AuthenticationGlobals
+from otp.uberdog.persistence.AccountLookupResult import AccountLookupResult
+from otp.uberdog.persistence.DeveloperAccountDb import DeveloperAccountDb
+from otp.uberdog.persistence.MongoAccountDb import MongoAccountDb
 
-# --- ACCOUNT DATABASES ---
-# These classes make up the available account database interfaces for Toontown Online.
-# At the moment, we have two functional account database interfaces: DeveloperAccountDB, and LocalAccountDB.
-# These will be explained further in their respective class definition.
-class AccountDB:
-    """
-    AccountDB is the base class for all account database interface implementations. Inherit from this class when
-    creating new account database interfaces, but DO NOT try to use this class on its own; you'll have a bad time!
-    """
-    notify = DirectNotifyGlobal.directNotify.newCategory('AccountDB')
-
-    def __init__(self, gameServicesManager):
-        self.gameServicesManager = gameServicesManager
-
-        # This uses dbm, so we open the DB file:
-        accountDbFile = simbase.config.GetString('accountdb-local-file', 'astron/databases/accounts.db')
-        self.dbm = dbm.dumb.open(accountDbFile, 'c')
-
-    def lookup(self, playToken, callback):
-        raise NotImplementedError('lookup')  # Must be overridden by subclass.
-
-    def storeAccountID(self, databaseId, accountId, callback):
-        self.dbm[databaseId] = str(accountId)
-        if getattr(self.dbm, 'sync', None):
-            self.dbm.sync()
-            callback(True)
-        else:
-            self.notify.warning('Unable to associate user %s with account %d!' % (databaseId, accountId))
-            callback(False)
-
-
-class DeveloperAccountDB(AccountDB):
-    """
-    DeveloperAccountDB is a special account database interface implementation designed for use on developer builds of
-    the game. This is the default account database interface when running the server locally via source code, which is
-    assumed to be a development environment. DeveloperAccountDB accepts a username, and assigns each new user with
-    "TTOFF_DEVELOPER" access automatically upon login.
-    """
-    notify = DirectNotifyGlobal.directNotify.newCategory('DeveloperAccountDB')
-
-    def lookup(self, playToken, callback):
-        # Check if this play token exists in the dbm:
-        if str(playToken) not in self.dbm:
-            # It is not, so we'll associate them with a brand new account object.
-            callback({'success': True,
-                      'accountId': 0,
-                      'databaseId': playToken,
-                      'accessLevel': "TTOFF_DEVELOPER"})
-        else:
-            def handleAccount(dclass, fields):
-                if dclass != self.gameServicesManager.air.dclassesByName['AccountUD']:
-                    result = {'success': False,
-                              'reason': 'Your account object (%s) was not found in the database!' % dclass}
-                else:
-                    # We already have an account object, so we'll just return what we have.
-                    result = {'success': True,
-                              'accountId': int(self.dbm[playToken]),
-                              'databaseId': playToken,
-                              'accessLevel': fields.get('ACCESS_LEVEL', 'NO_ACCESS')}
-
-                callback(result)
-
-            self.gameServicesManager.air.dbInterface.queryObject(self.gameServicesManager.air.dbId,
-                                                                 int(self.dbm[playToken]), handleAccount)
+if typing.TYPE_CHECKING:
+    from toontown.toonbase.ToonBaseGlobals import taskMgr
 
 
 class GameOperation(FSM):
@@ -115,6 +58,220 @@ class GameOperation(FSM):
         self.demand('Off')
 
 
+class DiscordAuthenticateOperation(GameOperation):
+    """
+    The painful operation of authenticating a user via Discord before allowing a login.
+    The idea with this source is that we DO NOT want to store information such as emails and passwords for users,
+    since we are a small and uncredible group. This means our login process can only be done in 1 way, where we
+    let people login via a play token. This is where Discord OAuth2 comes in to play.
+
+    This operation acts as a middleman in the login process. If Discord OAuth2 is enabled, then we don't accept
+    play tokens from connections. We provide them with a unique identifier and tell them to authorize us to log in with
+    that identifier using their Discord account. Once we retrieve their Discord ID and verify that it matches with
+    the unique identifier and Astron connection, we can use their Discord ID as a play token.
+
+    I would also like to make a developer note on the structure of this class. Usually, I order methods in order of
+    public then private methods, but I tried to lay out the order of definitions in this class with the order that
+    the code should be executed, due to the callback nature of operations. If you read this class from top to bottom,
+    you can expect that the flow of the operation should match.
+    """
+    notify = DirectNotifyGlobal.directNotify.newCategory('DiscordAuthenticateOperation')
+    targetConnection = True
+
+    def __init__(self, gameServicesManager, target, uuid, client, secret, redirect):
+        super().__init__(gameServicesManager, target)
+        self.uuid = uuid  # The unique "token" we generated that is going to match this auth event with this connection.
+        self._clientId = client  # The client ID that is used to build an OAuth2 link
+        self._secret = secret  # The client secret that is used to verify an OAuth2 link
+        self._redirect = redirect
+        self.user: AuthenticationGlobals.DiscordUserInformation | None = None
+
+    def __build_oauth2_link(self) -> str:
+        return f"https://discord.com/oauth2/authorize?client_id={self._clientId}&response_type=code&redirect_uri={self._redirect}&scope=identify&state={self.uuid}"
+
+    def __build_redirect_link(self) -> str:
+        """
+        Formats a redirect link to replace encoded HTTP characters.
+        """
+        return self._redirect.replace('%2F', '/').replace('%3A', ':')
+
+    def enterStart(self):
+        """
+        Send the sender how we are handling authentication and a unique identifier that our callback can handle.
+        We need to provide the client with that UUID so when they send the authentication link, we know that they
+        are the ones that sent it on the backend. Once we receive that authentication hit on our public API from
+        their redirect, we can be sure that the connection that is associated with this UUID belongs to the connection
+        that authenticated. Since we are mapping server side only connection IDs to this unique ID, even if
+        the user were to authenticate from another device via copying the link and going somewhere else, only
+        the connection that initiated the process will be able to log in.
+        The next step for this operation will occur from Discord forcing a redirect for the user after the
+        authentication process that hits our public /auth API with a temporary code that we can use to get tokens.
+        """
+        # Accept any discord authentication events. We will know if an event affects us if the session matches our UUID.
+        # todo: maybe find a way to make this less verbose. very java pilled currently.
+        self.accept(AuthenticationGlobals.DiscordAuthenticationEventContext.AUTH_EVENT_IDENTIFIER,
+                    self.__handle_discord_auth_event)
+        self.notify.debug(f"Starting discord auth operation for sender {self.target} with session {self.uuid}. Waiting for auth response...")
+
+        # Alert the connection of how we authenticate.
+        self.gameServicesManager.sendUpdateToChannel(self.target, 'setAuthScheme',
+                                                     [self.gameServicesManager.authenticationScheme, self.uuid, self.__build_oauth2_link()])
+
+    def exitStart(self):
+        """
+        When we exit the start process, we no longer need to listen for authentication events.
+        """
+        self.notify.debug(f"No longer listening for an authentication event for sender {self.target} with session {self.uuid}")
+        self.ignore(AuthenticationGlobals.DiscordAuthenticationEventContext.AUTH_EVENT_IDENTIFIER)
+
+    def __handle_discord_auth_event(self, event: AuthenticationGlobals.DiscordAuthenticationEventContext):
+        # If this session doesn't apply to us, don't continue. Just means someone else is authenticating.
+        if event.session != self.uuid:
+            return
+
+        self.notify.debug(f"Handling discord auth event for sender {self.target} with session {self.uuid}.")
+
+        # If we aren't in a valid state to continue, don't do anything.
+        if self.state != 'Start':
+            return
+
+        self.notify.debug(f"In correct state, moving on to token retrieval.")
+        # This applies to us! The user successfully authenticated. Go to the next step.
+        self.demand('RetrieveToken', event.code)
+        self.ignore(AuthenticationGlobals.DiscordAuthenticationEventContext.AUTH_EVENT_IDENTIFIER)
+
+    def enterRetrieveToken(self, code: str):
+        """
+        The user has successfully gone through the OAuth2 process of logging in via their browser, and they have sent
+        us a code that we can trade for access/refresh tokens. These tokens can then be utilized to retrieve
+        non-sensitive information about their Discord account. All we need to do in this step is send a POST request
+        to Discord's API. The result will give us tokens.
+        """
+        # First, required form data.
+        data = {
+            'client_id': self._clientId,
+            'client_secret': self._secret,
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': f'{self.__build_redirect_link()}'
+        }
+        # Header information.
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        self.notify.debug(f"Sending POST request to retrieve access token for session {self.uuid} using code: {code}")
+        # Send the response. Make sure to set up a callback when we receive a response.
+        AuthenticationGlobals.send_post(
+            'https://discord.com/api/v10/oauth2/token',
+            data=data,
+            headers=headers,
+            callback=self.__handle_access_token_response
+        )
+
+    def __handle_access_token_response(self, response: requests.Response | None):
+
+        self.notify.debug(f"Received response from POST request to retrieve access token for session {self.uuid}.")
+
+        # If we aren't in a valid state to continue, don't do anything.
+        # This can happen if our operation gets killed in the middle of an HTTP request.
+        if self.state != 'RetrieveToken':
+            return
+
+        if response is None:
+            self.demand("Kill", "Failed to communicate with Discord's authentication API. Try again later.")
+            return
+
+        self.notify.debug(f"Received response from access token request with a status code of {response.status_code} reason={response.reason}")
+
+        # If the response is None, that means this operation is toast. Cancel.
+        if response.status_code != 200:
+            self.notify.warning(f"failed to retrieve access tokens - response: {response.json()}")
+            self.demand('Kill', "Failed to retrieve authentication token from Discord. Is the API down?")
+            return
+
+        self.notify.debug(f"In correct state, moving on to information retrieval.")
+
+        # Let's go to the next step.
+        self.demand('RetrieveInformation', response)
+
+    def enterRetrieveInformation(self, response: requests.Response):
+        """
+        Called once we receive a successful response from Discord when trying to trade a code for access tokens.
+        Sends a new request to Discord that queries user information using their access token.
+        """
+        # The data we received contains an access token. Use this token to query information about them.
+        data = response.json()
+        token = data['access_token']
+        headers = {
+            'Authorization': f"Bearer {token}"
+        }
+
+        self.notify.debug(f"Sending GET request to retrieve information about access token for session {self.uuid}.")
+        self.notify.debug(f"Full data: {data}")
+        # Fire and forget a GET response to query information about the user using their authentication token.
+        AuthenticationGlobals.send_get(
+            'https://discord.com/api/v10/oauth2/@me',
+            headers=headers,
+            callback=self.__handle_discord_information_response
+        )
+
+    def __handle_discord_information_response(self, response: requests.Response | None):
+
+        self.notify.debug(f"Handling Discord information response for session {self.uuid}.")
+
+        # If we aren't in a valid state to continue, don't do anything.
+        # This can happen if our operation gets killed in the middle of an HTTP request.
+        if self.state != 'RetrieveInformation':
+            return
+
+        self.notify.debug(f"Received response from information request with a status code of {response.status_code} reason={response.reason}")
+
+        # If the response is None, that means this operation is toast. Cancel.
+        if response is None or response.status_code != 200:
+            self.notify.warning(f"failed to retrieve discord information - response: {response.json()}")
+            self.demand('Kill', "Failed to retrieve user information from Discord. Is the API down?")
+            return
+
+        self.notify.debug(f"In correct state, moving on to information parsing.")
+
+        # Next step!
+        self.demand('GotInformation', response)
+
+    def enterGotInformation(self, response: requests.Response):
+        """
+        This response should contain information about the user! Now that we have Discord information to associate
+        with this session and connection, we can now move on to the normal login stage. Finally.
+        This call will clean up this operation. Afterward, we can schedule the new one.
+        """
+        # Clean up this operation. We are done.
+        self.notify.debug(f"Successfully authenticated and extracted information. Cleaning up Authentication operation...")
+
+        # Queue up a new login operation, using the discord ID as the play token. todo
+        # We have their discord ID! This is also a valid state in authentication. We can simply use their
+        # Discord ID as a play token. Additionally, we can also keep track of other data related to their account.
+        data = response.json()
+        _id = data['user']["id"]
+        username = data['user']["username"]
+        pfp = data['user']["avatar"]
+        self.user = AuthenticationGlobals.DiscordUserInformation(_id, username, pfp)
+        self.notify.debug(f"Parsed discord information for session {self.uuid}: id={_id} - username={username} - pfp={pfp}")
+        self.notify.debug(f"Information parsed: {data}")
+
+        # Clean up this operation. Since a user is set, it will attempt to transition to the login event.
+        self.demand("Off")
+        
+    def enterOff(self):
+        """
+        When this operation is done, we no longer need to worry about timing it out.
+        """
+        super().enterOff()
+        taskMgr.remove(f"discord-auth-timeout-{self.target}")
+
+        if self.user is not None:
+            self.notify.debug(f"User information is defined! Queueing up a Login operation...")
+            self.gameServicesManager.startLoginWithPlaytoken(self.target, self.user.userId)
+
+
 class LoginOperation(GameOperation):
     notify = DirectNotifyGlobal.directNotify.newCategory('LoginOperation')
     targetConnection = True
@@ -133,27 +290,32 @@ class LoginOperation(GameOperation):
         # Calls the lookup function on the GameServicesManager's defined account DB interface.
         self.gameServicesManager.accountDb.lookup(self.playToken, self.__handleLookup)
 
-    def __handleLookup(self, result):
+    def __handleLookup(self, result: AccountLookupResult):
         # This is a callback function that will be called by the lookup function
         # of the GameServicesManager's account DB interface. It processes the
         # lookup function's result & determines which operation should run next.
-        if not result.get('success'):
+        self.notify.debug(f"Received lookup result: {result}")
+        if not result.success:
             # The play token was rejected! Kill the connection.
             self.gameServicesManager.air.writeServerEvent('play-token-rejected', self.target, self.playToken)
-            self.demand('Kill', result.get('reason', 'The accounts database rejected your play token.'))
+            self.notify.warning(f"Rejecting play token {self.playToken}.")
+            self.demand('Kill', result.reason)
             return
 
         # Grab the databaseId, accessLevel, and accountId from the result.
-        self.databaseId = result.get('databaseId', 0)
-        self.accessLevel = result.get('accessLevel', 'NO_ACCESS')
-        accountId = result.get('accountId', 0)
+        self.databaseId = result.databaseId
+        self.accessLevel = result.accessLevel
+        accountId = result.accountId
+        self.notify.debug(f"Entering account retrieval/creation process with dbId={self.databaseId} accessLevel={self.accessLevel} accId{accountId}.")
 
         if accountId:
             # There is an account ID, so let's retrieve the associated account.
             self.accountId = accountId
+            self.notify.debug(f"Account ID is not 0. Retrieve the account with ID {accountId}.")
             self.demand('RetrieveAccount')
         else:
             # There is no account ID, so let's create a new account.
+            self.notify.debug(f"Account ID is 0. Create a new account.")
             self.demand('CreateAccount')
 
     def enterCreateAccount(self):
@@ -166,6 +328,7 @@ class LoginOperation(GameOperation):
                         'ACCOUNT_ID': str(self.databaseId),
                         'ACCESS_LEVEL': self.accessLevel}
 
+        self.notify.debug(f"Creating account with data {self.account}")
         # Create the account object in the database using the data from self.account.
         # self.__handleCreate is the callback which will be called after createObject has completed.
         self.gameServicesManager.air.dbInterface.createObject(self.gameServicesManager.air.dbId,
@@ -173,6 +336,9 @@ class LoginOperation(GameOperation):
                                                               self.account, self.__handleCreate)
 
     def __handleCreate(self, accountId):
+
+        self.notify.debug(f"Account creation process for account {accountId}")
+
         # This function handles successful & unsuccessful account creations.
         if self.state != 'CreateAccount':
             # If we're not in the CreateAccount state, this request is invalid.
@@ -213,6 +379,7 @@ class LoginOperation(GameOperation):
         # Query the database object associated with self.accountId.
         # self.__handleRetrieve is the callback which will be called
         # after queryObject has completed.
+        self.notify.debug(f"Entering account retrieval process. Querying for account {self.accountId}")
         self.gameServicesManager.air.dbInterface.queryObject(self.gameServicesManager.air.dbId, self.accountId,
                                                              self.__handleRetrieve)
 
@@ -221,10 +388,12 @@ class LoginOperation(GameOperation):
         # the SetAccount state. Otherwise, the connection is killed.
         if dclass != self.gameServicesManager.air.dclassesByName['AccountUD']:
             # This is not an account object! Kill the connection.
+            self.notify.warning(f'Object class associated with account {self.accountId} is not an AccountUD object. It is {dclass}')
             self.demand('Kill', 'Your account object (%s) was not found in the database!' % dclass)
             return
 
         # We can now enter the SetAccount state.
+        self.notify.debug(f"Entering SetAccount phase. Successfully queried account.")
         self.account = fields
         self.demand('SetAccount')
 
@@ -281,6 +450,7 @@ class AvatarOperation(GameOperation):
     def __handleRetrieve(self, dclass, fields):
         if dclass != self.gameServicesManager.air.dclassesByName['AccountUD']:
             # This is not an account object! Kill the connection.
+            self.notify.warning(f"Failed to query for {self.target}'s avatars. The dclass is not an AccountUD! It is {dclass}")
             self.demand('Kill', 'Your account object (%s) was not found in the database!' % dclass)
             return
 
@@ -653,9 +823,47 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
 
     def __init__(self, air):
         DistributedObjectGlobalUD.__init__(self, air)
+        self._clientId = environ.get('DISCORD_APP_CLIENT_ID', None)
+        self._clientSecret = environ.get('DISCORD_APP_CLIENT_SECRET', None)
+        self._clientRedirect = environ.get('DISCORD_APP_CLIENT_REDIRECT', None)
         self.connection2fsm = {}
         self.account2fsm = {}
         self.accountDb = None
+
+        # The authentication scheme you want the server to use. You may only use one. The following options are as follows:
+        # AUTHENTICATION_SCHEME_DISCORD: Usernameless/Passwordless/Emailless login. Users login by clicking a link.
+        # AUTHENTICATION_SCHEME_DEVTOKEN: Users login by providing a username. No passwords/emails involved, your username is essentially your login password.
+        _authScheme = environ.get('AUTHENTICATION_SCHEME', 'DEVTOKEN')
+        self.authenticationScheme = None
+        if _authScheme == 'DEVTOKEN':
+            self.authenticationScheme = AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN
+        elif _authScheme == 'DISCORDOAUTH2':
+            self.authenticationScheme = AuthenticationGlobals.AUTHENTICATION_SCHEME_DISCORD
+
+        # If an auth scheme was unresolved, default to devtoken. Print out a warning though just in case.
+        if self.authenticationScheme is None:
+            self.notify.warning(f"Did not detect a valid authentication scheme. Defaulting to DEVTOKEN. Please be sure to double check your configuration.")
+            self.authenticationScheme = AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN
+
+        # This is an important step and a fatal configuration issue if this occurs.
+        # If we are using discord authentication but have no OAuth2 environment variables set, make the application throw.
+        if self.authenticationScheme == AuthenticationGlobals.AUTHENTICATION_SCHEME_DISCORD:
+            if None in (self._clientId, self._clientSecret, self._clientRedirect):
+                self.notify.error(f"OAuth2 authentication scheme is enabled but you are missing values for either your client ID, client secret, or redirect URI. Check your configuration and try again!")
+                raise Exception(f"OAuth2 authentication scheme is enabled but you are missing values for either your client ID, client secret, or redirect URI. Check your configuration and try again!")
+
+        # If the client secret and ID are STILL None, it means they are unneeded. Ensure they aren't None so Astron doesn't freak out.
+        if self._clientId is None:
+            self._clientId = ''
+        if self._clientSecret is None:
+            self._clientSecret = ''
+        if self._clientRedirect is None:
+            self._clientRedirect = ''
+
+    def __findMongoCredentials(self):
+        user = environ.get('MONGO_ROOT_USERNAME', None)
+        passw = environ.get('MONGO_ROOT_PASSWORD', None)
+        return user, passw
 
     def announceGenerate(self):
         DistributedObjectGlobalUD.announceGenerate(self)
@@ -670,10 +878,53 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         self.account2fsm = {}
 
         # Instantiate the account database interface.
-        # TODO: In the future, add more database interfaces & make this configurable.
-        self.accountDb = DeveloperAccountDB(self)
+        # If we have Mongo credentials set, we can assume we want to use MongoDB. Otherwise, just use Dev DB.
+        credentials = self.__findMongoCredentials()
+        if None in credentials:
+            self.accountDb = DeveloperAccountDb(self)
+        else:
+            self.accountDb = MongoAccountDb(self, f"mongodb://{credentials[0]}:{credentials[1]}@db:27017/astrondb")
+
+    def requestAuthScheme(self):
+        """
+        Called from a client. They would like to know our authentication scheme. Associate this connection with
+        a short-lived identifier so we can map an OAuth2 callback with them. This will also trigger the
+        "Authentication" process in the login flow, which happens before actually logging them in.
+        """
+        sender = self.air.getMsgSender()
+
+        # Create a new UUID and associate it with this sender.
+        uuid: uuidlib.UUID = uuidlib.uuid4()
+        self.notify.debug(f"Started new authentication session with {sender}. Their session ID is {uuid}")
+        taskMgr.doMethodLater(5 * 60, self.__timeoutAuthenticationProcess, f"discord-auth-timeout-{sender}", extraArgs=[sender])  # Expire this process after 5 min.
+        self.notify.debug(f"Authentication session will time out in 5 minutes.")
+
+        # This operation starts in a floating limbo state, while we wait for the user to authenticate.
+        self.connection2fsm[sender] = DiscordAuthenticateOperation(self, sender, str(uuid), self._clientId, self._clientSecret, self._clientRedirect)
+        self.connection2fsm[sender].request('Start')
+
+    def __timeoutAuthenticationProcess(self, sender, _=None):
+        """
+        Called internally when we want to expire an authentication process. Only will do anything if there is
+        currently an authentication procedure in progress for the given sender.
+        """
+        if sender not in self.connection2fsm:
+            return
+
+        # If the current operation isn't an auth operation, don't worry about it.
+        operation = self.connection2fsm[sender]
+        if not isinstance(operation, DiscordAuthenticateOperation):
+            return
+
+        operation.request("Kill", "Timed out waiting for authentication.")
 
     def login(self, playToken):
+        """
+        Called via an astron update from clients. They provide a play token for us to check against.
+        When they provide us this token, we need to see if it associates with an account.
+        Note that this will only work if we are entrusting clients with their own play tokens. If we are using
+        a method of OAuth2 to authenticate, we do not log in clients via this method.
+        """
         # Get the connection ID.
         sender = self.air.getMsgSender()
 
@@ -689,9 +940,40 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
             self.killConnectionFSM(sender)
             return
 
-        # Run the login operation.
+        if self.authenticationScheme != AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN:
+            # If this fires, this is low-key suspicious. We gave them the authentication scheme. Why are they trying to
+            # log in using their own play token when they told them we aren't using them?
+            self.killConnection(sender, "Authentication failed. Are your files out of date?")
+            return
+
+        # Run the normal login operation.
+        self.startLoginWithPlaytoken(sender, playToken)
+
+    def startLoginWithPlaytoken(self, sender, token):
+        """
+        Starts the login process with a given token. If we are not in a valid state for this connection to login,
+        nothing will happen. Ensure the following conditions are met before calling this method:
+        - There is currently not an operation running for the connection (sender).
+        - The token is a play token you trust. If you are authenticating via OAuth2, it needs to be checked to be valid.
+        - You are sure you are fine with the given sender logging in using the given token.
+        """
+        # Run the normal login operation.
+        self.notify.debug(f"Attempting login operation for sender {sender} with token {token}")
+
+        # If we are in the middle of an authentication operation, and we are in a valid state to login, clean it up.
+        operation = self.connection2fsm.get(sender)
+        if isinstance(operation, DiscordAuthenticateOperation):
+            self.notify.debug(f"Connection {sender} was in the middle of authentication and tried to login.")
+            if operation.state == "GotInformation":
+                self.notify.debug(f"They were in a valid state to proceed. Clean up auth operation.")
+                operation.demand("Off")
+            else:
+                self.notify.debug(f"They were not ready to login. Don't do anything. Current state: {operation.state}")
+                return
+
+        self.notify.debug(f"Starting login operation for {sender}. Currently running operation? {sender in self.connection2fsm}")
         self.connection2fsm[sender] = LoginOperation(self, sender)
-        self.connection2fsm[sender].request('Start', playToken)
+        self.connection2fsm[sender].request('Start', token)
 
     def killConnection(self, connectionId, reason):
         # Sends CLIENTAGENT_EJECT to the given connectionId with the given reason.

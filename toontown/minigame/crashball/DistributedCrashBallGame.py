@@ -83,8 +83,6 @@ class DistributedCrashBallGame(DistributedMinigame, CrashBallGamePhysicsWorld):
         # Add our game ClassicFSM to the framework ClassicFSM
         self.addChildGameFSM(self.gameFSM)
 
-        self.notify.setDebug(True)
-
         self.lastForceArrowUpdateTime = 0
         self.npcPlayerIds = []
         self.npcPlayers = {}

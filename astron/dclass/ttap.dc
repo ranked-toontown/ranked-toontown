@@ -825,6 +825,8 @@ struct PotentialAvatar {
 };
 
 dclass GameServicesManager : DistributedObject {
+  requestAuthScheme() clsend;
+  setAuthScheme(int8, string, string);
   login(string) clsend;
   acceptLogin();
   requestAvatarList() clsend;

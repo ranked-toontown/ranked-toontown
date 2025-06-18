@@ -221,8 +221,18 @@ class OTPClientRepository(ClientRepositoryBase):
                   self.exitConnect, [
                       'noConnection',
                       'login',
+                      'authDiscovery',
                       'failedToConnect',
                       'failedToGetServerConstants']),
+            State('authDiscovery',
+                  self.enterAuthDiscovery,
+                  self.exitAuthDiscovery,[
+                      'login',
+                      'noConnection',
+                      'waitForGameList',
+                      'reject'
+                      'failedToConnect',
+                      'shutdown']),
             State('login',
                   self.enterLogin,
                   self.exitLogin, [
@@ -488,7 +498,17 @@ class OTPClientRepository(ClientRepositoryBase):
     def gotoFirstScreen(self):
         self.startReaderPollTask()
         self.startHeartbeat()
+        self.loginFSM.request('authDiscovery')
+
+    def enterAuthDiscovery(self):
+        self.gameServicesManager.d_requestAuthScheme()
+        self.acceptOnce('authSchemeReceived', self.__handleAuthDiscovery)
+
+    def __handleAuthDiscovery(self):
         self.loginFSM.request('login')
+
+    def exitAuthDiscovery(self):
+        pass
 
     @report(types=['args', 'deltaStamp'], dConfigParam='teleport')
     def enterLogin(self):

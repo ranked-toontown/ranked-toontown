@@ -245,10 +245,7 @@ GlobalDialogColor = (1,
  1,
  0.75,
  1)
-DefaultBackgroundColor = (0.3,
- 0.3,
- 0.3,
- 1)
+DefaultBackgroundColor = (0.16, 0.16, 0.16, 1)
 toonBodyScales = {'mouse': 0.6,
  'cat': 0.73,
  'duck': 0.66,

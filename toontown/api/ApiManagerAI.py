@@ -18,7 +18,6 @@ class ApiManagerAI(DistributedObjectGlobalAI):
 
     def __init__(self, air):
         DistributedObjectGlobalAI.__init__(self, air)
-        self.Notify.setDebug(True)
 
     def announceGenerate(self):
         super().announceGenerate()
