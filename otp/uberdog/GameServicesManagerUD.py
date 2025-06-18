@@ -909,7 +909,7 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
 
         # If we are not using OAuth2, we can simply just tell the user we are using normal logins.
         if self.authenticationScheme == AuthenticationGlobals.AUTHENTICATION_SCHEME_DEVTOKEN:
-            self.sendUpdateToChannel(sender, 'setAuthScheme',[self.authenticationScheme, uuid, ''])
+            self.sendUpdateToChannel(sender, 'setAuthScheme',[self.authenticationScheme, str(uuid), ''])
             return
 
         # This operation starts in a floating limbo state, while we wait for the user to authenticate.
