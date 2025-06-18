@@ -1,5 +1,29 @@
 services:
+
+  db:
+    image: mongo:latest
+    command: mongod --quiet --bind_ip 0.0.0.0 --logpath /dev/null  # Makes mongo shut the fuck up bc it is so obnoxious
+    # Use this command instead if you are having authentication issues.
+    # It is not recommended, but as long as you are NOT exposing any ports, it is mostly safe in non-production environments.
+#    command: mongod --noauth --bind_ip 0.0.0.0
+    container_name: db
+    environment:
+      - MONGO_INITDB_DATABASE=admin
+      - MONGO_INITDB_ROOT_USERNAME=$MONGO_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD=$MONGO_ROOT_PASSWORD
+    # Only expose ports if you NEED to externally access the database.
+#    ports:  # Use for windows
+#      - "27017:27017"
+#    ports: # Use for linux
+#      - "127.0.0.1:27017:27017"
+    volumes:
+      - ./database:/data/db
+    restart: unless-stopped
+    mem_reservation: 512m
+
   astron:
+    depends_on:
+      - db
     build:
       context: ../..
       dockerfile: launch/docker/astron.dockerfile
@@ -20,6 +44,8 @@ services:
       dockerfile: launch/docker/server.dockerfile
     platform: linux/amd64 # Force x64 on ARM platforms.
     restart: always
+    ports:
+      - "8080:8080"
     environment:
       SERVICE_TO_RUN: UD
       BASE_CHANNEL: 1000000

@@ -79,6 +79,11 @@ roles:
       backend:
           type: yaml
           directory: ../databases/astrondb
+          # If you wish to use docker/mongo, comment the above 2 lines and uncomment the next two.
+#          type: mongodb
+#          server: mongodb://db:27017/astrondb
+          # If you need to authenticate, use this one.
+#          server: mongodb://<username>:<password>@db:27017/astrondb
 
     - type: dbss
       database: 4003
