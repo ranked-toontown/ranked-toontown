@@ -24,7 +24,6 @@ RUN apt-get install -y \
 # Install game dependencies \
 COPY requirements.txt .
 RUN python3.11 -m pip install -r requirements.txt
-RUN python3.11 -m pip install "https://github.com/toontown-archipelago/panda3d/releases/latest/download/panda3d-1.11.0-cp311-cp311-linux_x86_64.whl"
 
 # Start the server
 ENTRYPOINT ["python3.11", "-m", "launch.launcher.launch"]
