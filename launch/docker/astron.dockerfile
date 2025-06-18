@@ -27,7 +27,7 @@ ENV CMAKE_PREFIX_PATH=/usr/local/lib/cmake
 
 # Build Astron
 WORKDIR /app/build
-RUN git clone -b mongo https://github.com/ranked-toontown/Astron.git .
+RUN git clone https://github.com/ranked-toontown/Astron.git .
 RUN mkdir -p build && \
     cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release \
