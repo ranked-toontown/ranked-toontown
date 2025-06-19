@@ -560,6 +560,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def enterFrameworkWaitServerStart(self):
         self.notify.debug('BASE: enterFrameworkWaitServerStart')
+        # Clean up the ready timeout timer since we're no longer waiting for ready
+        self._destroyReadyTimeoutTimer()
         if self.numPlayers > 1:
             msg = TTLocalizer.MinigameWaitingForOtherPlayers
         else:

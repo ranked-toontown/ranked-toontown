@@ -604,6 +604,8 @@ class DistributedCraneGame(DistributedMinigame):
         return panel
 
     def __handlePlayButton(self):
+        # Clean up the ready timeout timer when play is pressed
+        self._destroyReadyTimeoutTimer()
         messenger.send(self.rulesDoneEvent)
 
     def __handleModifiersButton(self):
