@@ -872,8 +872,21 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Only reset spawn order if it hasn't been manually customized by the leader
         if not hasattr(self, 'customSpawnOrderSet') or not self.customSpawnOrderSet:
             self.toonSpawnpointOrder = [i for i in range(16)]
-            if self.ruleset.RANDOM_SPAWN_POSITIONS:
+            
+            # For best of 1 matches, randomize only the first spawn positions based on number of participants
+            if self.bestOfValue == 1:
+                # Get number of participating toons (not spectating)
+                numParticipants = len(self.getParticipantIdsNotSpectating())
+                if numParticipants > 0:
+                    # Randomize only the first 'numParticipants' positions
+                    firstPositions = self.toonSpawnpointOrder[:numParticipants]
+                    random.shuffle(firstPositions)
+                    # Put the randomized positions back at the beginning
+                    self.toonSpawnpointOrder[:numParticipants] = firstPositions
+            # For other matches (best of 3, 5, 7), use the existing ruleset randomization if enabled
+            elif self.ruleset.RANDOM_SPAWN_POSITIONS:
                 random.shuffle(self.toonSpawnpointOrder)
+                
         self.d_setToonSpawnpointOrder()
 
     def resetCustomSpawnOrder(self):
