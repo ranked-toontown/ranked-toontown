@@ -118,6 +118,12 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         """
         self.sendUpdate('setSkillProfileKey', [key.value if self.isRanked() else ''])
 
+    def d_setReadyTimeout(self, timeout):
+        """
+        Send the ready timeout duration to clients so they can display a countdown timer.
+        """
+        self.sendUpdate('setReadyTimeout', [timeout])
+
     def addChildGameFSM(self, gameFSM):
         self.frameworkFSM.getStateNamed('frameworkGame').addChild(gameFSM)
 
@@ -364,6 +370,9 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         for avId in list(self.stateDict.keys()):
             if self.stateDict[avId] == READY:
                 self.__barrier.clear(avId)
+
+        # Send the timeout duration to clients so they can display a countdown timer
+        self.d_setReadyTimeout(READY_TIMEOUT)
 
         self.notify.debug('  safezone: %s' % self.getSafezoneId())
         self.notify.debug('difficulty: %s' % self.getDifficulty())

@@ -91,6 +91,8 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Status effect system will be set via setStatusEffectSystemId
         self.statusEffectSystem : DistributedStatusEffectSystem | None = None
+        
+
 
         self.warningSfx = None
 
@@ -894,6 +896,8 @@ class DistributedCraneGame(DistributedMinigame):
             modifierEnum = self.modifiers[modifierIndex].MODIFIER_ENUM
             self.sendUpdate('removeModifier', [modifierEnum])
     
+
+
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
         self.ignore('spotStatusChanged')
@@ -1310,14 +1314,14 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default
         self.rulesPanel.hide()
 
+
+
         # Only show the play and participants buttons for the leader
         if self.isLocalToonHost():
             self.playButton.show()
             self.modifiersButton.show()
             self.bestOfButton.show()
-        else:
-            # Non-leader players automatically trigger ready
-            messenger.send(self.rulesDoneEvent)
+        # Non-leaders just wait for the leader to start or the timer to expire
 
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
@@ -1344,6 +1348,9 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Clean up click detection
         self.ignore('mouse1')
+        
+        # Clean up any pending auto-ready task
+        taskMgr.remove(self.uniqueName('auto-ready'))
             
         # Make sure to clean up all indicators
         self.removeStatusIndicators()

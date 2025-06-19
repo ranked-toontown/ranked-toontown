@@ -1805,6 +1805,7 @@ dclass DistributedMinigame : DistributedObject {
   setGameExit() broadcast;
   setGameAbort() broadcast;
   setSpectators(uint32[]) broadcast ram;
+  setReadyTimeout(uint16) broadcast;
 };
 
 dclass DistributedMinigameTemplate : DistributedMinigame {

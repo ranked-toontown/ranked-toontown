@@ -63,6 +63,10 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.frameworkFSM.enterInitialState()
         self.skillProfileKey = ''
         self._telemLimiter = None
+        
+        # Ready timeout timer
+        self.readyTimeoutTimer = None
+        self.readyTimeoutDuration = 0
         return
 
     def addChildGameFSM(self, gameFSM):
@@ -366,6 +370,41 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.skillProfileKey = key
         self.updatePlayerNametags()
 
+    def setReadyTimeout(self, timeout):
+        """
+        Receive the ready timeout duration from the server and start displaying a countdown timer.
+        """
+        self.readyTimeoutDuration = timeout
+        self._createReadyTimeoutTimer()
+
+    def _createReadyTimeoutTimer(self):
+        """Create and display the ready timeout countdown timer"""
+        from toontown.toonbase import ToontownTimer
+        
+        # Clean up any existing timer
+        self._destroyReadyTimeoutTimer()
+        
+        self.readyTimeoutTimer = ToontownTimer.ToontownTimer()
+        self.readyTimeoutTimer.reparentTo(aspect2d)
+        self.readyTimeoutTimer.setScale(0.4)
+        self.readyTimeoutTimer.setPos(1.5, 0, -0.8)  # Bottom right corner
+        
+        # Start the countdown - when it expires, the server will automatically abort the game
+        self.readyTimeoutTimer.countdown(self.readyTimeoutDuration, self._handleReadyTimeoutExpired)
+
+    def _handleReadyTimeoutExpired(self):
+        """Called when the ready timeout timer expires (though server handles the actual timeout)"""
+        # The server will handle the actual timeout and game abort
+        # This is just for visual feedback
+        pass
+
+    def _destroyReadyTimeoutTimer(self):
+        """Clean up the ready timeout timer"""
+        if self.readyTimeoutTimer is not None:
+            self.readyTimeoutTimer.stop()
+            self.readyTimeoutTimer.removeNode()
+            self.readyTimeoutTimer = None
+
     def updatePlayerNametags(self):
         """
         Updates every player's nametag in the instance.
@@ -511,6 +550,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.rulesPanel.exit()
         self.rulesPanel.unload()
         del self.rulesPanel
+        # Clean up the ready timeout timer
+        self._destroyReadyTimeoutTimer()
 
     def handleRulesDone(self):
         self.notify.debug('BASE: handleRulesDone')
@@ -560,6 +601,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def enterFrameworkCleanup(self):
         self.notify.debug('BASE: enterFrameworkCleanup')
+        # Clean up the ready timeout timer
+        self._destroyReadyTimeoutTimer()
         for action in self.cleanupActions:
             action()
 
