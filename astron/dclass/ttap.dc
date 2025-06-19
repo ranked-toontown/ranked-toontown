@@ -3978,6 +3978,8 @@ dclass DistributedCraneGame: DistributedMinigame {
   setOvertime(uint8 flag) broadcast ram;
   handleSpotStatusChanged(uint8 spotIndex, bool isPlayer) airecv clsend;
   updateSpotStatus(uint8 spotIndex, bool isPlayer) broadcast ram;
+  addModifier(uint32 modifierEnum, uint8 tier) airecv clsend;
+  removeModifier(uint32 modifierEnum) airecv clsend;
 };
 
 dclass DistributedScaleGame: DistributedMinigame {

@@ -1608,3 +1608,64 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
 
         self.__updateSkillProfile()
+
+    def addModifier(self, modifierEnum, tier=1):
+        """Handle request to add a modifier from the client"""
+        # Only allow the leader to add modifiers
+        avId = self.air.getAvatarIdFromSender()
+        if not self.hasHost() or avId != self.getHost():
+            self.notify.warning(f"Non-leader {avId} attempted to add modifier")
+            return
+        
+        # Check if modifier already exists
+        for mod in self.modifiers:
+            if mod.MODIFIER_ENUM == modifierEnum:
+                self.notify.warning(f"Modifier {modifierEnum} already exists")
+                return
+        
+        # Get the modifier class and create instance
+        if modifierEnum in CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES:
+            modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES[modifierEnum]
+            modifier = modifierClass(tier)
+            self.applyModifier(modifier, updateClient=True)
+            self.notify.info(f"Added modifier {modifier.getName()} (tier {tier})")
+        else:
+            self.notify.warning(f"Unknown modifier enum: {modifierEnum}")
+    
+    def removeModifier(self, modifierEnum):
+        """Handle request to remove a modifier from the client"""
+        # Only allow the leader to remove modifiers
+        avId = self.air.getAvatarIdFromSender()
+        if not self.hasHost() or avId != self.getHost():
+            self.notify.warning(f"Non-leader {avId} attempted to remove modifier")
+            return
+        
+        # Find and remove the modifier
+        for i, mod in enumerate(self.modifiers):
+            if mod.MODIFIER_ENUM == modifierEnum:
+                removedMod = self.modifiers.pop(i)
+                # Rebuild ruleset from scratch without the removed modifier
+                self.__rebuildRuleset()
+                self.notify.info(f"Removed modifier {removedMod.getName()}")
+                return
+        
+        self.notify.warning(f"Modifier {modifierEnum} not found to remove")
+    
+    def __rebuildRuleset(self):
+        """Rebuild the ruleset from scratch with current modifiers"""
+        # Reset to base ruleset
+        self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
+        
+        # Reapply all remaining modifiers
+        for modifier in self.modifiers:
+            modifier.apply(self.ruleset)
+        
+        self.ruleset.validate()
+        
+        # Update clients
+        self.d_setRawRuleset()
+        self.d_setModifiers()
+        
+        # Update boss if it exists
+        if self.getBoss() is not None:
+            self.getBoss().setRuleset(self.ruleset)
