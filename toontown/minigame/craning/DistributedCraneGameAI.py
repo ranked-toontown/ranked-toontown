@@ -1627,6 +1627,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if modifierEnum in CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES:
             modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES[modifierEnum]
             modifier = modifierClass(tier)
+            
+            # Add to desired modifiers so it persists across game restarts
+            self.desiredModifiers.append(modifier)
+            
             self.applyModifier(modifier, updateClient=True)
             self.notify.info(f"Added modifier {modifier.getName()} (tier {tier})")
         else:
@@ -1640,16 +1644,27 @@ class DistributedCraneGameAI(DistributedMinigameAI):
             self.notify.warning(f"Non-leader {avId} attempted to remove modifier")
             return
         
-        # Find and remove the modifier
+        # Find and remove the modifier from both lists
+        removedMod = None
+        
+        # Remove from current modifiers
         for i, mod in enumerate(self.modifiers):
             if mod.MODIFIER_ENUM == modifierEnum:
                 removedMod = self.modifiers.pop(i)
-                # Rebuild ruleset from scratch without the removed modifier
-                self.__rebuildRuleset()
-                self.notify.info(f"Removed modifier {removedMod.getName()}")
-                return
+                break
         
-        self.notify.warning(f"Modifier {modifierEnum} not found to remove")
+        # Remove from desired modifiers so it doesn't come back on restart
+        for i, mod in enumerate(self.desiredModifiers):
+            if mod.MODIFIER_ENUM == modifierEnum:
+                self.desiredModifiers.pop(i)
+                break
+        
+        if removedMod:
+            # Rebuild ruleset from scratch without the removed modifier
+            self.__rebuildRuleset()
+            self.notify.info(f"Removed modifier {removedMod.getName()}")
+        else:
+            self.notify.warning(f"Modifier {modifierEnum} not found to remove")
     
     def __rebuildRuleset(self):
         """Rebuild the ruleset from scratch with current modifiers"""
