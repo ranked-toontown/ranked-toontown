@@ -6,7 +6,7 @@ from direct.fsm import ClassicFSM, State
 from toontown.battle.BattleBase import *
 from . import CogDisguiseGlobals
 from toontown.toonbase.ToontownBattleGlobals import getStageCreditMultiplier
-from direct.showbase.PythonUtil import addListsByValue
+from otp.otpbase.PythonUtil import addListsByValue
 from otp.otpbase.PythonUtil import enumerate
 from ..archipelago.definitions.death_reason import DeathReason
 

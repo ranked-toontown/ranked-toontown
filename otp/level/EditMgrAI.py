@@ -1,6 +1,6 @@
 from . import EditMgrBase
 if __dev__:
-    from direct.showbase.PythonUtil import list2dict
+    from otp.otpbase.PythonUtil import list2dict
     from . import EditorGlobals
 
 class EditMgrAI(EditMgrBase.EditMgrBase):

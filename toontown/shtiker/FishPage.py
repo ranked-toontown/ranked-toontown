@@ -51,7 +51,7 @@ class FishPage(ShtikerPage.ShtikerPage):
         trophyCase.find('glass1').reparentTo(trophyCase, -1)
         trophyCase.find('shelf').reparentTo(trophyCase, -1)
         self.trophyCase = trophyCase
-        self.title = DirectLabel(parent=self, relief=None, text='', text_scale=0.1, pos=(0, 0, 0.65))
+        self.title = DirectLabel(parent=self, relief=None, text='', text_scale=0.12, pos=(0, 0, 0.6)) 
         normalColor = (1, 1, 1, 1)
         clickColor = (0.8, 0.8, 0, 1)
         rolloverColor = (0.15, 0.82, 1.0, 1)
@@ -67,8 +67,8 @@ class FishPage(ShtikerPage.ShtikerPage):
     def createFishPicker(self):
         if not hasattr(self, 'picker'):
             self.picker = FishPicker.FishPicker(self)
-            self.picker.setPos(-0.555, 0, 0.1)
-            self.picker.setScale(0.95)
+            self.picker.setPos(-0.555, 0, 0.04)
+            self.picker.setScale(0.9)
             self.rod = DirectLabel(parent=self.picker, relief=None, text='', text_align=TextNode.ALeft, text_scale=0.06, pos=(0.9, 0, -0.65))
         return
 

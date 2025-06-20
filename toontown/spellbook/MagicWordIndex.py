@@ -1840,6 +1840,22 @@ class MaxDoodle(MagicWord):
         pet.b_setTrickAptitudes([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return "Maxed your doodle!"
 
+class PrintMessenger(MagicWord):
+    desc = "Dumps messenger on the AI"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+
+    def handleWord(self, invoker, avId, toon, *args):
+        print(messenger)
+        return "Check AI logs"
+
+
+class PrintTaskManager(MagicWord):
+    desc = "Dumps taskmgr on the AI"
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+
+    def handleWord(self, invoker, avId, toon, *args):
+        print(taskMgr)
+        return "Check AI logs"
 
 class LeaveRace(MagicWord):
     desc = "Leave the current race you are in."
@@ -1848,6 +1864,19 @@ class LeaveRace(MagicWord):
 
     def handleWord(self, invoker, avId, toon, *args):
         messenger.send('leaveRace')
+
+
+class Queue(MagicWord):
+    desc = "Enters the matchmaking queue."
+    execLocation = MagicWordConfig.EXEC_LOC_SERVER
+    accessLevel = 'TTOFF_DEVELOPER'
+
+    def handleWord(self, invoker, avId, toon, *args):
+        success = simbase.air.matchmaker.addPlayerToQueue(toon)
+        if not success:
+            return f"{toon.getName()} was unable to join the queue. They are probably already in it."
+
+        return f"{toon.getName()} is now in the queue!"
 
 
 class ListRanks(MagicWord):
@@ -1899,23 +1928,6 @@ class RestartPieRound(MagicWord):
         boss.b_setState('BattleThree')
         return "Restarting Pie Round"
 
-
-class HitCFO(MagicWord):
-    desc = "Hits the CFO."
-    execLocation = MagicWordConfig.EXEC_LOC_SERVER
-    arguments = [("damage", int, False, 0)]
-    accessLevel = 'USER'
-
-    def handleWord(self, invoker, avId, toon, *args):
-        dmg = args[0]
-        from ..minigame.craning.DistributedCraneGameAI import DistributedCraneGameAI
-        craneGame = findToonInMinigame(DistributedCraneGameAI, invoker.doId)
-        if craneGame is None:
-            return "You aren't in a crane round!"
-
-        craneGame.recordHit(dmg, impact=1)
-
-
 class EndCFO(MagicWord):
     aliases = ['end', 'finish', 'forfeit', 'ff']
     desc = "Ends the C.F.O. and forfeits, putting you in last place."
@@ -1932,10 +1944,11 @@ class EndCFO(MagicWord):
         context = craneGame.getScoringContext()
         _round = context.get_round(craneGame.currentRound)
         score = _round.get_score(invoker.doId)
+        num_players = len(craneGame.getParticipantsNotSpectating())
 
         # Ensure all participants at least have a point.
         for toon in craneGame.getParticipantsNotSpectating():
-            if toon.getDoId() != invoker.doId:
+            if toon.getDoId() != invoker.doId or num_players == 1:
                 craneGame.addScore(toon.getDoId(), 2000, reason=CraneLeagueGlobals.ScoreReason.KILLING_BLOW)
 
         craneGame.addScore(invoker.doId, -score, reason=CraneLeagueGlobals.ScoreReason.FORFEIT)

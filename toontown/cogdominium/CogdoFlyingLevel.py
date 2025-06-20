@@ -1,7 +1,7 @@
 from panda3d.core import NodePath, Plane, Vec3, Point3, CollisionPlane, CollisionNode
 from direct.showbase.RandomNumGen import RandomNumGen
 from direct.showbase.DirectObject import DirectObject
-from direct.showbase.PythonUtil import bound as clamp
+from otp.otpbase.PythonUtil import bound as clamp
 from . import CogdoUtil
 from . import CogdoFlyingGameGlobals as Globals
 from .CogdoFlyingLevelQuadrant import CogdoFlyingLevelQuadrant

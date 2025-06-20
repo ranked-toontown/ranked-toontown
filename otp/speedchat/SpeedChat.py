@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import boolEqual
+from otp.otpbase.PythonUtil import boolEqual
 from .SpeedChatTypes import *
 from .SCSettings import SCSettings
 from .SCTerminal import SCWhisperModeChangeEvent

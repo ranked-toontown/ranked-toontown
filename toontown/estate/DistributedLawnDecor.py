@@ -1,7 +1,7 @@
 from panda3d.core import *
 from direct.interval.IntervalGlobal import *
 from direct.distributed import ClockDelta
-from direct.showbase.PythonUtil import lerp
+from otp.otpbase.PythonUtil import lerp
 import math
 from direct.directnotify import DirectNotifyGlobal
 from direct.task import Task

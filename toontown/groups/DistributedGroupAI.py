@@ -50,7 +50,7 @@ class DistributedGroupAI(DistributedObjectAI, GroupBase):
 
         self.announce("Activity starting...")
         self.activityStartCooldown = time.time() + 6
-        minigame = self.air.minigameMgr.createMinigame(self.getMemberIds(), self.zoneId, newbieIds=[], spectatorIds=self.getSpectators(), startingVotes=None, metagameRound=-1)
+        minigame = self.air.minigameMgr.createMinigame(self.getMemberIds(), self.zoneId, hostId=self.getLeader(), spectatorIds=self.getSpectators())
         self.d_setMinigameZone(minigame)
 
     """
@@ -84,3 +84,10 @@ class DistributedGroupAI(DistributedObjectAI, GroupBase):
         """
         for avId in self.getMemberIds():
             self.sendUpdateToAvatarId(avId, 'setMinigameZone', [minigame.zone, minigame.gameId])
+
+    def getNumPlayersNotReady(self) -> int:
+        notReady = 0
+        for member in self.getMembers():
+            if member.status == GroupGlobals.STATUS_UNREADY:
+                notReady += 1
+        return notReady

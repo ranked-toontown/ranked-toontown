@@ -4,8 +4,8 @@ from direct.showbase.ShowBase import *
 from direct.interval.IntervalGlobal import *
 from toontown.battle.BattleProps import *
 from direct.distributed.ClockDelta import *
-from direct.showbase.PythonUtil import Functor
-from direct.showbase.PythonUtil import StackTrace
+from otp.otpbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import StackTrace
 from direct.gui.DirectGui import *
 from panda3d.core import *
 from libotp import *

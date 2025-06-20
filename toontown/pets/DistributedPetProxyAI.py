@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import contains, lerp
+from otp.otpbase.PythonUtil import contains, lerp
 from otp.otpbase.PythonUtil import clampScalar
 from direct.distributed import DistributedObjectAI
 from direct.directnotify import DirectNotifyGlobal

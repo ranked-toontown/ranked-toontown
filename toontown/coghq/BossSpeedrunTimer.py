@@ -18,7 +18,7 @@ class BossSpeedrunTimer:
     def __init__(self):
         self.frame = DirectFrame(pos=(-0.22, 0, .9))
         self.ot_frame = DirectFrame(pos=(0, 0, .9))
-        self.time_text = OnscreenText(parent=self.frame, text='00:00.00', style=3, fg=(.9, .9, .9, .85), align=TextNode.ALeft, scale=0.1, font=ToontownGlobals.getCompetitionFont())
+        self.time_text = DirectLabel(parent=self.frame, relief=None, text='00:00.00', text_shadow=(0, 0, 0, 1), text_fg=(.9, .9, .9, .85), text_align=TextNode.ALeft, scale=0.1, text_font=ToontownGlobals.getCompetitionFont())
         self.overtime_text = OnscreenText(parent=self.ot_frame, text='OVERTIME!', style=3, fg=(.9, .75, .4, .85), align=TextNode.ABoxedCenter, scale=0.1, font=ToontownGlobals.getCompetitionFont())
         self.overtime_text_sequence = Sequence(LerpScaleInterval(self.overtime_text, scale=1.2, blendType='easeInOut', duration=2), LerpScaleInterval(self.overtime_text, scale=1, blendType='easeInOut', duration=2))
         self.overtime_text_sequence.loop()
@@ -70,7 +70,7 @@ class BossSpeedrunTimer:
         self.overtime_text_sequence.finish()
         self.overtime_text.cleanup()
         self.stop_updating()
-        self.time_text.cleanup()
+        self.time_text.destroy()
         self.ot_frame.destroy()
         self.frame.destroy()
 
@@ -97,7 +97,7 @@ class BossSpeedrunTimedTimer(BossSpeedrunTimer):
 
     def reset(self):
         BossSpeedrunTimer.reset(self)
-        self.time_text['fg'] = (.9, .9, .9, .85)
+        self.time_text['text_fg'] = (.9, .9, .9, .85)
 
     def _determine_color(self, seconds):
         # If a time is overridden, it is red if it is 0 and green otherwise.
@@ -136,7 +136,7 @@ class BossSpeedrunTimedTimer(BossSpeedrunTimer):
         total_secs = self.calculate_time_left()
 
         # Figure out the color we want to set the timer to
-        self.time_text['fg'] = self._determine_color(total_secs)
+        self.time_text['text_fg'] = self._determine_color(total_secs)
 
         # If a time is overridden, always prefer to show that time.
         if self.overridden_time is not None:

@@ -1,5 +1,5 @@
 from panda3d.core import *
-from direct.showbase.PythonUtil import reduceAngle
+from otp.otpbase.PythonUtil import reduceAngle
 from otp.movement import Impulse
 import math
 

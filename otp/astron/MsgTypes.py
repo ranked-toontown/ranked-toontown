@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from direct.showbase.PythonUtil import invertDictLossless
+from otp.otpbase.PythonUtil import invertDictLossless
 
 CLIENT_HELLO =                                 1
 CLIENT_HELLO_RESP =                            2

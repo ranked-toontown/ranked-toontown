@@ -2,7 +2,7 @@ import functools
 
 from panda3d.core import *
 from direct.directnotify import DirectNotifyGlobal
-from direct.showbase.PythonUtil import clamp
+from otp.otpbase.PythonUtil import clamp
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from toontown.coghq import DistributedCashbotBossCraneAI

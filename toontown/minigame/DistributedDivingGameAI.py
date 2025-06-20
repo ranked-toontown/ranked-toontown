@@ -9,6 +9,9 @@ import random
 import random
 import types
 
+from ..toonbase import ToontownGlobals
+
+
 class DistributedDivingGameAI(DistributedMinigameAI):
     fishProportions = []
     for i in range(6):

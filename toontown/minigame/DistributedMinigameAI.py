@@ -1,24 +1,15 @@
 from direct.directnotify.DirectNotifyGlobal import directNotify
-
-from otp.ai.AIBase import *
-from direct.distributed.ClockDelta import *
-from toontown.ai.ToonBarrier import *
 from direct.distributed import DistributedObjectAI
-from direct.fsm import ClassicFSM, State
+from direct.distributed.ClockDelta import *
+from direct.fsm import ClassicFSM
 from direct.fsm import State
+
+from toontown.ai.ToonBarrier import *
 from toontown.shtiker import PurchaseManagerAI
-from toontown.shtiker import NewbiePurchaseManagerAI
-from . import MinigameCreatorAI
-from direct.task import Task
-import random
 from . import MinigameGlobals
-from direct.showbase import PythonUtil
-from . import TravelGameGlobals
-from toontown.toonbase import ToontownGlobals
 from .utils.scoring_context import ScoringContext
 from ..matchmaking.skill_profile_keys import SkillProfileKey
 from ..matchmaking.skill_rating import OpenSkillMatch, OpenSkillMatchDeltaResults
-from ..toon.DistributedToonAI import DistributedToonAI
 
 EXITED = 0
 EXPECTED = 1
@@ -48,18 +39,54 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         ], 'frameworkOff', 'frameworkOff')
 
         self.frameworkFSM.enterInitialState()
+
+        # The host of this minigame. It's possible that there isn't a host. If that's the case, this is probably a queued ranked game.
+        # Hosts will have the ability to tweak game settings, and toggle things such as cheats.
+        self.host: int | None = None
         self.avIdList = []
         self._spectators = []
-        self.toonsSkipped = []
         self.stateDict = {}
         self.difficultyOverride = None
         self.trolleyZoneOverride = None
-        self.metagameRound = -1
-        self.startingVotes = {}
         self.context = ScoringContext()
 
         # The SR context to use for this minigame. If none, we assume this is not a ranked game.
         self.skillProfileKey: SkillProfileKey | None = SkillProfileKey.MINIGAMES
+
+    def hasHost(self) -> bool:
+        """
+        Checks if there is a host of this minigame that has elevated privileges.
+        """
+        return self.host is not None and self.host != 0
+
+    def getHost(self) -> int:
+        """
+        Gets the host of this minigame. This can be 0, indicating there is no host and the server should determine
+        logical flow. (Have to use 0 so astron will work....)
+        """
+        return self.host if self.host is not None else 0
+
+    def setHost(self, avId: int | None) -> None:
+        """
+        Updates the host of this match. You can set this to None/0 to make the host surrender their privileges.
+        """
+        self.host = avId
+        if self.host == 0:
+            self.host = None
+
+    def d_setHost(self, avId: int | None) -> None:
+        """
+        Tells the client that a certain avatar is considered the host. Can pass in 0 or None to clear.
+        """
+        self.sendUpdate('setHost', [avId if avId is not None else 0])
+
+    def b_setHost(self, avId: int | None) -> None:
+        """
+        Sets the host of this match. Can pass in 0 or None to clear.
+        Also tells the client that a certain avatar is considered the host. Can pass in 0 or None to clear.
+        """
+        self.setHost(avId)
+        self.d_setHost(avId)
 
     def isRanked(self) -> bool:
         """
@@ -90,6 +117,12 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         assuming the game is unranked.
         """
         self.sendUpdate('setSkillProfileKey', [key.value if self.isRanked() else ''])
+
+    def d_setReadyTimeout(self, timeout):
+        """
+        Send the ready timeout duration to clients so they can display a countdown timer.
+        """
+        self.sendUpdate('setReadyTimeout', [timeout])
 
     def addChildGameFSM(self, gameFSM):
         self.frameworkFSM.getStateNamed('frameworkGame').addChild(gameFSM)
@@ -124,11 +157,6 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         """
         return avId in self._spectators
 
-    def setNewbieIds(self, newbieIds):
-        self.newbieIdList = newbieIds
-        if len(self.newbieIdList) > 0:
-            self.notify.debug('BASE: setNewbieIds: %s' % self.newbieIdList)
-
     def setTrolleyZone(self, trolleyZone):
         self.trolleyZone = trolleyZone
 
@@ -138,9 +166,6 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
             self.difficultyOverride = MinigameGlobals.QuantizeDifficultyOverride(difficultyOverride)
         self.trolleyZoneOverride = trolleyZoneOverride
         return
-
-    def setMetagameRound(self, roundNum):
-        self.metagameRound = roundNum
 
     def _playing(self):
         if not hasattr(self, 'gameFSM'):
@@ -162,8 +187,20 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
 
     def delete(self):
         self.notify.debug('BASE: delete: deleting AI minigame object')
-        del self.frameworkFSM
+        
+        # Clean up combo trackers
+        if hasattr(self, 'comboTrackers'):
+            self.cleanupComboTrackers()
+        
+        # Clean up status effect system
+        if hasattr(self, 'statusEffectSystem') and self.statusEffectSystem:
+            self.statusEffectSystem.requestDelete()
+            self.statusEffectSystem = None
+        
+        # Ignore all events
         self.ignoreAll()
+        
+        taskMgr.remove(self.uniqueName('no-host-start-delay'))
         DistributedObjectAI.DistributedObjectAI.delete(self)
 
     def isSinglePlayer(self):
@@ -334,6 +371,9 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
             if self.stateDict[avId] == READY:
                 self.__barrier.clear(avId)
 
+        # Send the timeout duration to clients so they can display a countdown timer
+        self.d_setReadyTimeout(READY_TIMEOUT)
+
         self.notify.debug('  safezone: %s' % self.getSafezoneId())
         self.notify.debug('difficulty: %s' % self.getDifficulty())
 
@@ -353,12 +393,21 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         del self.__barrier
 
     def enterFrameworkGame(self):
-        self.notify.debug('BASE: enterFrameworkGame')
-        self.gameStartTime = globalClock.getRealTime()
-        self.b_setGameStart(globalClockDelta.localToNetworkTime(self.gameStartTime))
+
+        def __start(_=None):
+            self.notify.debug('BASE: enterFrameworkGame')
+            self.gameStartTime = globalClock.getRealTime()
+            self.b_setGameStart(globalClockDelta.localToNetworkTime(self.gameStartTime))
+
+        # If there is no host, we should give them a few seconds to prepare so we don't jumpscare them.
+        # No host games only happen from queues, where the players will immediately ready up upon connecting.
+        if not self.hasHost():
+            taskMgr.doMethodLater(3, __start, self.uniqueName('no-host-start-delay'))
+        else:
+            __start()
 
     def exitFrameworkGame(self):
-        pass
+        taskMgr.remove(self.uniqueName('no-host-start-delay'))
 
     def enterFrameworkWaitClientsExit(self):
         self.notify.debug('BASE: enterFrameworkWaitClientsExit')
@@ -446,7 +495,7 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
         points = self.context.get_total_points()
         scoreList = [max(0, points.get(player, 0)) for player in self.avIdList]
 
-        pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, self.newbieIdList, spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
+        pm = PurchaseManagerAI.PurchaseManagerAI(self.air, self.avIdList, scoreList, self.minigameId, self.trolleyZone, previousHost=self.getHost(), spectators=self.getSpectators(), profileDeltas=deltas.get_player_results().values() if deltas is not None else None)
         pm.generateWithRequired(self.zoneId)
 
     def exitFrameworkCleanup(self):
@@ -455,27 +504,6 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
     def requestExit(self):
         self.notify.debug('BASE: requestExit: client has requested the game to end')
         self.setGameAbort()
-
-    def checkSkip(self):
-        self.notify.info("Checking skip")
-        if len(self.toonsSkipped) >= 1:
-            # exit minigame
-            self.notify.info('Skipping minigame')
-            self.requestExit()
-        # else:
-        #     # tell the client the amount of toons skipped
-        #     self.notify.info('Sending client skip amount')
-        #     self.sendUpdate('setSkipAmount', [len(self.toonsSkipped)])
-        return
-    
-    def requestSkip(self):
-        toon = self.air.getAvatarIdFromSender()
-        if (toon not in self.avIdList) or (toon in self.toonsSkipped):
-            self.notify.warning('Unable to request skip')
-            return
-        self.toonsSkipped.append(toon)
-        self.notify.info('toons Skipped appended')
-        self.checkSkip()
 
     def local2GameTime(self, timestamp):
         return timestamp - self.gameStartTime
@@ -506,21 +534,3 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
     def logAllPerfect(self):
         for avId in self.avIdList:
             self.logPerfectGame(avId)
-
-    def getStartingVotes(self):
-        retval = []
-        for avId in self.avIdList:
-            if avId in self.startingVotes:
-                retval.append(self.startingVotes[avId])
-            else:
-                self.notify.warning('how did this happen? avId=%d not in startingVotes %s' % (avId, self.startingVotes))
-                retval.append(0)
-
-        return retval
-
-    def setStartingVote(self, avId, startingVote):
-        self.startingVotes[avId] = startingVote
-        self.notify.debug('setting starting vote of avId=%d to %d' % (avId, startingVote))
-
-    def getMetagameRound(self):
-        return self.metagameRound

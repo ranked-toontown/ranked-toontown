@@ -21,7 +21,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         self.currPageTabIndex = None
         self.pageTabFrame = DirectFrame(parent=self, relief=None, pos=(0.93, 1, 0.575), scale=1.25)
         self.pageTabFrame.hide()
-        self.currPageIndex = None
+        self.currPageIndex: int = 0
         self.pageBeforeNews = None
         self.entered = 0
         self.safeMode = 0
@@ -315,8 +315,7 @@ class ShtikerBook(DirectFrame, StateData.StateData):
         return
 
     def setPage(self, page, enterPage = True):
-        if self.currPageIndex is not None:
-            self.pages[self.currPageIndex].exit()
+        self.pages[self.currPageIndex].exit()
         self.currPageIndex = self.pages.index(page)
         self.setPageTabIndex(self.currPageIndex)
         if enterPage:
@@ -341,10 +340,9 @@ class ShtikerBook(DirectFrame, StateData.StateData):
 
     def isOnPage(self, page):
         result = False
-        if self.currPageIndex is not None:
-            curPage = self.pages[self.currPageIndex]
-            if curPage == page:
-                result = True
+        curPage = self.pages[self.currPageIndex]
+        if curPage == page:
+            result = True
         return result
 
     def obscureButton(self, obscured):

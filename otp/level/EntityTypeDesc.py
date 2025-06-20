@@ -1,6 +1,6 @@
 from direct.directnotify import DirectNotifyGlobal
 from . import AttribDesc
-from direct.showbase.PythonUtil import mostDerivedLast
+from otp.otpbase.PythonUtil import mostDerivedLast
 
 class EntityTypeDesc:
     notify = DirectNotifyGlobal.directNotify.newCategory('EntityTypeDesc')

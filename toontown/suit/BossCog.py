@@ -13,7 +13,7 @@ from . import Suit
 from direct.task.Task import Task
 from . import SuitDNA
 from toontown.battle import BattleProps
-from direct.showbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import Functor
 import string
 import types
 from direct.gui.DirectGui import *

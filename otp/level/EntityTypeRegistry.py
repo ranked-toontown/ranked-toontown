@@ -3,7 +3,7 @@ from direct.directnotify import DirectNotifyGlobal
 import types
 from . import AttribDesc
 from . import EntityTypeDesc
-from direct.showbase.PythonUtil import mostDerivedLast
+from otp.otpbase.PythonUtil import mostDerivedLast
 import os
 import string
 import importlib

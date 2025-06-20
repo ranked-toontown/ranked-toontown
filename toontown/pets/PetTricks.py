@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-from direct.showbase.PythonUtil import invertDictLossless
+from otp.otpbase.PythonUtil import invertDictLossless
 from direct.interval.IntervalGlobal import *
 import types
 import random

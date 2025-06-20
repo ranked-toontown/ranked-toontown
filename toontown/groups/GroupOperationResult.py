@@ -12,6 +12,8 @@ class GroupOperationResult(Enum):
     GROUP_FULL = "the group is full"
     GROUP_STARTING = "the group is leaving"
     ALREADY_IN_GROUP = "they are already in a group"
+    SELF_QUEUE = "you are in a matchmaking queue"
+    IN_QUEUE = "they are in a matchmaking queue"
     ALREADY_PRESENT = "they are already in the group"
     IS_SAME_PERSON = "are the same person"
     NONEXISTENT_TOON = "toon does not exist"
