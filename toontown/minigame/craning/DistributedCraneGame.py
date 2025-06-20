@@ -1647,7 +1647,8 @@ class DistributedCraneGame(DistributedMinigame):
             self.playButton.show()
             self.modifiersButton.show()
             self.bestOfButton.show()
-        # Non-leaders just wait for the leader to start or the timer to expire
+        else:
+            messenger.send(self.rulesDoneEvent)
 
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
