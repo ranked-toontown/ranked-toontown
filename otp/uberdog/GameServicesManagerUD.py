@@ -861,11 +861,6 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         if self._clientRedirect is None:
             self._clientRedirect = ''
 
-    def __findMongoCredentials(self):
-        user = environ.get('MONGO_ROOT_USERNAME', None)
-        passw = environ.get('MONGO_ROOT_PASSWORD', None)
-        return user, passw
-
     def announceGenerate(self):
         DistributedObjectGlobalUD.announceGenerate(self)
 
@@ -880,16 +875,12 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
 
         # Instantiate the account database interface.
         # If we have Mongo credentials set, we can assume we want to use MongoDB. Otherwise, just use Dev DB.
-        credentials = self.__findMongoCredentials()
+        credentials = environ.get('MONGO_CONNECTION_STRING', None)
         if self._playtokenStrategy == 'MONGODB':
-            prefix = ''
-            if credentials[0]:
-                prefix += credentials[0]
-            if credentials[1]:
-                prefix += ':' + credentials[1]
-            if None not in credentials:
-                prefix += '@'
-            self.accountDb = MongoAccountDb(self, f"mongodb://{prefix}db:27017/astrondb")
+            if credentials is None:
+                self.notify.error(f"Your configuration is invalid. If you want to use MongoDB for playtokens, you must provide the `MONGO_CONNECTION_STRING` environment variable.")
+                exit(1)
+            self.accountDb = MongoAccountDb(self, credentials)
         else:
             self.accountDb = DeveloperAccountDb(self)
 

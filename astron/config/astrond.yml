@@ -77,13 +77,13 @@ roles:
           min: 100000000
           max: 399999999
       backend:
-          type: yaml
-          directory: ../databases/astrondb
+#          type: yaml
+#          directory: ../databases/astrondb
           # If you wish to use docker/mongo, comment the above 2 lines and uncomment the next two.
-#          type: mongodb
-#          server: mongodb://db:27017/astrondb
+          type: mongodb
+#          server: mongodb://<host>:<port>/astrondb
           # If you need to authenticate, use this one.
-#          server: mongodb://<username>:<password>@db:27017/astrondb
+#          server: mongodb://<username>:<password>@<host>:<port>/astrondb?authSource=admin
 
     - type: dbss
       database: 4003
