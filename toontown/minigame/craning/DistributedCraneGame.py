@@ -156,6 +156,13 @@ class DistributedCraneGame(DistributedMinigame):
 
         self.overtimeActive = False
 
+        # Initialize modifiers panel variables
+        self.modifiersPanel = None
+        self.modifiersPanelVisible = False
+        
+        # Initialize modifier config dialog variable
+        self.modifierConfigDialog = None
+
     def getTitle(self):
         return TTLocalizer.CraneGameTitle
 
@@ -597,10 +604,6 @@ class DistributedCraneGame(DistributedMinigame):
         
         btnGeom.removeNode()
         
-        # Initialize modifiers panel variables
-        self.modifiersPanel = None
-        self.modifiersPanelVisible = False
-        
         return panel
 
     def __handlePlayButton(self):
@@ -890,15 +893,332 @@ class DistributedCraneGame(DistributedMinigame):
     def __addModifier(self, modifierEnum):
         """Add a modifier to the game"""
         if self.isLocalToonHost():
-            self.sendUpdate('addModifier', [modifierEnum, 1])  # Default tier 1
+            # Check if this modifier has configurable parameters
+            if self.__modifierHasParameters(modifierEnum):
+                self.__showModifierConfigDialog(modifierEnum)
+            else:
+                # Add directly with default tier 1
+                self.sendUpdate('addModifier', [modifierEnum, 1])
     
-    def __removeModifier(self, modifierIndex):
-        """Remove a modifier from the game"""
-        if self.isLocalToonHost() and modifierIndex < len(self.modifiers):
-            modifierEnum = self.modifiers[modifierIndex].MODIFIER_ENUM
-            self.sendUpdate('removeModifier', [modifierEnum])
+    def __modifierHasParameters(self, modifierEnum):
+        """Check if a modifier has configurable parameters (tiers)"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Get the modifier class
+        modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
+        if not modifierClass:
+            return False
+        
+        # Create a temporary instance to check if it uses tiers meaningfully
+        tempMod = modifierClass()
+        
+        # Check some common modifiers that have meaningful tier differences
+        tieredModifiers = [
+            27,  # ModifierTimerEnabler (Margin Call)
+            2,   # ModifierCFOHPIncreaser (Financial Aid)
+            3,   # ModifierCFOHPDecreaser (Budget Cuts)
+            0,   # ModifierComboExtender (Chains of Finesse)
+            1,   # ModifierComboShortener (Chain Locker)
+            4,   # ModifierDesafeImpactIncreaser (Strong/Tough/Reinforced Safes)
+            9,   # ModifierGoonDamageInflictIncreaser (Goon damage)
+            10,  # ModifierSafeDamageInflictIncreaser (Safe damage)
+            11,  # ModifierGoonSpeedIncreaser (Goon speed)
+            12,  # ModifierGoonCapIncreaser (Goon cap)
+            16,  # ModifierTreasureHealDecreaser (Treasure heal decrease)
+            17,  # ModifierTreasureRNG (Treasure drop chance)
+            18,  # ModifierTreasureCapDecreaser (Treasure cap)
+            19,  # ModifierUberBonusIncreaser (Uber bonus)
+            29,  # ModifierLaffDrain (Leaky Laff)
+        ]
+        
+        return modifierEnum in tieredModifiers
     
-
+    def __showModifierConfigDialog(self, modifierEnum):
+        """Show configuration dialog for a modifier"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Get the modifier class
+        modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
+        if not modifierClass:
+            return
+        
+        # Hide the modifiers panel temporarily
+        if self.modifiersPanel:
+            self.modifiersPanel.hide()
+        
+        # Create configuration dialog - make it wider for two-column layout
+        self.modifierConfigDialog = DirectFrame(
+            relief=None,
+            image=DGG.getDefaultDialogGeom(),
+            image_color=ToontownGlobals.GlobalDialogColor,
+            image_scale=(1.8, 1, 1.4),  # Made wider for two columns
+            pos=(0, 0, 0),
+            parent=aspect2d,
+            sortOrder=DGG.NO_FADE_SORT_INDEX + 1
+        )
+        
+        # Create a sample modifier to get information
+        sampleMod = modifierClass()
+        
+        # Title
+        titleLabel = DirectLabel(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            text=f"Configure {sampleMod.getName()}",
+            text_scale=0.07,
+            text_pos=(0, 0.55),
+            text_fg=sampleMod.TITLE_COLOR,
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Instructions
+        instructionsLabel = DirectLabel(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            text="Choose the intensity/duration:",
+            text_scale=0.05,
+            text_pos=(0, 0.45),
+            text_fg=(0.3, 0.3, 0.3, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Load button assets
+        buttons = loader.loadModel('phase_3/models/gui/dialog_box_buttons_gui')
+        buttonImage = (buttons.find('**/ChtBx_OKBtn_UP'), 
+                      buttons.find('**/ChtBx_OKBtn_DN'), 
+                      buttons.find('**/ChtBx_OKBtn_Rllvr'))
+        
+        cancelButtonImage = (buttons.find('**/CloseBtn_UP'), 
+                          buttons.find('**/CloseBtn_DN'), 
+                          buttons.find('**/CloseBtn_Rllvr'))
+        
+        # Create tier selection options based on modifier type
+        self.__createTierOptions(modifierEnum, modifierClass, buttonImage)
+        
+        # Cancel button
+        cancelButton = DirectButton(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            image=cancelButtonImage,
+            text="Cancel",
+            text_scale=0.05,
+            text_pos=(0, -0.1),
+            pos=(0, 0, -0.5),
+            command=self.__cancelModifierConfig
+        )
+        
+        buttons.removeNode()
+    
+    def __createTierOptions(self, modifierEnum, modifierClass, buttonImage):
+        """Create tier selection options with two-column layout"""
+        
+        # Special handling for different modifier types
+        if modifierEnum == 27:  # ModifierTimerEnabler (Margin Call)
+            self.__createTimeSelectionOptions(modifierEnum, buttonImage)
+        elif modifierEnum in [2, 3]:  # HP modifiers
+            self.__createPercentageOptions(modifierEnum, modifierClass, buttonImage, "HP")
+        elif modifierEnum in [0, 1]:  # Combo modifiers
+            self.__createPercentageOptions(modifierEnum, modifierClass, buttonImage, "Combo Duration")
+        elif modifierEnum == 29:  # ModifierLaffDrain (Leaky Laff)
+            self.__createLaffDrainOptions(modifierEnum, buttonImage)
+        else:
+            # Generic tier options (1-5)
+            self.__createGenericTierOptions(modifierEnum, modifierClass, buttonImage)
+    
+    def __createTimeSelectionOptions(self, modifierEnum, buttonImage):
+        """Create time selection options for Margin Call modifier"""
+        timeOptions = [
+            (1, "1 minute"),
+            (2, "2 minutes"), 
+            (3, "3 minutes"),
+            (5, "5 minutes"),
+            (10, "10 minutes")
+        ]
+        
+        startY = 0.3
+        for i, (tier, label) in enumerate(timeOptions):
+            currentY = startY - i * 0.08
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=label,
+                text_scale=0.045,
+                text_pos=(-0.35, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __createPercentageOptions(self, modifierEnum, modifierClass, buttonImage, statName):
+        """Create percentage-based tier options"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Create sample modifiers to get percentage values
+        tiers = [1, 2, 3, 4, 5]
+        startY = 0.3
+        
+        for i, tier in enumerate(tiers):
+            try:
+                sampleMod = modifierClass(tier)
+                currentY = startY - i * 0.08
+                
+                # Get the percentage or value for display
+                if hasattr(sampleMod, '_perc_increase'):
+                    value = sampleMod._perc_increase()
+                    description = f"Tier {tier}: +{value}% {statName}"
+                elif hasattr(sampleMod, '_perc_decrease'):
+                    value = sampleMod._perc_decrease()
+                    description = f"Tier {tier}: -{value}% {statName}"
+                elif hasattr(sampleMod, '_duration'):
+                    value = sampleMod._duration()
+                    description = f"Tier {tier}: +{value}% {statName}"
+                else:
+                    description = f"Tier {tier}"
+                
+                # Description label on the left
+                descLabel = DirectLabel(
+                    parent=self.modifierConfigDialog,
+                    relief=None,
+                    text=description,
+                    text_scale=0.04,
+                    text_pos=(-0.4, currentY),
+                    text_fg=(0.2, 0.2, 0.2, 1),
+                    text_font=ToontownGlobals.getInterfaceFont(),
+                    text_align=TextNode.ALeft
+                )
+                
+                # Selection button on the right
+                selectButton = DirectButton(
+                    parent=self.modifierConfigDialog,
+                    relief=None,
+                    image=buttonImage,
+                    pos=(0.4, 0, currentY+0.015),
+                    scale=(0.7, 1, 0.7),
+                    command=self.__confirmModifierConfig,
+                    extraArgs=[modifierEnum, tier]
+                )
+            except:
+                # Fallback for tiers that might not work
+                break
+    
+    def __createLaffDrainOptions(self, modifierEnum, buttonImage):
+        """Create laff drain rate selection options"""
+        drainOptions = [
+            (1, "Every 1.0 seconds"),
+            (2, "Every 1.0 seconds"),
+            (3, "Every 0.75 seconds"),
+            (4, "Every 0.5 seconds"),
+            (5, "Every 0.25 seconds"),
+            (6, "Every 0.1 seconds")
+        ]
+        
+        startY = 0.3
+        for i, (tier, label) in enumerate(drainOptions):
+            currentY = startY - i * 0.08
+            description = f"Tier {tier}: {label}"
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=description,
+                text_scale=0.04,
+                text_pos=(-0.4, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __createGenericTierOptions(self, modifierEnum, modifierClass, buttonImage):
+        """Create generic tier 1-5 options with descriptions"""
+        tiers = [1, 2, 3, 4, 5]
+        startY = 0.3
+        
+        for i, tier in enumerate(tiers):
+            currentY = startY - i * 0.08
+            
+            # Try to get a meaningful description
+            try:
+                sampleMod = modifierClass(tier)
+                if hasattr(sampleMod, '_perc_increase'):
+                    value = sampleMod._perc_increase()
+                    description = f"Tier {tier}: +{value}% effect"
+                elif hasattr(sampleMod, '_perc_decrease'):
+                    value = sampleMod._perc_decrease()
+                    description = f"Tier {tier}: -{value}% effect"
+                elif hasattr(sampleMod, 'getDescription'):
+                    # Get the description and try to extract meaningful info
+                    desc = sampleMod.getDescription()
+                    description = f"Tier {tier}: {sampleMod.getName()}"
+                else:
+                    description = f"Tier {tier}: Standard intensity"
+            except:
+                description = f"Tier {tier}: Standard intensity"
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=description,
+                text_scale=0.04,
+                text_pos=(-0.4, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __confirmModifierConfig(self, modifierEnum, tier):
+        """Confirm the modifier configuration and add it"""
+        # Clean up the config dialog
+        self.__cancelModifierConfig()
+        
+        # Add the modifier with the selected tier
+        self.sendUpdate('addModifier', [modifierEnum, tier])
+    
+    def __cancelModifierConfig(self):
+        """Cancel modifier configuration"""
+        if hasattr(self, 'modifierConfigDialog') and self.modifierConfigDialog:
+            self.modifierConfigDialog.destroy()
+            self.modifierConfigDialog = None
+        
+        # Show the modifiers panel again
+        if self.modifiersPanel and self.modifiersPanelVisible:
+            self.modifiersPanel.show()
 
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
@@ -918,6 +1238,10 @@ class DistributedCraneGame(DistributedMinigame):
             self.currentModifiersList = None
             self.availableModifiersList = None
         self.modifiersPanelVisible = False
+        # Clean up modifier config dialog if it exists
+        if hasattr(self, 'modifierConfigDialog') and self.modifierConfigDialog is not None:
+            self.modifierConfigDialog.destroy()
+            self.modifierConfigDialog = None
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -1641,3 +1965,9 @@ class DistributedCraneGame(DistributedMinigame):
         # The server will handle the transition to the next round automatically
         # We just need to clean up the victory state
         return Task.done
+
+    def __removeModifier(self, modifierIndex):
+        """Remove a modifier from the game"""
+        if self.isLocalToonHost() and modifierIndex < len(self.modifiers):
+            modifierEnum = self.modifiers[modifierIndex].MODIFIER_ENUM
+            self.sendUpdate('removeModifier', [modifierEnum])
