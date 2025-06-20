@@ -55,6 +55,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.rollModsOnStart = False
         self.numModsWanted = 5
         self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
+        self.defaultModifiersInitialized = False  # Track if we've initialized default modifiers
 
         self.customSpawnPositions = {}
         self.customSpawnOrderSet = False  # Track if spawn order has been manually set by leader
@@ -65,7 +66,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
-        self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
+        self.comboTrackers = {}
 
         self.gameFSM = ClassicFSM.ClassicFSM('DistributedMinigameTemplateAI',
                                [
@@ -247,7 +248,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.d_setRoundInfo()
 
     def setupRuleset(self):
-
         self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
         self.modifiers.clear()
         modifiers = []
@@ -257,12 +257,16 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.rollModsOnStart:
             modifiers += self.rollRandomModifiers()
 
-        # Temporary until the ruleset/modifiers tabs are implemented into the rules panel interface.
-        # If a toon is performing a solo crane round, use clash rules.
-        # If there is more than one toon present, use competitive crane league rules.
-        if len(self.getParticipantsNotSpectating()) >= 2:
-            modifiers.append(CraneLeagueGlobals.ModifierInvincibleBoss())
-            modifiers.append(CraneLeagueGlobals.ModifierTimerEnabler(3))
+        # Add default competitive modifiers only on first setup for 2+ players
+        if len(self.getParticipantsNotSpectating()) >= 2 and not self.defaultModifiersInitialized:
+            invincibleBoss = CraneLeagueGlobals.ModifierInvincibleBoss()
+            timerEnabler = CraneLeagueGlobals.ModifierTimerEnabler(3)
+            modifiers.append(invincibleBoss)
+            modifiers.append(timerEnabler)
+            # Also add them to desiredModifiers so they persist until explicitly removed
+            self.desiredModifiers.append(invincibleBoss)
+            self.desiredModifiers.append(timerEnabler)
+            self.defaultModifiersInitialized = True
 
         self.applyModifiers(modifiers, updateClient=True)
 
