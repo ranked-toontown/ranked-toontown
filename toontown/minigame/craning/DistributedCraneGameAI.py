@@ -4,7 +4,7 @@ from operator import itemgetter
 
 from direct.fsm import ClassicFSM
 from direct.fsm import State
-from direct.showbase.PythonUtil import clamp
+from otp.otpbase.PythonUtil import clamp
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, CollisionPolygon, CollisionBox, NodePath, Vec3, Point3
 from toontown.coghq import CraneLeagueGlobals
@@ -55,6 +55,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.rollModsOnStart = False
         self.numModsWanted = 5
         self.desiredModifiers = []  # Modifiers added manually via commands or by the host during game settings. Will always ensure these are added every crane round.
+        self.defaultModifiersInitialized = False  # Track if we've initialized default modifiers
 
         self.customSpawnPositions = {}
         self.customSpawnOrderSet = False  # Track if spawn order has been manually set by leader
@@ -65,7 +66,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.goonMinScale = 0.8
         self.goonMaxScale = 2.4
 
-        self.comboTrackers = {}  # Maps avId -> CashbotBossComboTracker instance
+        self.comboTrackers = {}
 
         self.gameFSM = ClassicFSM.ClassicFSM('DistributedMinigameTemplateAI',
                                [
@@ -98,6 +99,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Add our game ClassicFSM to the framework ClassicFSM
         self.addChildGameFSM(self.gameFSM)
+        
+        # Track safe effect tasks
+        self.safeEffectTasks = set()
 
         # State tracking related to the overtime mechanic.
         self.overtimeWillHappen = False  # Setting this to True will cause the CFO to enter "overtime" mode when time runs out.
@@ -107,15 +111,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Instances of "cheats" that can be interacted with to make the crane round behave a certain way.
         self.practiceCheatHandler: CraneGamePracticeCheatAI = CraneGamePracticeCheatAI(self)
 
-        self.statusEffectSystem = DistributedStatusEffectSystemAI(self, air,
-            StatusEffect.BURNED, 
-            StatusEffect.DRENCHED, 
-            StatusEffect.WINDED, 
-            StatusEffect.GROUNDED, 
-            StatusEffect.EXPLODE, 
-            StatusEffect.FROZEN, 
-            StatusEffect.SHATTERED
-        )
+        self.statusEffectSystem: DistributedStatusEffectSystemAI | None = None
 
         # Memory leak prevention - track event listeners and task names
         self._deathListenerEvents = []
@@ -140,6 +136,15 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         self.boss = DistributedCashbotBossStrippedAI(self.air, self)
         self.boss.generateWithRequired(self.zoneId)
+        self.statusEffectSystem = DistributedStatusEffectSystemAI(self, self.air,
+                                        StatusEffect.BURNED,
+                                        StatusEffect.DRENCHED,
+                                        StatusEffect.WINDED,
+                                        StatusEffect.GROUNDED,
+                                        StatusEffect.EXPLODE,
+                                        StatusEffect.FROZEN,
+                                        StatusEffect.SHATTERED
+                                        )
         self.statusEffectSystem.generateWithRequired(self.zoneId)
         self.d_setBossCogId()
         self.d_setStatusEffectSystemId()
@@ -166,7 +171,10 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.__bossExists():
             self.boss.cleanupBossBattle()
             self.boss.requestDelete()
+            self.boss.removeNode()
+            self.statusEffectSystem.requestDelete()
         self.boss = None
+        self.statusEffectSystem = None
 
     def __bossExists(self) -> bool:
         return self.boss is not None
@@ -181,6 +189,11 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         for taskName in self._allTaskNames:
             taskMgr.remove(taskName)
         self._allTaskNames.clear()
+        
+        # Clean up safe effect tasks
+        for taskName in self.safeEffectTasks:
+            taskMgr.remove(taskName)
+        self.safeEffectTasks.clear()
         
         # Clean up specific known tasks
         taskMgr.remove(self.uniqueName('times-up-task'))
@@ -235,7 +248,6 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.d_setRoundInfo()
 
     def setupRuleset(self):
-
         self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
         self.modifiers.clear()
         modifiers = []
@@ -245,12 +257,16 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         if self.rollModsOnStart:
             modifiers += self.rollRandomModifiers()
 
-        # Temporary until the ruleset/modifiers tabs are implemented into the rules panel interface.
-        # If a toon is performing a solo crane round, use clash rules.
-        # If there is more than one toon present, use competitive crane league rules.
-        if len(self.getParticipantsNotSpectating()) >= 2:
-            modifiers.append(CraneLeagueGlobals.ModifierInvincibleBoss())
-            modifiers.append(CraneLeagueGlobals.ModifierTimerEnabler(3))
+        # Add default competitive modifiers only on first setup for 2+ players
+        if len(self.getParticipantsNotSpectating()) >= 2 and not self.defaultModifiersInitialized:
+            invincibleBoss = CraneLeagueGlobals.ModifierInvincibleBoss()
+            timerEnabler = CraneLeagueGlobals.ModifierTimerEnabler(3)
+            modifiers.append(invincibleBoss)
+            modifiers.append(timerEnabler)
+            # Also add them to desiredModifiers so they persist until explicitly removed
+            self.desiredModifiers.append(invincibleBoss)
+            self.desiredModifiers.append(timerEnabler)
+            self.defaultModifiersInitialized = True
 
         self.applyModifiers(modifiers, updateClient=True)
 
@@ -860,8 +876,21 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         # Only reset spawn order if it hasn't been manually customized by the leader
         if not hasattr(self, 'customSpawnOrderSet') or not self.customSpawnOrderSet:
             self.toonSpawnpointOrder = [i for i in range(16)]
-            if self.ruleset.RANDOM_SPAWN_POSITIONS:
+            
+            # For best of 1 matches, randomize only the first spawn positions based on number of participants
+            if self.bestOfValue == 1:
+                # Get number of participating toons (not spectating)
+                numParticipants = len(self.getParticipantIdsNotSpectating())
+                if numParticipants > 0:
+                    # Randomize only the first 'numParticipants' positions
+                    firstPositions = self.toonSpawnpointOrder[:numParticipants]
+                    random.shuffle(firstPositions)
+                    # Put the randomized positions back at the beginning
+                    self.toonSpawnpointOrder[:numParticipants] = firstPositions
+            # For other matches (best of 3, 5, 7), use the existing ruleset randomization if enabled
+            elif self.ruleset.RANDOM_SPAWN_POSITIONS:
                 random.shuffle(self.toonSpawnpointOrder)
+                
         self.d_setToonSpawnpointOrder()
 
     def resetCustomSpawnOrder(self):
@@ -1306,9 +1335,29 @@ class DistributedCraneGameAI(DistributedMinigameAI):
                 if safe and not self.statusEffectSystem.isObjectStatusEffected(safe.getDoId()):
                     statusEffect = random.choice(list(SAFE_ALLOWED_EFFECTS))
                     self.statusEffectSystem.b_applyStatusEffect(safe.getDoId(), statusEffect)
+                    # Store the safe's doId before creating the task
+                    safeDoId = safe.getDoId()
+                    # Create task name
+                    taskName = self.uniqueName(f'remove-effect-{safeDoId}')
                     # Remove the effect after 10 seconds
-                    taskMgr.doMethodLater(10.0, lambda task, doId=safe.getDoId(), effect=statusEffect: self.statusEffectSystem.b_removeStatusEffect(doId, effect) or task.done, self.uniqueName(f'remove-effect-{safe.getDoId()}'))
+                    taskMgr.doMethodLater(10.0, lambda task, doId=safeDoId, effect=statusEffect: self.__removeSafeEffect(doId, effect) or task.done, taskName)
+                    # Track the task
+                    self.safeEffectTasks.add(taskName)
         return task.again
+
+    def __removeSafeEffect(self, doId, effect):
+        """Safely remove a status effect from a safe, handling the case where the safe no longer exists"""
+        if not hasattr(self, 'statusEffectSystem') or not self.statusEffectSystem:
+            return True
+            
+        # Check if the safe still exists
+        safe = self.air.doId2do.get(doId)
+        if not safe:
+            return True
+            
+        # Remove the effect
+        self.statusEffectSystem.b_removeStatusEffect(doId, effect)
+        return True
 
     def startSafeEffectTask(self):
         """Start the task that periodically applies effects to safes"""
@@ -1563,3 +1612,79 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         self.sendUpdate('updateSpotStatus', [spotIndex, isPlayer])
 
         self.__updateSkillProfile()
+
+    def addModifier(self, modifierEnum, tier=1):
+        """Handle request to add a modifier from the client"""
+        # Only allow the leader to add modifiers
+        avId = self.air.getAvatarIdFromSender()
+        if not self.hasHost() or avId != self.getHost():
+            self.notify.warning(f"Non-leader {avId} attempted to add modifier")
+            return
+        
+        # Check if modifier already exists
+        for mod in self.modifiers:
+            if mod.MODIFIER_ENUM == modifierEnum:
+                self.notify.warning(f"Modifier {modifierEnum} already exists")
+                return
+        
+        # Get the modifier class and create instance
+        if modifierEnum in CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES:
+            modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES[modifierEnum]
+            modifier = modifierClass(tier)
+            
+            # Add to desired modifiers so it persists across game restarts
+            self.desiredModifiers.append(modifier)
+            
+            self.applyModifier(modifier, updateClient=True)
+            self.notify.info(f"Added modifier {modifier.getName()} (tier {tier})")
+        else:
+            self.notify.warning(f"Unknown modifier enum: {modifierEnum}")
+    
+    def removeModifier(self, modifierEnum):
+        """Handle request to remove a modifier from the client"""
+        # Only allow the leader to remove modifiers
+        avId = self.air.getAvatarIdFromSender()
+        if not self.hasHost() or avId != self.getHost():
+            self.notify.warning(f"Non-leader {avId} attempted to remove modifier")
+            return
+        
+        # Find and remove the modifier from both lists
+        removedMod = None
+        
+        # Remove from current modifiers
+        for i, mod in enumerate(self.modifiers):
+            if mod.MODIFIER_ENUM == modifierEnum:
+                removedMod = self.modifiers.pop(i)
+                break
+        
+        # Remove from desired modifiers so it doesn't come back on restart
+        for i, mod in enumerate(self.desiredModifiers):
+            if mod.MODIFIER_ENUM == modifierEnum:
+                self.desiredModifiers.pop(i)
+                break
+        
+        if removedMod:
+            # Rebuild ruleset from scratch without the removed modifier
+            self.__rebuildRuleset()
+            self.notify.info(f"Removed modifier {removedMod.getName()}")
+        else:
+            self.notify.warning(f"Modifier {modifierEnum} not found to remove")
+    
+    def __rebuildRuleset(self):
+        """Rebuild the ruleset from scratch with current modifiers"""
+        # Reset to base ruleset
+        self.ruleset = CraneLeagueGlobals.CraneGameRuleset()
+        
+        # Reapply all remaining modifiers
+        for modifier in self.modifiers:
+            modifier.apply(self.ruleset)
+        
+        self.ruleset.validate()
+        
+        # Update clients
+        self.d_setRawRuleset()
+        self.d_setModifiers()
+        
+        # Update boss if it exists
+        if self.getBoss() is not None:
+            self.getBoss().setRuleset(self.ruleset)

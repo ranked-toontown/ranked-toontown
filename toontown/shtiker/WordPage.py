@@ -31,7 +31,7 @@ class WordPage(ShtikerPage.ShtikerPage):
         self.acc1Page.hide()
         self.acc2Page = AccTabPage2(self)
         self.acc2Page.hide()
-        titleHeight = 0.61
+        titleHeight = 0.6
         self.title = DirectLabel(parent=self, relief=None, text=TTLocalizer.SpellbookPageTitle, text_scale=0.12, pos=(0, 0, titleHeight))
         normalColor = (1, 1, 1, 1)
         clickColor = (0.8, 0.8, 0, 1)

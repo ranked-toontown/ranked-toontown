@@ -6,7 +6,7 @@ from direct.tkwidgets import Slider, Floater
 from tkinter.simpledialog import askstring
 from tkinter.messagebox import showwarning, askyesno
 from tkinter import *
-from direct.showbase.PythonUtil import Functor, list2dict
+from otp.otpbase.PythonUtil import Functor, list2dict
 from direct.gui.DirectGui import DGG
 import tkinter.filedialog
 from direct.showbase import DirectObject

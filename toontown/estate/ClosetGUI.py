@@ -1,4 +1,4 @@
-from direct.showbase.PythonUtil import Functor
+from otp.otpbase.PythonUtil import Functor
 from direct.gui.DirectGui import *
 from panda3d.core import *
 from toontown.makeatoon import ClothesGUI

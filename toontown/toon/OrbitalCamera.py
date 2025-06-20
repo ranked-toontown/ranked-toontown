@@ -5,9 +5,10 @@ from panda3d.core import (BitMask32, CollisionHandlerFloor,
 from direct.directnotify import DirectNotifyGlobal
 from direct.fsm.FSM import FSM
 from direct.showbase.InputStateGlobal import inputState
-from direct.showbase.PythonUtil import fitSrcAngle2Dest, lerp, reduceAngle
+from otp.otpbase.PythonUtil import fitSrcAngle2Dest, lerp, reduceAngle
 from direct.task import Task
 from direct.task.TaskManagerGlobal import taskMgr
+import sys
 
 from otp.otpbase import OTPGlobals
 from toontown.toon.ParamObj import ParamObj
@@ -429,7 +430,8 @@ class OrbitalCamera(FSM, NodePath, ParamObj):
     def _startMouseControlTasks(self):
         if self.mouseControl:
             properties = WindowProperties()
-            properties.setMouseMode(properties.MRelative)
+            if sys.platform != "darwin":
+                properties.setMouseMode(properties.MRelative)
             base.win.requestProperties(properties)
             self._startMouseReadTask()
             self._startMouseUpdateTask()

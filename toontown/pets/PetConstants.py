@@ -1,7 +1,7 @@
 from enum import IntEnum
 
 from panda3d.core import *
-from direct.showbase.PythonUtil import invertDictLossless
+from otp.otpbase.PythonUtil import invertDictLossless
 import math
 from toontown.toonbase import ToontownGlobals
 OurPetsMoodChangedKey = 'OurPetsMoodChanged'

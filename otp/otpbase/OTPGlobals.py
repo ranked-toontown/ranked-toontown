@@ -243,7 +243,7 @@ DetectGarbageHotkey = 'shift-f11'
 PrintCamPosHotkey = 'f12'
 GlobalDialogColor = (1,
  1,
- 0.75,
+ 1,
  1)
 DefaultBackgroundColor = (0.3,
  0.3,

@@ -1,7 +1,7 @@
 import math
 from panda3d.core import NodePath, Vec3, CollisionTraverser, CollisionHandlerQueue, CollisionRay, CollisionNode
 from math import pi, sin, cos
-from direct.showbase.PythonUtil import bound as clamp
+from otp.otpbase.PythonUtil import bound as clamp
 from otp.otpbase import OTPGlobals
 from toontown.toonbase import ToontownGlobals
 from . import CogdoFlyingGameGlobals as Globals

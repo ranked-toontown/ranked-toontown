@@ -11,7 +11,7 @@ from direct.interval.FunctionInterval import Func, Wait
 from direct.interval.LerpInterval import LerpPosHprInterval
 from direct.interval.MetaInterval import Parallel, Sequence
 from direct.showbase.MessengerGlobal import messenger
-from direct.showbase.PythonUtil import reduceAngle
+from otp.otpbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
     VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube, TextNode, Vec4
@@ -91,6 +91,8 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Status effect system will be set via setStatusEffectSystemId
         self.statusEffectSystem : DistributedStatusEffectSystem | None = None
+        
+
 
         self.warningSfx = None
 
@@ -153,6 +155,13 @@ class DistributedCraneGame(DistributedMinigame):
         self.addChildGameFSM(self.gameFSM)
 
         self.overtimeActive = False
+
+        # Initialize modifiers panel variables
+        self.modifiersPanel = None
+        self.modifiersPanelVisible = False
+        
+        # Initialize modifier config dialog variable
+        self.modifierConfigDialog = None
 
     def getTitle(self):
         return TTLocalizer.CraneGameTitle
@@ -563,10 +572,10 @@ class DistributedCraneGame(DistributedMinigame):
         )
         self.playButton.hide()  # Play button starts hidden
         
-        # Create participants button next to play button
-        self.participantsButton = DirectButton(
+        # Create modifiers button next to play button (was participants)
+        self.modifiersButton = DirectButton(
             relief=None,
-            text='Participants',
+            text='Modifiers',
             text_scale=0.055,
             text_pos=(0, -0.02),
             geom=(btnGeom.find('**/QuitBtn_UP'),
@@ -574,11 +583,11 @@ class DistributedCraneGame(DistributedMinigame):
                   btnGeom.find('**/QuitBtn_RLVR')),
             geom_scale=(0.7, 1, 1),
             pos=(-0.75, 0, 0.85),
-            command=self.__handleParticipantsButton
+            command=self.__handleModifiersButton
         )
-        self.participantsButton.hide()  # Participants button starts hidden
+        self.modifiersButton.hide()  # Modifiers button starts hidden
         
-        # Create best of button next to participants button
+        # Create best of button next to modifiers button
         self.bestOfButton = DirectButton(
             relief=None,
             text=f'Best of {self.bestOfValue}',
@@ -595,68 +604,66 @@ class DistributedCraneGame(DistributedMinigame):
         
         btnGeom.removeNode()
         
-        # Initialize participants panel variables
-        self.participantsPanel = None
-        self.participantsPanelVisible = False
-        
         return panel
 
     def __handlePlayButton(self):
+        # Clean up the ready timeout timer when play is pressed
+        self._destroyReadyTimeoutTimer()
         messenger.send(self.rulesDoneEvent)
 
-    def __handleParticipantsButton(self):
-        """Toggle the participants panel visibility"""
-        if self.participantsPanelVisible:
-            self.__hideParticipantsPanel()
+    def __handleModifiersButton(self):
+        """Toggle the modifiers panel visibility"""
+        if self.modifiersPanelVisible:
+            self.__hideModifiersPanel()
         else:
-            self.__showParticipantsPanel()
+            self.__showModifiersPanel()
     
-    def __showParticipantsPanel(self):
-        """Create and show the participants panel"""
-        if self.participantsPanel is None:
-            self.__createParticipantsPanel()
+    def __showModifiersPanel(self):
+        """Create and show the modifiers panel"""
+        if self.modifiersPanel is None:
+            self.__createModifiersPanel()
         
-        self.participantsPanel.show()
-        self.participantsPanelVisible = True
+        self.modifiersPanel.show()
+        self.modifiersPanelVisible = True
     
-    def __hideParticipantsPanel(self):
-        """Hide the participants panel"""
-        if self.participantsPanel is not None:
-            self.participantsPanel.hide()
-        self.participantsPanelVisible = False
+    def __hideModifiersPanel(self):
+        """Hide the modifiers panel"""
+        if self.modifiersPanel is not None:
+            self.modifiersPanel.hide()
+        self.modifiersPanelVisible = False
     
-    def __createParticipantsPanel(self):
-        """Create the participants management panel using proper game UI conventions"""
+    def __createModifiersPanel(self):
+        """Create the modifiers management panel using proper game UI conventions"""
         
         # Create the main panel frame using proper dialog styling
-        self.participantsPanel = DirectFrame(
+        self.modifiersPanel = DirectFrame(
             relief=None,
             image=DGG.getDefaultDialogGeom(),
             image_color=ToontownGlobals.GlobalDialogColor,
-            image_scale=(1.4, 1, 1.2),
-            pos=(0.8, 0, 0),
+            image_scale=(1.6, 1, 1.4),
+            pos=(0, 0, 0),
             parent=aspect2d,
             sortOrder=DGG.NO_FADE_SORT_INDEX
         )
         
         # Title label
         titleLabel = DirectLabel(
-            parent=self.participantsPanel,
+            parent=self.modifiersPanel,
             relief=None,
-            text="Manage Spawn Order",
+            text="Manage Modifiers",
             text_scale=0.08,
-            text_pos=(0, 0.45),
+            text_pos=(0, 0.55),
             text_fg=(0.1, 0.1, 0.4, 1),
             text_font=ToontownGlobals.getInterfaceFont()
         )
         
         # Instructions label
         instructionsLabel = DirectLabel(
-            parent=self.participantsPanel,
+            parent=self.modifiersPanel,
             relief=None,
-            text="Use arrows to change spawn positions",
+            text="Add and remove modifiers for the game",
             text_scale=0.05,
-            text_pos=(0, 0.35),
+            text_pos=(0, 0.45),
             text_fg=(0.3, 0.3, 0.3, 1),
             text_font=ToontownGlobals.getInterfaceFont()
         )
@@ -664,34 +671,91 @@ class DistributedCraneGame(DistributedMinigame):
         # Load GUI assets for scroll list
         gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
         
-        # Create scrolled list for participants using proper game styling
-        self.participantsList = DirectScrolledList(
-            parent=self.participantsPanel,
+        # Current modifiers section
+        currentModsLabel = DirectLabel(
+            parent=self.modifiersPanel,
             relief=None,
-            pos=(0, 0, 0.05),
-            numItemsVisible=6,
-            forceHeight=0.08,
-            itemFrame_frameSize=(-0.6, 0.6, -0.04, 0.04),
-            itemFrame_pos=(0, 0, 0),
-            itemFrame_relief=DGG.SUNKEN,
-            itemFrame_frameColor=(0.85, 0.95, 1, 1),
-            itemFrame_borderWidth=(0.01, 0.01),
+            text="Current Modifiers:",
+            text_scale=0.06,
+            text_pos=(-0.75, 0.3),
+            text_fg=(0.2, 0.2, 0.6, 1),
+            text_font=ToontownGlobals.getInterfaceFont(),
+            text_align=TextNode.ALeft
+        )
+        
+        # Create scrolled list for current modifiers
+        self.currentModifiersList = DirectScrolledList(
+            parent=self.modifiersPanel,
+            relief=DGG.SUNKEN,
+            frameColor=(0.85, 0.95, 1, 1),
+            borderWidth=(0.01, 0.01),
+            pos=(-0.35, 0, 0.2),
+            frameSize=(-0.4, 0.2, -0.24, 0.0),
+            numItemsVisible=4,
+            forceHeight=0.06,
+            itemFrame_frameSize=(-0.38, 0.38, -0.03, 0.03),
+            itemFrame_pos=(0, 0, -0.032),
+            itemFrame_relief=None,
             # Scroll buttons using proper assets
             incButton_image=(gui.find('**/FndsLst_ScrollUp'),
                            gui.find('**/FndsLst_ScrollDN'),
                            gui.find('**/FndsLst_ScrollUp_Rllvr'),
                            gui.find('**/FndsLst_ScrollUp')),
             incButton_relief=None,
-            incButton_scale=(1.0, 1.0, -1.0),
-            incButton_pos=(0.5, 0, -0.35),
+            incButton_scale=(0.3, 0.3, -1.1),
+            incButton_pos=(0.15, 0, -0.26),
             incButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6),
             decButton_image=(gui.find('**/FndsLst_ScrollUp'),
                            gui.find('**/FndsLst_ScrollDN'),
                            gui.find('**/FndsLst_ScrollUp_Rllvr'),
                            gui.find('**/FndsLst_ScrollUp')),
             decButton_relief=None,
-            decButton_scale=(1.0, 1.0, 1.0),
-            decButton_pos=(0.5, 0, 0.25),
+            decButton_scale=(0.3, 0.3, 1.1),
+            decButton_pos=(0.15, 0, 0.03),
+            decButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6)
+        )
+        
+        # Available modifiers section
+        availableModsLabel = DirectLabel(
+            parent=self.modifiersPanel,
+            relief=None,
+            text="Available Modifiers:",
+            text_scale=0.06,
+            text_pos=(0.1, 0.3),
+            text_fg=(0.2, 0.2, 0.6, 1),
+            text_font=ToontownGlobals.getInterfaceFont(),
+            text_align=TextNode.ALeft
+        )
+        
+        # Create scrolled list for available modifiers
+        self.availableModifiersList = DirectScrolledList(
+            parent=self.modifiersPanel,
+            relief=DGG.SUNKEN,
+            frameColor=(0.95, 0.85, 1, 1),
+            borderWidth=(0.01, 0.01),
+            pos=(0.5, 0, 0.2),
+            frameSize=(-0.4, 0.2, -0.24, 0.0),
+            numItemsVisible=4,
+            forceHeight=0.06,
+            itemFrame_frameSize=(-0.38, 0.38, -0.03, 0.03),
+            itemFrame_pos=(0, 0, -0.032),
+            itemFrame_relief=None,
+            # Scroll buttons using proper assets
+            incButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            incButton_relief=None,
+            incButton_scale=(0.3, 0.3, -1.1),
+            incButton_pos=(0.15, 0, -0.26),
+            incButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6),
+            decButton_image=(gui.find('**/FndsLst_ScrollUp'),
+                           gui.find('**/FndsLst_ScrollDN'),
+                           gui.find('**/FndsLst_ScrollUp_Rllvr'),
+                           gui.find('**/FndsLst_ScrollUp')),
+            decButton_relief=None,
+            decButton_scale=(0.3, 0.3, 1.1),
+            decButton_pos=(0.15, 0, 0.03),
             decButton_image3_color=Vec4(0.6, 0.6, 0.6, 0.6)
         )
         
@@ -703,161 +767,458 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Close button using proper styling
         closeButton = DirectButton(
-            parent=self.participantsPanel,
+            parent=self.modifiersPanel,
             relief=None,
             image=closeButtonImage,
             text="Close",
             text_scale=0.05,
             text_pos=(0, -0.1),
-            pos=(0, 0, -0.45),
-            command=self.__hideParticipantsPanel
+            pos=(0, 0, -0.55),
+            command=self.__hideModifiersPanel
         )
         
         # Clean up loaded models
         gui.removeNode()
         buttons.removeNode()
         
-        # Populate the list with current participants
-        self.__updateParticipantsList()
+        # Populate the lists with current and available modifiers
+        self.__updateModifiersLists()
         
         # Initially hide the panel
-        self.participantsPanel.hide()
+        self.modifiersPanel.hide()
     
-    def __updateParticipantsList(self):
-        """Update the participants list display with proper styling"""
-        if self.participantsList is None:
+    def __updateModifiersLists(self):
+        """Update the modifiers lists with current and available modifiers"""
+        if self.currentModifiersList is None or self.availableModifiersList is None:
             return
             
         # Clear existing items
-        self.participantsList.removeAllItems()
+        self.currentModifiersList.removeAllItems()
+        self.availableModifiersList.removeAllItems()
         
-        # Load button assets for up/down arrows
+        # Load button assets for add/remove buttons
         gui = loader.loadModel('phase_3.5/models/gui/friendslist_gui')
-        arrowUpImage = (gui.find('**/FndsLst_ScrollUp'),
-                       gui.find('**/FndsLst_ScrollDN'),
-                       gui.find('**/FndsLst_ScrollUp_Rllvr'),
-                       gui.find('**/FndsLst_ScrollUp'))
-        arrowDownImage = (gui.find('**/FndsLst_ScrollUp'),
-                         gui.find('**/FndsLst_ScrollDN'),
-                         gui.find('**/FndsLst_ScrollUp_Rllvr'),
-                         gui.find('**/FndsLst_ScrollUp'))
+        addButtonImage = (gui.find('**/Horiz_Arrow_UP'),
+                         gui.find('**/Horiz_Arrow_DN'),
+                         gui.find('**/Horiz_Arrow_Rllvr'),
+                         gui.find('**/Horiz_Arrow_UP'))
+        removeButtonImage = (gui.find('**/Horiz_Arrow_UP'),
+                           gui.find('**/Horiz_Arrow_DN'),
+                           gui.find('**/Horiz_Arrow_Rllvr'),
+                           gui.find('**/Horiz_Arrow_UP'))
         
-        # Get participating toons (not spectating)
-        participatingToons = self.getParticipantsNotSpectating()
-        
-        # Create items for each participating toon in spawn order
-        for i, toon in enumerate(participatingToons):
-            if i >= len(self.toonSpawnpointOrder):
-                break  # Safety check
-                
-            spawnIndex = self.toonSpawnpointOrder[i]
-            toonName = toon.getName() if toon else f"Player {i+1}"
-            
-            # Create item frame
+        # Populate current modifiers list
+        for i, mod in enumerate(self.modifiers):
             itemFrame = DirectFrame(
                 relief=None,
-                frameSize=(-0.6, 0.6, -0.04, 0.04),
-                frameColor=(0.9, 0.9, 0.9, 0.8) if i % 2 == 0 else (0.8, 0.8, 0.8, 0.8)
+                frameSize=(-0.38, 0.38, -0.03, 0.03)
             )
             
-            # Position number label (spawn order)
-            posLabel = DirectLabel(
-                parent=itemFrame,
-                relief=None,
-                text=f"{i+1}.",
-                text_scale=0.035,
-                text_pos=(-0.5, 0, 0),
-                text_fg=(0.2, 0.2, 0.6, 1),
-                text_font=ToontownGlobals.getInterfaceFont(),
-                text_align=TextNode.ALeft
-            )
-            
-            # Toon name label
+            # Modifier name label
             nameLabel = DirectLabel(
                 parent=itemFrame,
                 relief=None,
-                text=toonName,
-                text_scale=0.035,
-                text_pos=(-0.2, 0, 0),
-                text_fg=(0.1, 0.1, 0.1, 1),
+                text=mod.getName(),
+                text_scale=0.025,
+                text_pos=(-0.35, 0, 0),
+                text_fg=mod.TITLE_COLOR,
                 text_font=ToontownGlobals.getInterfaceFont(),
                 text_align=TextNode.ALeft
             )
             
-            # Spawn point label
-            spawnLabel = DirectLabel(
+            # Remove button
+            removeButton = DirectButton(
                 parent=itemFrame,
                 relief=None,
-                text=f"Spot {spawnIndex + 1}",
-                text_scale=0.03,
-                text_pos=(0.15, 0, 0),
-                text_fg=(0.4, 0.4, 0.4, 1),
+                image=removeButtonImage,
+                image_scale=(0.3, 1, 0.3),
+                image_hpr=(0, 0, 180),  # Rotate to make it a remove arrow
+                pos=(0.17, 0, 0),
+                command=self.__removeModifier,
+                extraArgs=[i]
+            )
+            
+            self.currentModifiersList.addItem(itemFrame)
+        
+        # Get available modifiers (all modifiers not currently active)
+        from toontown.coghq import CraneLeagueGlobals
+        currentModEnums = [mod.MODIFIER_ENUM for mod in self.modifiers]
+        availableModClasses = []
+        
+        # Get all modifier classes and filter out currently active ones
+        for modEnum, modClass in CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.items():
+            if modEnum not in currentModEnums:
+                availableModClasses.append(modClass)
+        
+        # Sort by type (Helpful, Hurtful, Special)
+        availableModClasses.sort(key=lambda x: (x.MODIFIER_TYPE, x.MODIFIER_ENUM))
+        
+        # Populate available modifiers list
+        for i, modClass in enumerate(availableModClasses):
+            mod = modClass()  # Create instance for display
+            
+            itemFrame = DirectFrame(
+                relief=None,
+                frameSize=(-0.38, 0.38, -0.03, 0.03)
+            )
+            
+            # Modifier name label
+            nameLabel = DirectLabel(
+                parent=itemFrame,
+                relief=None,
+                text=mod.getName(),
+                text_scale=0.025,
+                text_pos=(-0.35, 0, 0),
+                text_fg=mod.TITLE_COLOR,
                 text_font=ToontownGlobals.getInterfaceFont(),
                 text_align=TextNode.ALeft
             )
             
-            # Up arrow button (only if not first)
-            if i > 0:
-                upButton = DirectButton(
-                    parent=itemFrame,
-                    relief=None,
-                    image=arrowUpImage,
-                    image_scale=(0.4, 1, 0.4),
-                    pos=(0.35, 0, 0),
-                    command=self.__moveParticipantUp,
-                    extraArgs=[i]
-                )
+            # Add button
+            addButton = DirectButton(
+                parent=itemFrame,
+                relief=None,
+                image=addButtonImage,
+                image_scale=(0.3, 1, 0.3),
+                pos=(0.17, 0, 0),
+                command=self.__addModifier,
+                extraArgs=[modClass.MODIFIER_ENUM]
+            )
             
-            # Down arrow button (only if not last)
-            if i < len(participatingToons) - 1:
-                downButton = DirectButton(
-                    parent=itemFrame,
-                    relief=None,
-                    image=arrowDownImage,
-                    image_scale=(0.4, 1, -0.4),  # Negative scale to flip arrow
-                    pos=(0.5, 0, 0),
-                    command=self.__moveParticipantDown,
-                    extraArgs=[i]
-                )
-            
-            # Add to scrolled list
-            self.participantsList.addItem(itemFrame)
+            self.availableModifiersList.addItem(itemFrame)
         
         # Clean up loaded model
         gui.removeNode()
-
-    def __moveParticipantUp(self, participantIndex):
-        """Move a participant up in the spawn order"""
-        if participantIndex > 0 and participantIndex < len(self.toonSpawnpointOrder):
-            # Swap spawn point indices
-            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex - 1] = \
-                self.toonSpawnpointOrder[participantIndex - 1], self.toonSpawnpointOrder[participantIndex]
-            
-            # Update the display
-            self.__updateParticipantsList()
-            
-            # Send update to server if we're the leader
-            self.__sendSpawnOrderUpdate()
     
-    def __moveParticipantDown(self, participantIndex):
-        """Move a participant down in the spawn order"""
-        if participantIndex >= 0 and participantIndex < len(self.toonSpawnpointOrder) - 1:
-            # Swap spawn point indices
-            self.toonSpawnpointOrder[participantIndex], self.toonSpawnpointOrder[participantIndex + 1] = \
-                self.toonSpawnpointOrder[participantIndex + 1], self.toonSpawnpointOrder[participantIndex]
-            
-            # Update the display
-            self.__updateParticipantsList()
-            
-            # Send update to server if we're the leader
-            self.__sendSpawnOrderUpdate()
+    def __addModifier(self, modifierEnum):
+        """Add a modifier to the game"""
+        if self.isLocalToonHost():
+            # Check if this modifier has configurable parameters
+            if self.__modifierHasParameters(modifierEnum):
+                self.__showModifierConfigDialog(modifierEnum)
+            else:
+                # Add directly with default tier 1
+                self.sendUpdate('addModifier', [modifierEnum, 1])
     
-    def __sendSpawnOrderUpdate(self):
-        """Send the updated spawn order to the server"""
-        # Only the leader can send spawn order updates
-        if self.avIdList[0] == base.localAvatar.doId:
-            # Send the updated spawn order to the AI
-            self.sendUpdate('updateSpawnOrder', [self.toonSpawnpointOrder])
+    def __modifierHasParameters(self, modifierEnum):
+        """Check if a modifier has configurable parameters (tiers)"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Get the modifier class
+        modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
+        if not modifierClass:
+            return False
+        
+        # Create a temporary instance to check if it uses tiers meaningfully
+        tempMod = modifierClass()
+        
+        # Check some common modifiers that have meaningful tier differences
+        tieredModifiers = [
+            27,  # ModifierTimerEnabler (Margin Call)
+            2,   # ModifierCFOHPIncreaser (Financial Aid)
+            3,   # ModifierCFOHPDecreaser (Budget Cuts)
+            0,   # ModifierComboExtender (Chains of Finesse)
+            1,   # ModifierComboShortener (Chain Locker)
+            4,   # ModifierDesafeImpactIncreaser (Strong/Tough/Reinforced Safes)
+            9,   # ModifierGoonDamageInflictIncreaser (Goon damage)
+            10,  # ModifierSafeDamageInflictIncreaser (Safe damage)
+            11,  # ModifierGoonSpeedIncreaser (Goon speed)
+            12,  # ModifierGoonCapIncreaser (Goon cap)
+            16,  # ModifierTreasureHealDecreaser (Treasure heal decrease)
+            17,  # ModifierTreasureRNG (Treasure drop chance)
+            18,  # ModifierTreasureCapDecreaser (Treasure cap)
+            19,  # ModifierUberBonusIncreaser (Uber bonus)
+            29,  # ModifierLaffDrain (Leaky Laff)
+        ]
+        
+        return modifierEnum in tieredModifiers
+    
+    def __showModifierConfigDialog(self, modifierEnum):
+        """Show configuration dialog for a modifier"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Get the modifier class
+        modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
+        if not modifierClass:
+            return
+        
+        # Hide the modifiers panel temporarily
+        if self.modifiersPanel:
+            self.modifiersPanel.hide()
+        
+        # Create configuration dialog - make it wider for two-column layout
+        self.modifierConfigDialog = DirectFrame(
+            relief=None,
+            image=DGG.getDefaultDialogGeom(),
+            image_color=ToontownGlobals.GlobalDialogColor,
+            image_scale=(1.8, 1, 1.4),  # Made wider for two columns
+            pos=(0, 0, 0),
+            parent=aspect2d,
+            sortOrder=DGG.NO_FADE_SORT_INDEX + 1
+        )
+        
+        # Create a sample modifier to get information
+        sampleMod = modifierClass()
+        
+        # Title
+        titleLabel = DirectLabel(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            text=f"Configure {sampleMod.getName()}",
+            text_scale=0.07,
+            text_pos=(0, 0.55),
+            text_fg=sampleMod.TITLE_COLOR,
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Instructions
+        instructionsLabel = DirectLabel(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            text="Choose the intensity/duration:",
+            text_scale=0.05,
+            text_pos=(0, 0.45),
+            text_fg=(0.3, 0.3, 0.3, 1),
+            text_font=ToontownGlobals.getInterfaceFont()
+        )
+        
+        # Load button assets
+        buttons = loader.loadModel('phase_3/models/gui/dialog_box_buttons_gui')
+        buttonImage = (buttons.find('**/ChtBx_OKBtn_UP'), 
+                      buttons.find('**/ChtBx_OKBtn_DN'), 
+                      buttons.find('**/ChtBx_OKBtn_Rllvr'))
+        
+        cancelButtonImage = (buttons.find('**/CloseBtn_UP'), 
+                          buttons.find('**/CloseBtn_DN'), 
+                          buttons.find('**/CloseBtn_Rllvr'))
+        
+        # Create tier selection options based on modifier type
+        self.__createTierOptions(modifierEnum, modifierClass, buttonImage)
+        
+        # Cancel button
+        cancelButton = DirectButton(
+            parent=self.modifierConfigDialog,
+            relief=None,
+            image=cancelButtonImage,
+            text="Cancel",
+            text_scale=0.05,
+            text_pos=(0, -0.1),
+            pos=(0, 0, -0.5),
+            command=self.__cancelModifierConfig
+        )
+        
+        buttons.removeNode()
+    
+    def __createTierOptions(self, modifierEnum, modifierClass, buttonImage):
+        """Create tier selection options with two-column layout"""
+        
+        # Special handling for different modifier types
+        if modifierEnum == 27:  # ModifierTimerEnabler (Margin Call)
+            self.__createTimeSelectionOptions(modifierEnum, buttonImage)
+        elif modifierEnum in [2, 3]:  # HP modifiers
+            self.__createPercentageOptions(modifierEnum, modifierClass, buttonImage, "HP")
+        elif modifierEnum in [0, 1]:  # Combo modifiers
+            self.__createPercentageOptions(modifierEnum, modifierClass, buttonImage, "Combo Duration")
+        elif modifierEnum == 29:  # ModifierLaffDrain (Leaky Laff)
+            self.__createLaffDrainOptions(modifierEnum, buttonImage)
+        else:
+            # Generic tier options (1-5)
+            self.__createGenericTierOptions(modifierEnum, modifierClass, buttonImage)
+    
+    def __createTimeSelectionOptions(self, modifierEnum, buttonImage):
+        """Create time selection options for Margin Call modifier"""
+        timeOptions = [
+            (1, "1 minute"),
+            (2, "2 minutes"), 
+            (3, "3 minutes"),
+            (5, "5 minutes"),
+            (10, "10 minutes")
+        ]
+        
+        startY = 0.3
+        for i, (tier, label) in enumerate(timeOptions):
+            currentY = startY - i * 0.08
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=label,
+                text_scale=0.045,
+                text_pos=(-0.35, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __createPercentageOptions(self, modifierEnum, modifierClass, buttonImage, statName):
+        """Create percentage-based tier options"""
+        from toontown.coghq import CraneLeagueGlobals
+        
+        # Create sample modifiers to get percentage values
+        tiers = [1, 2, 3, 4, 5]
+        startY = 0.3
+        
+        for i, tier in enumerate(tiers):
+            try:
+                sampleMod = modifierClass(tier)
+                currentY = startY - i * 0.08
+                
+                # Get the percentage or value for display
+                if hasattr(sampleMod, '_perc_increase'):
+                    value = sampleMod._perc_increase()
+                    description = f"Tier {tier}: +{value}% {statName}"
+                elif hasattr(sampleMod, '_perc_decrease'):
+                    value = sampleMod._perc_decrease()
+                    description = f"Tier {tier}: -{value}% {statName}"
+                elif hasattr(sampleMod, '_duration'):
+                    value = sampleMod._duration()
+                    description = f"Tier {tier}: +{value}% {statName}"
+                else:
+                    description = f"Tier {tier}"
+                
+                # Description label on the left
+                descLabel = DirectLabel(
+                    parent=self.modifierConfigDialog,
+                    relief=None,
+                    text=description,
+                    text_scale=0.04,
+                    text_pos=(-0.4, currentY),
+                    text_fg=(0.2, 0.2, 0.2, 1),
+                    text_font=ToontownGlobals.getInterfaceFont(),
+                    text_align=TextNode.ALeft
+                )
+                
+                # Selection button on the right
+                selectButton = DirectButton(
+                    parent=self.modifierConfigDialog,
+                    relief=None,
+                    image=buttonImage,
+                    pos=(0.4, 0, currentY+0.015),
+                    scale=(0.7, 1, 0.7),
+                    command=self.__confirmModifierConfig,
+                    extraArgs=[modifierEnum, tier]
+                )
+            except:
+                # Fallback for tiers that might not work
+                break
+    
+    def __createLaffDrainOptions(self, modifierEnum, buttonImage):
+        """Create laff drain rate selection options"""
+        drainOptions = [
+            (1, "Every 1.0 seconds"),
+            (2, "Every 1.0 seconds"),
+            (3, "Every 0.75 seconds"),
+            (4, "Every 0.5 seconds"),
+            (5, "Every 0.25 seconds"),
+            (6, "Every 0.1 seconds")
+        ]
+        
+        startY = 0.3
+        for i, (tier, label) in enumerate(drainOptions):
+            currentY = startY - i * 0.08
+            description = f"Tier {tier}: {label}"
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=description,
+                text_scale=0.04,
+                text_pos=(-0.4, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __createGenericTierOptions(self, modifierEnum, modifierClass, buttonImage):
+        """Create generic tier 1-5 options with descriptions"""
+        tiers = [1, 2, 3, 4, 5]
+        startY = 0.3
+        
+        for i, tier in enumerate(tiers):
+            currentY = startY - i * 0.08
+            
+            # Try to get a meaningful description
+            try:
+                sampleMod = modifierClass(tier)
+                if hasattr(sampleMod, '_perc_increase'):
+                    value = sampleMod._perc_increase()
+                    description = f"Tier {tier}: +{value}% effect"
+                elif hasattr(sampleMod, '_perc_decrease'):
+                    value = sampleMod._perc_decrease()
+                    description = f"Tier {tier}: -{value}% effect"
+                elif hasattr(sampleMod, 'getDescription'):
+                    # Get the description and try to extract meaningful info
+                    desc = sampleMod.getDescription()
+                    description = f"Tier {tier}: {sampleMod.getName()}"
+                else:
+                    description = f"Tier {tier}: Standard intensity"
+            except:
+                description = f"Tier {tier}: Standard intensity"
+            
+            # Description label on the left
+            descLabel = DirectLabel(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                text=description,
+                text_scale=0.04,
+                text_pos=(-0.4, currentY),
+                text_fg=(0.2, 0.2, 0.2, 1),
+                text_font=ToontownGlobals.getInterfaceFont(),
+                text_align=TextNode.ALeft
+            )
+            
+            # Selection button on the right
+            selectButton = DirectButton(
+                parent=self.modifierConfigDialog,
+                relief=None,
+                image=buttonImage,
+                pos=(0.4, 0, currentY+0.015),
+                scale=(0.7, 1, 0.7),
+                command=self.__confirmModifierConfig,
+                extraArgs=[modifierEnum, tier]
+            )
+    
+    def __confirmModifierConfig(self, modifierEnum, tier):
+        """Confirm the modifier configuration and add it"""
+        # Clean up the config dialog
+        self.__cancelModifierConfig()
+        
+        # Add the modifier with the selected tier
+        self.sendUpdate('addModifier', [modifierEnum, tier])
+    
+    def __cancelModifierConfig(self):
+        """Cancel modifier configuration"""
+        if hasattr(self, 'modifierConfigDialog') and self.modifierConfigDialog:
+            self.modifierConfigDialog.destroy()
+            self.modifierConfigDialog = None
+        
+        # Show the modifiers panel again
+        if self.modifiersPanel and self.modifiersPanelVisible:
+            self.modifiersPanel.show()
 
     def __cleanupRulesPanel(self):
         self.ignore(self.rulesDoneEvent)
@@ -865,17 +1226,22 @@ class DistributedCraneGame(DistributedMinigame):
         if self.playButton is not None:
             self.playButton.destroy()
             self.playButton = None
-        if self.participantsButton is not None:
-            self.participantsButton.destroy()
-            self.participantsButton = None
+        if self.modifiersButton is not None:
+            self.modifiersButton.destroy()
+            self.modifiersButton = None
         if self.bestOfButton is not None:
             self.bestOfButton.destroy()
             self.bestOfButton = None
-        if self.participantsPanel is not None:
-            self.participantsPanel.destroy()
-            self.participantsPanel = None
-            self.participantsList = None
-        self.participantsPanelVisible = False
+        if self.modifiersPanel is not None:
+            self.modifiersPanel.destroy()
+            self.modifiersPanel = None
+            self.currentModifiersList = None
+            self.availableModifiersList = None
+        self.modifiersPanelVisible = False
+        # Clean up modifier config dialog if it exists
+        if hasattr(self, 'modifierConfigDialog') and self.modifierConfigDialog is not None:
+            self.modifierConfigDialog.destroy()
+            self.modifierConfigDialog = None
         if self.rulesPanel is not None:
             self.rulesPanel.cleanup()
             self.rulesPanel = None
@@ -1274,20 +1640,21 @@ class DistributedCraneGame(DistributedMinigame):
         # Hide the panel by default
         self.rulesPanel.hide()
 
-        # Only show the play and participants buttons for the leader (first player in avIdList)
-        if self.avIdList[0] == base.localAvatar.doId:
+
+
+        # Only show the play and participants buttons for the leader
+        if self.isLocalToonHost():
             self.playButton.show()
-            self.participantsButton.show()
+            self.modifiersButton.show()
             self.bestOfButton.show()
         else:
-            # Non-leader players automatically trigger ready
             messenger.send(self.rulesDoneEvent)
 
         # Position toons in the rules formation
         self.setToonsToRulesPositions()
 
         # Only setup click detection for the leader
-        if self.avIdList[0] == base.localAvatar.doId:
+        if self.isLocalToonHost():
             # Make sure the click ray is using our spotlight bitmask
             self.clickRayNode.setFromCollideMask(self.spotlightBitMask)
             self.accept('mouse1', self.handleMouseClick)
@@ -1308,6 +1675,9 @@ class DistributedCraneGame(DistributedMinigame):
         
         # Clean up click detection
         self.ignore('mouse1')
+        
+        # Clean up any pending auto-ready task
+        taskMgr.remove(self.uniqueName('auto-ready'))
             
         # Make sure to clean up all indicators
         self.removeStatusIndicators()
@@ -1316,7 +1686,7 @@ class DistributedCraneGame(DistributedMinigame):
     def handleMouseClick(self):
         """Handle mouse clicks during the rules state to detect clicks on spotlights."""
         # Only the leader can click
-        if self.avIdList[0] != base.localAvatar.doId:
+        if not self.isLocalToonHost():
             return
         
         # Get the mouse position
@@ -1455,7 +1825,7 @@ class DistributedCraneGame(DistributedMinigame):
         floorNode.attachNewNode(floorGeomNode)
 
         # Add collision cylinder for clicking
-        if self.avIdList[0] == base.localAvatar.doId:  # Only leader gets collision
+        if self.isLocalToonHost():  # Only leader gets collision
             radius = 1  # Same radius as the spotlight
             collTube = CollisionTube(0, 0, 4, 0, 0, 1.2, radius)  # point1_x, point1_y, point1_z, point2_x, point2_y, point2_z, radius
             collNode = CollisionNode(f'spotlightSphere-{toon.doId}')  # Keep the same node name for consistency
@@ -1523,8 +1893,10 @@ class DistributedCraneGame(DistributedMinigame):
 
     def enterFrameworkWaitServerStart(self):
         self.notify.debug('BASE: enterFrameworkWaitServerStart')
-        if self.numPlayers > 1:
+        if self.numPlayers > 1 and self.hasHost():
             msg = "Waiting for Group Leader to start..."
+        elif self.numPlayers > 1:
+            msg = "The game will start shortly..."
         else:
             msg = TTLocalizer.MinigamePleaseWait
         self.waitingStartLabel['text'] = msg
@@ -1534,10 +1906,6 @@ class DistributedCraneGame(DistributedMinigame):
         """Receive updated spawn order from server"""
         self.toonSpawnpointOrder = order[:]
         self.notify.info(f"Received spawn order update: {self.toonSpawnpointOrder}")
-        
-        # Update the participants panel if it's visible
-        if self.participantsPanelVisible and self.participantsList is not None:
-            self.__updateParticipantsList()
 
     def __handleBestOfButton(self):
         """Handle the "Best of" button click"""
@@ -1555,7 +1923,7 @@ class DistributedCraneGame(DistributedMinigame):
         self.bestOfButton['text'] = f'Best of {self.bestOfValue}'
         
         # Send update to server if we're the leader
-        if self.avIdList[0] == base.localAvatar.doId:
+        if self.isLocalToonHost():
             self.sendUpdate('setBestOf', [self.bestOfValue])
 
     def setBestOf(self, value):
@@ -1579,8 +1947,28 @@ class DistributedCraneGame(DistributedMinigame):
         if self.scoreboard:
             self.scoreboard.setRoundInfo(currentRound, roundWins, self.bestOfValue)
 
+    def setModifiers(self, mods):
+        """Receive modifier updates from the server"""
+        modsToSet = []  # A list of CFORulesetModifierBase subclass instances
+        for modStruct in mods:
+            modsToSet.append(CraneLeagueGlobals.CFORulesetModifierBase.fromStruct(modStruct))
+
+        self.modifiers = modsToSet
+        self.modifiers.sort(key=lambda m: m.MODIFIER_TYPE)
+        self.heatDisplay.update(self.modifiers)
+        
+        # Update the modifiers panel if it's visible
+        if self.modifiersPanelVisible and self.currentModifiersList is not None:
+            self.__updateModifiersLists()
+
     def __nextRound(self, task=None):
         """Transition to the next round"""
         # The server will handle the transition to the next round automatically
         # We just need to clean up the victory state
         return Task.done
+
+    def __removeModifier(self, modifierIndex):
+        """Remove a modifier from the game"""
+        if self.isLocalToonHost() and modifierIndex < len(self.modifiers):
+            modifierEnum = self.modifiers[modifierIndex].MODIFIER_ENUM
+            self.sendUpdate('removeModifier', [modifierEnum])

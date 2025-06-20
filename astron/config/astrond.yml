@@ -48,6 +48,10 @@ uberdogs:
       id: 4708
       anonymous: false
 
+    - class: DistributedMatchmaker
+      id: 4709
+      anonymous: false
+
     - class: TTOffChatManager
       id: 4681
       anonymous: false

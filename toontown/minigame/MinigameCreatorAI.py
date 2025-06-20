@@ -108,9 +108,9 @@ class MinigameCreatorAI:
 
         return choices
 
-    def createMinigame(self, playerArray, trolleyZone, minigameZone=None, previousGameId=ToontownGlobals.NoPreviousGameId, newbieIds=None, spectatorIds=None, startingVotes=None, metagameRound=-1, desiredNextGame=None) -> GeneratedMinigame:
-        if newbieIds is None:
-            newbieIds = []
+    def createMinigame(self, playerArray, trolleyZone, minigameZone=None,
+                       previousGameId=ToontownGlobals.NoPreviousGameId, hostId=None,
+                       spectatorIds=None, desiredNextGame=None) -> GeneratedMinigame:
 
         if spectatorIds is None:
             spectatorIds = []
@@ -122,13 +122,11 @@ class MinigameCreatorAI:
 
         minigameChoices = self.getMinigameChoices(len(playerArray), previousGameId=previousGameId, allowTrolleyTracks=False)
         mgId = random.choice(minigameChoices)
-        mgId = ToontownGlobals.CraneGameId
+        mgId = ToontownGlobals.CraneGameId  # Todo: Always choose crane game.
 
-        if metagameRound > -1:
-            if metagameRound % 2 == 0:
-                mgId = ToontownGlobals.TravelGameId
-            elif desiredNextGame:
-                mgId = desiredNextGame
+        # Check for a minigame override.
+        if desiredNextGame is not None:
+            mgId = desiredNextGame
 
         # Check for requested minigames via commands, clear request if one was found
         for toonId in playerArray:
@@ -138,29 +136,16 @@ class MinigameCreatorAI:
                 break
 
         if mgId not in self.MINIGAME_ID_TO_CLASS:
-            print(f"Unable to find minigame constructor matching minigame id: {mgId}, defaulting to cannon game")
+            print(f"Unable to find minigame constructor matching minigame id: {mgId}, defaulting to crane game")
             traceback.print_exc()
-            mg = DistributedCannonGameAI.DistributedCannonGameAI(self.air, ToontownGlobals.CannonGameId)
+            mg = DistributedCraneGameAI(self.air, ToontownGlobals.CraneGameId)
         else:
             mg = self.MINIGAME_ID_TO_CLASS[mgId](self.air, mgId)
 
         mg.setExpectedAvatars(playerArray)
-        mg.setNewbieIds(newbieIds)
         mg.setTrolleyZone(trolleyZone)
-        if startingVotes is None:
-            for avId in playerArray:
-                mg.setStartingVote(avId, TravelGameGlobals.DefaultStartingVotes)
-
-        else:
-            for index in range(len(startingVotes)):
-                avId = playerArray[index]
-                votes = startingVotes[index]
-                if votes < 0:
-                    print('createMinigame negative votes, avId=%s votes=%s' % (avId, votes))
-                    votes = 0
-                mg.setStartingVote(avId, votes)
-
-        mg.setMetagameRound(metagameRound)
+        if hostId is not None:
+            mg.setHost(hostId)
         mg.generateWithRequired(minigameZone)
         
         # Track created minigame for memory monitoring

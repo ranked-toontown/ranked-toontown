@@ -9,7 +9,7 @@ from direct.interval.IntervalGlobal import ivalMgr
 from direct.distributed.PyDatagramIterator import PyDatagramIterator
 
 from direct.fsm import State
-from direct.showbase.PythonUtil import Functor, ScratchPad
+from otp.otpbase.PythonUtil import Functor, ScratchPad
 
 from libotp.nametag.WhisperGlobals import WhisperType
 from otp.avatar import Avatar
@@ -47,6 +47,7 @@ from toontown.hood import StreetSign
 from ..archipelago.distributed.DistributedArchipelagoManager import DistributedArchipelagoManager
 from ..friends.OnlinePlayerManager import OnlinePlayerManager
 from ..friends.OnlineToon import OnlineToon
+from ..matchmaking.DistributedMatchmaker import DistributedMatchmaker
 from ..matchmaking.LeaderboardManager import LeaderboardManager
 
 
@@ -64,6 +65,7 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
 
     onlinePlayerManager: OnlinePlayerManager
     leaderboardManager: LeaderboardManager
+    matchmaker: DistributedMatchmaker
     archipelagoManager: DistributedArchipelagoManager
 
     def __init__(self, serverVersion, launcher = None):
@@ -101,6 +103,7 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
         self.playerFriendsManager = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_PLAYER_FRIENDS_MANAGER, 'TTPlayerFriendsManager')
         self.onlinePlayerManager = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_ONLINE_PLAYER_MANAGER, 'OnlinePlayerManager')
         self.leaderboardManager = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_LEADERBOARD_MANAGER, 'LeaderboardManager')
+        self.matchmaker = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_MATCHMAKER, 'DistributedMatchmaker')
         self.speedchatRelay = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_TOONTOWN_SPEEDCHAT_RELAY, 'TTSpeedchatRelay')
         self.deliveryManager = self.generateGlobalObject(OtpDoGlobals.OTP_DO_ID_TOONTOWN_DELIVERY_MANAGER, 'DistributedDeliveryManager')
         if config.GetBool('want-code-redemption', 1):
@@ -563,7 +566,7 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
             else:
                 self.notify.info('dumpAllSubShardObjects: defaultShard is %s' % localAvatar.defaultShard)
 
-            ignoredClasses = ('MagicWordManager', 'TimeManager', 'DistributedDistrict', 'FriendManager', 'NewsManager', 'ToontownMagicWordManager', 'WelcomeValleyManager', 'DistributedTrophyMgr', 'CatalogManager', 'DistributedBankMgr', 'EstateManager', 'RaceManager', 'SafeZoneManager', 'DeleteManager', 'TutorialManager', 'ToontownDistrict', 'DistributedDeliveryManager', 'LeaderboardManager', 'DistributedPartyManager', 'AvatarFriendsManager', 'InGameNewsMgr', 'WhitelistMgr', 'TTCodeRedemptionMgr', 'DistributedArchipelagoManager')
+            ignoredClasses = ('MagicWordManager', 'TimeManager', 'DistributedDistrict', 'FriendManager', 'NewsManager', 'ToontownMagicWordManager', 'WelcomeValleyManager', 'DistributedTrophyMgr', 'CatalogManager', 'DistributedBankMgr', 'EstateManager', 'RaceManager', 'SafeZoneManager', 'DeleteManager', 'TutorialManager', 'ToontownDistrict', 'DistributedDeliveryManager', 'LeaderboardManager', 'DistributedMatchmaker', 'DistributedPartyManager', 'AvatarFriendsManager', 'InGameNewsMgr', 'WhitelistMgr', 'TTCodeRedemptionMgr', 'DistributedArchipelagoManager')
         messenger.send('clientCleanup')
         for avId, pad in list(self.__queryAvatarMap.items()):
             pad.delayDelete.destroy()

@@ -2,7 +2,7 @@ from panda3d.core import *
 from direct.interval.IntervalGlobal import *
 from .StomperGlobals import *
 from direct.distributed import ClockDelta
-from direct.showbase.PythonUtil import lerp
+from otp.otpbase.PythonUtil import lerp
 import math
 from . import DistributedCrusherEntity
 from . import MovingPlatform

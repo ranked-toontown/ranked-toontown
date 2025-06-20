@@ -86,15 +86,23 @@ class DistributedGroupManagerAI(DistributedObjectAI):
 
     def __canJoinGroup(self, inviter: int, recipient: int) -> GroupOperationResult:
 
-        # First case, is this the same person?
-        if inviter == recipient:
-            return GroupOperationResult.IS_SAME_PERSON
-
         # Do both toons exist?
         inviterToon = self.air.getDo(inviter)
         recipientToon = self.air.getDo(recipient)
         if None in (inviterToon, recipientToon):
             return GroupOperationResult.NONEXISTENT_TOON
+
+        # Are we queueing?
+        if self.air.matchmaker.isPlayerInQueue(inviterToon):
+            return GroupOperationResult.SELF_QUEUE
+
+        # First case, is this the same person?
+        if inviter == recipient:
+            return GroupOperationResult.IS_SAME_PERSON
+
+        # Is the recipient queueing?
+        if self.air.matchmaker.isPlayerInQueue(recipientToon):
+            return GroupOperationResult.IN_QUEUE
 
         # Grab the groups of both members.
         inviterGroup = self.getGroup(inviterToon)
@@ -354,10 +362,7 @@ class DistributedGroupManagerAI(DistributedObjectAI):
             return
 
         # Is everyone ready?
-        notReady = 0
-        for member in group.getMembers():
-            if member.status == GroupGlobals.STATUS_UNREADY:
-                notReady += 1
+        notReady = group.getNumPlayersNotReady()
         if notReady > 0:
             group.announce(f"{requester.getName()} wants to start the activity but {notReady} toon{'s' if notReady > 1 else ''} {'are' if notReady > 1 else 'is'} not ready!")
             return

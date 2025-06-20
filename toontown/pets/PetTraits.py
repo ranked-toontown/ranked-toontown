@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-from direct.showbase.PythonUtil import randFloat, normalDistrib
+from otp.otpbase.PythonUtil import randFloat, normalDistrib
 from otp.otpbase.PythonUtil import clampScalar
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 import random, copy

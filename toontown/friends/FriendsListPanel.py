@@ -130,6 +130,7 @@ class FriendsListPanel(DirectFrame, StateData.StateData):
         self.close = None
         self.leftButton = None
         self.rightButton = None
+        self.queueButton = None
 
     def load(self):
 
@@ -164,6 +165,24 @@ class FriendsListPanel(DirectFrame, StateData.StateData):
                                                                          gui.find('**/Horiz_Arrow_DN'),
                                                                          gui.find('**/Horiz_Arrow_Rllvr'),
                                                                          gui.find('**/Horiz_Arrow_UP')), image3_color=Vec4(0.6, 0.6, 0.6, 0.6), pos=(0.17, 0, -0.38), command=self.__right)
+
+        # TODO: this can go somewhere else once we decide how we want our main UI to look.
+        queueGui = base.loader.loadModel("phase_3/models/gui/quit_button")
+        self.queueButton = DirectButton(
+            parent=self, relief=None, pos=(0.01, 0, -.52),
+            text='Queue', scale=1.1,
+            text_scale=0.05, image_pos=(0, 0, 0.015),
+            image=(
+                queueGui.find("**/QuitBtn_UP"),
+                queueGui.find("**/QuitBtn_DN"),
+                queueGui.find("**/QuitBtn_RLVR"),
+            ),
+            image_scale=(0.7, 1, 1),
+            image_color=(.15, .85, .15, 1),
+            command=lambda: base.cr.matchmaker.d_requestQueueState(True)
+        )
+        queueGui.removeNode()
+        # TODO: End temporary queue button.
         gui.removeNode()
         auxGui.removeNode()
         return
@@ -180,6 +199,7 @@ class FriendsListPanel(DirectFrame, StateData.StateData):
         del self.close
         del self.leftButton
         del self.rightButton
+        del self.queueButton
         del self.playerButtons
         DirectFrame.destroy(self)
 

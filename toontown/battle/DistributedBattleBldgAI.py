@@ -4,7 +4,7 @@ from .BattleBase import *
 from .BattleCalculatorAI import *
 from toontown.toonbase.ToontownBattleGlobals import *
 from .SuitBattleGlobals import *
-from direct.showbase.PythonUtil import addListsByValue
+from otp.otpbase.PythonUtil import addListsByValue
 from . import DistributedBattleBaseAI
 from direct.task import Task
 from direct.directnotify import DirectNotifyGlobal

@@ -1,27 +1,25 @@
-from panda3d.core import *
-from toontown.toonbase.ToonBaseGlobal import *
-from direct.gui.DirectGui import *
-from direct.distributed.ClockDelta import *
-from toontown.toonbase import ToontownGlobals
-from direct.distributed import DistributedObject
-from direct.directnotify import DirectNotifyGlobal
-from direct.fsm import ClassicFSM, State
-from direct.fsm import State
-from . import MinigameRulesPanel
-from direct.task.Task import Task
-from toontown.toon import Toon
-from direct.showbase import RandomNumGen
-from toontown.toonbase import TTLocalizer
 import random
-from . import MinigameGlobals
-from direct.showbase import PythonUtil
-from toontown.toon import TTEmote
+
+from direct.directnotify import DirectNotifyGlobal
+from direct.distributed import DistributedObject
+from direct.distributed.ClockDelta import *
+from direct.fsm import ClassicFSM
+from direct.fsm import State
+from direct.gui.DirectGui import *
+from direct.showbase import RandomNumGen
+from direct.task.Task import Task
+from panda3d.core import *
+
 from otp.avatar import Emote
 from otp.distributed.TelemetryLimiter import RotationLimitToH, TLGatherAllAvs
+from toontown.toon import Toon
+from toontown.toonbase import TTLocalizer
+from . import MinigameGlobals
+from . import MinigameRulesPanel
 from ..archipelago.definitions import color_profile
-from ..archipelago.definitions.color_profile import ColorProfile
 from ..archipelago.util.global_text_properties import get_raw_formatted_string, MinimalJsonMessagePart
 from ..matchmaking.rank import Rank
+from ..toon.DistributedToon import DistributedToon
 
 
 class DistributedMinigame(DistributedObject.DistributedObject):
@@ -31,6 +29,7 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         DistributedObject.DistributedObject.__init__(self, cr)
         self.waitingStartLabel = DirectLabel(text=TTLocalizer.MinigameWaitingForOtherPlayers, text_fg=VBase4(1, 1, 1, 1), relief=None, pos=(-0.6, 0, -0.75), scale=0.075)
         self.waitingStartLabel.hide()
+        self.host: int | None = None  # The host of this minigame. If 0/None, there is no host.
         self.avIdList = []
         self._spectators = []
         self.remoteAvIdList = []
@@ -53,7 +52,6 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         hoodMinigameState.addChild(self.frameworkFSM)
         self.rulesDoneEvent = 'rulesDone'
         self.acceptOnce('minigameAbort', self.d_requestExit)
-        self.accept('minigameSkip', self.d_requestSkip)
         base.curMinigame = self
         self.modelCount = 500
         self.cleanupActions = []
@@ -63,10 +61,12 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.trolleyZoneOverride = None
         self.hasLocalToon = 0
         self.frameworkFSM.enterInitialState()
-        self.startingVotes = {}
-        self.metagameRound = -1
         self.skillProfileKey = ''
         self._telemLimiter = None
+        
+        # Ready timeout timer
+        self.readyTimeoutTimer = None
+        self.readyTimeoutDuration = 0
         return
 
     def addChildGameFSM(self, gameFSM):
@@ -215,6 +215,38 @@ class DistributedMinigame(DistributedObject.DistributedObject):
             del base.curMinigame
         Toon.unloadMinigameAnims()
 
+    def hasHost(self) -> bool:
+        return self.host is not None and self.host != 0
+
+    def setHost(self, host: int):
+        self.host = host
+        if self.host == 0:
+            self.host = None
+
+    def getHost(self) -> int | None:
+        return self.host
+
+    def isLocalToonHost(self) -> bool:
+        """
+        Returns True if our local toon is the host of this game.
+        """
+        return self.getHost() == base.localAvatar.getDoId()
+
+    def getHostToon(self) -> DistributedToon | None:
+        """
+        Gets the host as a DistributedToon object. If the result is none, there either isn't a host or the toon
+        that is assigned as host is not present in our instance. Be mindful of race conditions as well.
+        """
+        if not self.hasHost():
+            return None
+
+        # Query the toon in our client repository. If it's a toon, return it.
+        toon = base.cr.getDo(self.host)
+        if isinstance(toon, DistributedToon):
+            return toon
+
+        return None
+
     def setParticipants(self, avIds):
         self.avIdList = avIds
         self.numPlayers = len(self.avIdList)
@@ -337,6 +369,41 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         """
         self.skillProfileKey = key
         self.updatePlayerNametags()
+
+    def setReadyTimeout(self, timeout):
+        """
+        Receive the ready timeout duration from the server and start displaying a countdown timer.
+        """
+        self.readyTimeoutDuration = timeout
+        self._createReadyTimeoutTimer()
+
+    def _createReadyTimeoutTimer(self):
+        """Create and display the ready timeout countdown timer"""
+        from toontown.toonbase import ToontownTimer
+        
+        # Clean up any existing timer
+        self._destroyReadyTimeoutTimer()
+        
+        self.readyTimeoutTimer = ToontownTimer.ToontownTimer()
+        self.readyTimeoutTimer.reparentTo(aspect2d)
+        self.readyTimeoutTimer.setScale(0.4)
+        self.readyTimeoutTimer.setPos(1.5, 0, -0.8)  # Bottom right corner
+        
+        # Start the countdown - when it expires, the server will automatically abort the game
+        self.readyTimeoutTimer.countdown(self.readyTimeoutDuration, self._handleReadyTimeoutExpired)
+
+    def _handleReadyTimeoutExpired(self):
+        """Called when the ready timeout timer expires (though server handles the actual timeout)"""
+        # The server will handle the actual timeout and game abort
+        # This is just for visual feedback
+        pass
+
+    def _destroyReadyTimeoutTimer(self):
+        """Clean up the ready timeout timer"""
+        if self.readyTimeoutTimer is not None:
+            self.readyTimeoutTimer.stop()
+            self.readyTimeoutTimer.removeNode()
+            self.readyTimeoutTimer = None
 
     def updatePlayerNametags(self):
         """
@@ -462,9 +529,6 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.notify.debug('BASE: Sending requestExit')
         self.sendUpdate('requestExit', [])
 
-    def d_requestSkip(self):
-        self.sendUpdate('requestSkip')
-
     def enterFrameworkInit(self):
         self.notify.debug('BASE: enterFrameworkInit')
         self.setEmotes()
@@ -486,6 +550,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
         self.rulesPanel.exit()
         self.rulesPanel.unload()
         del self.rulesPanel
+        # Clean up the ready timeout timer
+        self._destroyReadyTimeoutTimer()
 
     def handleRulesDone(self):
         self.notify.debug('BASE: handleRulesDone')
@@ -494,6 +560,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def enterFrameworkWaitServerStart(self):
         self.notify.debug('BASE: enterFrameworkWaitServerStart')
+        # Clean up the ready timeout timer since we're no longer waiting for ready
+        self._destroyReadyTimeoutTimer()
         if self.numPlayers > 1:
             msg = TTLocalizer.MinigameWaitingForOtherPlayers
         else:
@@ -516,15 +584,12 @@ class DistributedMinigame(DistributedObject.DistributedObject):
             self.frameworkFSM.request('frameworkCleanup')
 
     def setGameExit(self):
-        print('setGameExit')
         if not self.hasLocalToon:
             return
         self.notify.debug('BASE: setGameExit: now safe to exit game')
         if self.frameworkFSM.getCurrentState().getName() != 'frameworkWaitServerFinish':
-            print('not waiting')
             self.__serverFinished = 1
         else:
-            print('waiting')
             self.frameworkFSM.request('frameworkCleanup')
 
     def exitFrameworkWaitServerFinish(self):
@@ -538,7 +603,8 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def enterFrameworkCleanup(self):
         self.notify.debug('BASE: enterFrameworkCleanup')
-        print('cleanup')
+        # Clean up the ready timeout timer
+        self._destroyReadyTimeoutTimer()
         for action in self.cleanupActions:
             action()
 
@@ -578,18 +644,3 @@ class DistributedMinigame(DistributedObject.DistributedObject):
 
     def unsetEmotes(self):
         Emote.globalEmote.releaseAll(base.localAvatar)
-
-    def setStartingVotes(self, startingVotesArray):
-        if not len(startingVotesArray) == len(self.avIdList):
-            self.notify.error('length does not match, startingVotes=%s, avIdList=%s' % (startingVotesArray, self.avIdList))
-            return
-        for index in range(len(self.avIdList)):
-            avId = self.avIdList[index]
-            self.startingVotes[avId] = startingVotesArray[index]
-
-        self.notify.debug('starting votes = %s' % self.startingVotes)
-
-    def setMetagameRound(self, metagameRound):
-        self.metagameRound = metagameRound
-
-

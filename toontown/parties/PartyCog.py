@@ -5,7 +5,7 @@ from direct.interval.MetaInterval import Sequence, Parallel
 from direct.interval.FunctionInterval import Func, Wait
 from direct.interval.SoundInterval import SoundInterval
 from direct.interval.LerpInterval import LerpScaleInterval, LerpFunc
-from direct.showbase.PythonUtil import bound as clamp
+from otp.otpbase.PythonUtil import bound as clamp
 from direct.task import Task
 from direct.fsm.FSM import FSM
 from panda3d.core import CollisionTube, CollisionNode, CollisionSphere, Point3, Vec4, NodePath, TextNode, Mat4

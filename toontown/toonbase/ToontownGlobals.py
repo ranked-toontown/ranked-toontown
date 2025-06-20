@@ -2,7 +2,7 @@ from enum import IntEnum
 
 from . import TTLocalizer
 from otp.otpbase.OTPGlobals import *
-from direct.showbase.PythonUtil import invertDict
+from otp.otpbase.PythonUtil import invertDict
 from panda3d.core import BitMask32, Vec4, Filename
 import collections
 

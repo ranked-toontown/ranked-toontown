@@ -92,7 +92,7 @@ class OptionsPage(ShtikerPage):
         self.optionsTabPage = OptionsTabPage(self)
         self.optionsTabPage.hide()
 
-        titleHeight = 0.61  # bigger number means higher the title
+        titleHeight = 0.6  # bigger number means higher the title
         self.title = DirectLabel(
             parent=self,
             relief=None,
