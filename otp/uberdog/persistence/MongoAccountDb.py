@@ -27,6 +27,7 @@ class MongoAccountDb(AccountDbBase):
         self.notify.debug(f"Connected to Mongo!")
         self._db: Database[Mapping[str, Any]] = self._client["astrondb"]
         self._tokens: Collection[Mapping[str, Any]] = self._db["playtokens"]
+        self.notify.info(f"Successfully initialized Mongo play token store")
 
     def lookup(self, playToken: str, callback):
         """

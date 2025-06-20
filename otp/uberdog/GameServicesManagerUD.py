@@ -398,6 +398,11 @@ class LoginOperation(GameOperation):
         self.demand('SetAccount')
 
     def enterSetAccount(self):
+
+        # Special edge case. If this is the VERY FIRST account, make them a superadmin. # todo server config. only needed as a one time thing if admin dashboard isn't made yet
+        if self.accountId == 100000000:
+            self.accessLevel = "TTOFF_DEVELOPER"
+
         # If somebody's already logged into this account, disconnect them.
         datagram = PyDatagram()
         datagram.addServerHeader(self.gameServicesManager.GetAccountConnectionChannel(self.accountId),
@@ -826,7 +831,7 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
         self._clientId = environ.get('DISCORD_APP_CLIENT_ID', None)
         self._clientSecret = environ.get('DISCORD_APP_CLIENT_SECRET', None)
         self._clientRedirect = environ.get('DISCORD_APP_CLIENT_REDIRECT', None)
-        self._playtokenStrategy = environ.get('DISCORD_PLAYTOKENSTRATEGY', 'FILESYSTEM')
+        self._playtokenStrategy = environ.get('PLAYTOKEN_STORAGE_STRATEGY', 'FILESYSTEM')
         self.connection2fsm = {}
         self.account2fsm = {}
         self.accountDb = None
@@ -883,6 +888,8 @@ class GameServicesManagerUD(DistributedObjectGlobalUD):
             self.accountDb = MongoAccountDb(self, credentials)
         else:
             self.accountDb = DeveloperAccountDb(self)
+
+        self.notify.info(f"Using {self.accountDb.__class__.__name__} interface for play token resolution.")
 
     def requestAuthScheme(self):
         """
