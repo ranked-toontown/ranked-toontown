@@ -1,14 +1,14 @@
 """
-WindowAntiFreeze - Prevents Panda3D window from freezing when title bar is dragged
+WindowAntiFreeze - Prevents Panda3D window from freezing during trolley minigames
 
 This module implements a solution to prevent the game from freezing when
-players hold the window title bar, which would otherwise make them
-invulnerable to boss attacks due to collision detection stopping.
+players hold the window title bar during trolley minigames, which would 
+otherwise make them invulnerable to attacks due to collision detection stopping.
 
 The solution works by:
-1. Disabling window dragging and system context menus entirely
+1. Disabling window dragging and right-click context menus during trolley minigames
 2. This prevents the modal loops that cause thread freezing
-3. Simple and effective approach with no complex message handling
+3. Only active during trolley minigames to minimize impact on normal gameplay
 """
 
 import sys
@@ -20,19 +20,15 @@ if os.name == 'nt':
     try:
         import ctypes
         from ctypes import wintypes
-        import threading
         
         # Windows API functions
         user32 = ctypes.windll.user32
         
         # Windows constants
         WM_SYSCOMMAND = 0x0112
-        WM_NCLBUTTONDOWN = 0x00A1
         WM_NCRBUTTONDOWN = 0x00A4
-        WM_NCRBUTTONUP = 0x00A5
         SC_MOVE = 0xF010
         SC_SIZE = 0xF000
-        SC_CONTEXTHELP = 0xF180
         HTCAPTION = 2
         HTSYSMENU = 3
         
@@ -61,7 +57,7 @@ else:
 
 class WindowAntiFreeze:
     """
-    Prevents window freezing by disabling problematic window operations.
+    Prevents window freezing by disabling problematic window operations during trolley minigames.
     """
     
     notify = DirectNotifyGlobal.directNotify.newCategory('WindowAntiFreeze')
@@ -71,7 +67,7 @@ class WindowAntiFreeze:
         self.new_wndproc = None
         self.hwnd = None
         self.installed = False
-        self.dragging = False
+        self.active = False  # Only active during trolley minigames
         
     def install(self):
         """Install the anti-freeze protection on the main Panda3D window."""
@@ -139,32 +135,34 @@ class WindowAntiFreeze:
         except Exception:
             pass
     
+    def activate(self):
+        """Activate anti-freeze protection (called when entering trolley minigames)."""
+        self.active = True
+        self.notify.info("WindowAntiFreeze: Activated for trolley minigame")
+    
+    def deactivate(self):
+        """Deactivate anti-freeze protection (called when leaving trolley minigames)."""
+        self.active = False
+        self.notify.info("WindowAntiFreeze: Deactivated")
+    
     def _window_proc(self, hwnd, msg, wparam, lparam):
         """
-        Custom window procedure that handles window operations safely.
+        Custom window procedure that blocks problematic operations only during trolley minigames.
         """
         try:
-            # Block right-click context menu on title bar and system menu
-            if msg == WM_NCRBUTTONDOWN and (wparam == HTCAPTION or wparam == HTSYSMENU):
-                return 0  # Block right-click context menu entirely
-            
-            # Handle title bar dragging with custom implementation
-            if msg == WM_NCLBUTTONDOWN and wparam == HTCAPTION:
-                if not self.dragging:
-                    self._start_async_drag()
-                return 0  # Block default drag behavior
-            
-            # Block problematic system commands that can cause freezing
-            if msg == WM_SYSCOMMAND:
-                command = wparam & 0xFFF0
+            # Only block operations when active (during trolley minigames)
+            if self.active:
+                # Block right-click context menu on title bar and system menu
+                if msg == WM_NCRBUTTONDOWN and (wparam == HTCAPTION or wparam == HTSYSMENU):
+                    return 0  # Block right-click context menu entirely
                 
-                # Block the default move command since we handle it ourselves
-                if command == SC_MOVE:
-                    return 0
-                
-                # Block resize and context help
-                if command == SC_SIZE or command == SC_CONTEXTHELP:
-                    return 0
+                # Block problematic system commands that can cause freezing
+                if msg == WM_SYSCOMMAND:
+                    command = wparam & 0xFFF0
+                    
+                    # Block window dragging and resizing
+                    if command == SC_MOVE or command == SC_SIZE:
+                        return 0  # Block the operations completely
             
             # Pass all other messages to the original window procedure
             if self.original_wndproc:
@@ -183,54 +181,6 @@ class WindowAntiFreeze:
                 return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
             except Exception:
                 return 0
-    
-    def _start_async_drag(self):
-        """Start window dragging on a separate thread to prevent freezing."""
-        if self.dragging:
-            return
-            
-        self.dragging = True
-        drag_thread = threading.Thread(target=self._handle_drag, daemon=True)
-        drag_thread.start()
-    
-    def _handle_drag(self):
-        """Handle window dragging asynchronously."""
-        try:
-            # Get initial cursor and window positions
-            cursor_pos = wintypes.POINT()
-            user32.GetCursorPos(ctypes.byref(cursor_pos))
-            start_cursor = (cursor_pos.x, cursor_pos.y)
-            
-            rect = wintypes.RECT()
-            user32.GetWindowRect(self.hwnd, ctypes.byref(rect))
-            start_window = (rect.left, rect.top)
-            
-            # Track mouse movement while button is held
-            while user32.GetAsyncKeyState(0x01) < 0:  # Left mouse button pressed
-                user32.GetCursorPos(ctypes.byref(cursor_pos))
-                
-                # Calculate new window position
-                dx = cursor_pos.x - start_cursor[0]
-                dy = cursor_pos.y - start_cursor[1]
-                new_x = start_window[0] + dx
-                new_y = start_window[1] + dy
-                
-                # Move the window
-                user32.SetWindowPos(
-                    self.hwnd,
-                    None,
-                    new_x, new_y,
-                    0, 0,
-                    0x0001 | 0x0004  # SWP_NOSIZE | SWP_NOZORDER
-                )
-                
-                # Small delay to prevent excessive CPU usage
-                threading.Event().wait(0.01)
-                
-        except Exception:
-            pass
-        finally:
-            self.dragging = False
 
 # Global instance
 _window_anti_freeze = None
@@ -258,7 +208,26 @@ def uninstall_window_anti_freeze():
     if _window_anti_freeze:
         _window_anti_freeze.uninstall()
 
+def activate_window_anti_freeze():
+    """Activate anti-freeze protection for trolley minigames."""
+    global _window_anti_freeze
+    
+    if _window_anti_freeze and _window_anti_freeze.installed:
+        _window_anti_freeze.activate()
+
+def deactivate_window_anti_freeze():
+    """Deactivate anti-freeze protection when leaving trolley minigames."""
+    global _window_anti_freeze
+    
+    if _window_anti_freeze and _window_anti_freeze.installed:
+        _window_anti_freeze.deactivate()
+
 def is_installed():
     """Check if the anti-freeze protection is installed."""
     global _window_anti_freeze
-    return _window_anti_freeze and _window_anti_freeze.installed 
+    return _window_anti_freeze and _window_anti_freeze.installed
+
+def is_active():
+    """Check if the anti-freeze protection is currently active."""
+    global _window_anti_freeze
+    return _window_anti_freeze and _window_anti_freeze.installed and _window_anti_freeze.active 

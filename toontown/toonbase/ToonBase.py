@@ -30,6 +30,7 @@ import toontown.archipelago.util.global_text_properties as global_text_propertie
 from .ErrorTrackingService import ErrorTrackingService, ServiceType, BasicErrorTrackingService
 from ..settings.Settings import Settings, ControlSettings
 from ..settings.DedicatedServerSettings import DedicatedServerSettings
+from .WindowAntiFreeze import install_window_anti_freeze
 
 if typing.TYPE_CHECKING:
     from toontown.toonbase.ToonBaseGlobals import *
@@ -114,7 +115,7 @@ class ToonBase(OTPBase.OTPBase):
         globalClock.setMaxDt(0.2)
         
         # Install window anti-freeze protection to prevent collision detection exploit
-        from .WindowAntiFreeze import install_window_anti_freeze
+        # Only active during trolley minigames
         taskMgr.doMethodLater(0.5, lambda task: install_window_anti_freeze(), 'install-anti-freeze')
         if fpsLimit != 0:
             globalClock.setMode(ClockObject.MLimited)
