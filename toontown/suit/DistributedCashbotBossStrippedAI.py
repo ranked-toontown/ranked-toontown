@@ -1,4 +1,3 @@
-import math
 import random
 import time
 
@@ -6,9 +5,8 @@ from direct.directnotify import DirectNotifyGlobal
 from direct.fsm import FSM
 from direct.task.TaskManagerGlobal import taskMgr
 
-from toontown.coghq import CraneLeagueGlobals
+from ..minigame.craning import CraneLeagueGlobals
 from toontown.coghq import DistributedCashbotBossSideCraneAI
-from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
 from toontown.toonbase import ToontownGlobals
 from .DistributedBossCogStrippedAI import DistributedBossCogStrippedAI
 from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, STATUS_EFFECT_DURATIONS
@@ -707,8 +705,7 @@ class DistributedCashbotBossStrippedAI(DistributedBossCogStrippedAI, FSM.FSM):
     
     def applyFrozenState(self):
         """Apply the frozen state to the boss"""
-        from toontown.toonbase import ToontownGlobals
-        
+
         # Store the previous state for recovery
         if not hasattr(self, 'preFreezeBossState'):
             self.preFreezeBossState = {

@@ -1,6 +1,6 @@
 import math
 
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 
 
 class CashbotBossComboTracker:

@@ -5,9 +5,9 @@ from direct.directnotify import DirectNotifyGlobal
 from toontown.toonbase import ToontownGlobals
 from otp.otpbase import OTPGlobals
 from . import DistributedCashbotBossObject
-import copy
 
-from toontown.coghq import CraneLeagueGlobals
+from ..minigame.craning import CraneLeagueGlobals
+
 
 class DistributedCashbotBossSafe(DistributedCashbotBossObject.DistributedCashbotBossObject):
 

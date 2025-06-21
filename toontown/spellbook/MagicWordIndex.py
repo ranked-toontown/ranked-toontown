@@ -1,10 +1,8 @@
 import traceback
-import types
 import collections
 import typing
 from typing import List, Dict, Type, TypeVar
 
-from direct.distributed.ClockDelta import globalClockDelta
 from direct.interval.IntervalGlobal import *
 
 from libotp import NametagGroup
@@ -13,7 +11,8 @@ from otp.otpbase import OTPLocalizer
 from otp.otpbase import OTPGlobals
 
 from toontown.battle import SuitBattleGlobals
-from toontown.coghq import CogDisguiseGlobals, CraneLeagueGlobals
+from toontown.coghq import CogDisguiseGlobals
+from ..minigame.craning import CraneLeagueGlobals
 from toontown.coghq.CraneLeagueHeatDisplay import CraneLeagueHeatDisplay
 from toontown.estate import GardenGlobals
 from toontown.fishing import FishGlobals
@@ -1886,7 +1885,7 @@ class ListRanks(MagicWord):
     accessLevel = 'NO_ACCESS'
 
     def handleWord(self, invoker, avId, toon, *args):
-        from toontown.matchmaking.rank import Rank, RankTier, DIVISIONS_PER_TIER, SKILL_RATING_PER_DIVISION
+        from toontown.matchmaking.rank import Rank, RankTier
         message = ""
         mmr = 100
         last = RankTier.IRON

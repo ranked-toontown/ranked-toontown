@@ -4,14 +4,11 @@ from panda3d.physics import *
 from direct.interval.IntervalGlobal import *
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed import DistributedSmoothNode
-from toontown.coghq import CraneLeagueGlobals
 from toontown.toonbase import ToontownGlobals
 from otp.otpbase import OTPGlobals
 from direct.fsm import FSM
 from direct.task import Task
 from direct.task.TaskManagerGlobal import taskMgr
-import math
-import copy
 from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 smileyDoId = 1
 

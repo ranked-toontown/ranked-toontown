@@ -11,10 +11,7 @@ from toontown.coghq import DistributedCashbotBossHeavyCraneAI
 from toontown.coghq import DistributedCashbotBossSafeAI
 from toontown.suit import DistributedCashbotBossGoonAI
 from toontown.coghq import DistributedCashbotBossTreasureAI
-from toontown.coghq import CraneLeagueGlobals
-from toontown.battle import BattleExperienceAI
-from toontown.chat import ResistanceChat
-from toontown.toon import DistributedToonAI
+from ..minigame.craning import CraneLeagueGlobals
 from direct.fsm import FSM
 from . import DistributedBossCogAI
 import random

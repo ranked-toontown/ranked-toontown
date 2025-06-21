@@ -20,8 +20,8 @@ from toontown.building import ElevatorConstants
 from toontown.battle import MovieToonVictory
 from toontown.battle import RewardPanel
 from toontown.distributed import DelayDelete
-from toontown.chat import ResistanceChat
-from toontown.coghq import CogDisguiseGlobals, CraneLeagueGlobals
+from toontown.coghq import CogDisguiseGlobals
+from ..minigame.craning import CraneLeagueGlobals
 from panda3d.core import *
 from panda3d.physics import *
 from panda3d.direct import *

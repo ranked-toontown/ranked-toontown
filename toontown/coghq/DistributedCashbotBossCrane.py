@@ -2,7 +2,6 @@ from direct.gui.DirectGui import *
 from panda3d.core import *
 from panda3d.direct import *
 from panda3d.physics import *
-from panda3d.core import LOrientationf
 from libotp import *
 from direct.interval.IntervalGlobal import *
 from direct.distributed.ClockDelta import *
@@ -11,12 +10,11 @@ from direct.distributed import DistributedObject
 from direct.showutil import Rope
 from direct.showbase import PythonUtil
 from direct.task import Task
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.toonbase import ToontownGlobals
 from toontown.toonbase import TTLocalizer
 from otp.otpbase import OTPGlobals
 from toontown.suit import DistributedCashbotBossGoon
-from toontown.coghq import DistributedCashbotBossSafe
 import random
 from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect
 

@@ -12,7 +12,7 @@ from toontown.battle import BattleExperience
 from toontown.battle import BattleBase
 from . import BossCog, BossCogGlobals
 from . import SuitDNA
-from toontown.coghq import CogDisguiseGlobals, CraneLeagueGlobals
+from toontown.coghq import CogDisguiseGlobals
 from toontown.coghq import BossHealthBar
 from direct.showbase import Transitions
 from toontown.hood import ZoneUtil
@@ -20,7 +20,6 @@ from toontown.building import ElevatorUtils
 from toontown.building import ElevatorConstants
 from toontown.distributed import DelayDelete
 from toontown.effects import DustCloud
-from toontown.toonbase import TTLocalizer
 from toontown.friends import FriendsListManager
 from direct.controls.ControlManager import CollisionHandlerRayStart
 from direct.showbase import PythonUtil

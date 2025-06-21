@@ -1,6 +1,5 @@
 import math
 
-from toontown.coghq import CraneLeagueGlobals
 from toontown.suit import BossCogGlobals
 
 

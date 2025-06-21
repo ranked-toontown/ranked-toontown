@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta
 
 from direct.gui.DirectGui import *
-from panda3d.core import *
 
-from toontown.coghq import CraneLeagueGlobals
 from toontown.suit.Suit import *
 from direct.task.Task import Task
 from direct.interval.IntervalGlobal import *

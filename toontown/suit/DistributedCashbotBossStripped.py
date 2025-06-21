@@ -4,7 +4,7 @@ from panda3d.core import *
 from panda3d.direct import *
 
 from libotp import *
-from toontown.coghq import CraneLeagueGlobals
+from ..minigame.craning import CraneLeagueGlobals
 from toontown.toonbase import TTLocalizer
 from toontown.toonbase import ToontownGlobals
 from . import SuitDNA

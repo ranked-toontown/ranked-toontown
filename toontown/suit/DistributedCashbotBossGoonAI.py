@@ -1,12 +1,10 @@
 from panda3d.core import *
 from direct.task.TaskManagerGlobal import *
-from direct.distributed.ClockDelta import *
-from direct.interval.IntervalGlobal import *
 from . import GoonGlobals
 from direct.task.Task import Task
 from toontown.toonbase import ToontownGlobals
-from otp.otpbase import OTPGlobals
-from toontown.coghq import DistributedCashbotBossObjectAI, CraneLeagueGlobals
+from toontown.coghq import DistributedCashbotBossObjectAI
+from ..minigame.craning import CraneLeagueGlobals
 from direct.showbase import PythonUtil
 from . import DistributedGoonAI
 import math

@@ -4,7 +4,7 @@ import typing
 
 from direct.directnotify import DirectNotifyGlobal
 
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.toonbase import ToontownGlobals
 
 if typing.TYPE_CHECKING:

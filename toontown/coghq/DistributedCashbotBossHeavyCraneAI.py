@@ -1,4 +1,4 @@
-from toontown.coghq import DistributedCashbotBossCraneAI, CraneLeagueGlobals
+from toontown.coghq import DistributedCashbotBossCraneAI
 from direct.fsm import FSM
 
 class DistributedCashbotBossHeavyCraneAI(DistributedCashbotBossCraneAI.DistributedCashbotBossCraneAI, FSM.FSM):

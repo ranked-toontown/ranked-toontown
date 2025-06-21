@@ -3,7 +3,6 @@ from otp.speedchat import ColorSpace
 from direct.gui.DirectGui import *
 from panda3d.core import *
 
-from toontown.coghq import CraneLeagueGlobals
 from toontown.toonbase import ToontownGlobals
 
 LOWEST_HEAT_H_VALUE = 80

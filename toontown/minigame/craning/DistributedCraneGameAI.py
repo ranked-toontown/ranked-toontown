@@ -1,15 +1,14 @@
 import math
 import random
-from operator import itemgetter
 
 from direct.fsm import ClassicFSM
 from direct.fsm import State
 from otp.otpbase.PythonUtil import clamp
 from direct.task.TaskManagerGlobal import taskMgr
-from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, CollisionPolygon, CollisionBox, NodePath, Vec3, Point3
-from toontown.coghq import CraneLeagueGlobals
+from panda3d.core import CollisionInvSphere, CollisionNode, CollisionSphere, CollisionTube, NodePath, Vec3, Point3
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.coghq.CashbotBossComboTracker import CashbotBossComboTracker
-from toontown.coghq.CraneLeagueGlobals import ScoreReason
+from toontown.minigame.craning.CraneLeagueGlobals import ScoreReason
 from toontown.coghq.DistributedCashbotBossCraneAI import DistributedCashbotBossCraneAI
 from toontown.coghq.DistributedCashbotBossHeavyCraneAI import DistributedCashbotBossHeavyCraneAI
 from toontown.coghq.DistributedCashbotBossSafeAI import DistributedCashbotBossSafeAI
@@ -17,7 +16,7 @@ from toontown.coghq.DistributedCashbotBossSideCraneAI import DistributedCashbotB
 from toontown.coghq.DistributedCashbotBossTreasureAI import DistributedCashbotBossTreasureAI
 from toontown.matchmaking.skill_profile_keys import SkillProfileKey
 from toontown.minigame.DistributedMinigameAI import DistributedMinigameAI
-from toontown.minigame.craning import CraneGameGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.minigame.craning.CraneGamePracticeCheatAI import CraneGamePracticeCheatAI
 from toontown.suit.DistributedCashbotBossGoonAI import DistributedCashbotBossGoonAI
 from toontown.suit.DistributedCashbotBossStrippedAI import DistributedCashbotBossStrippedAI
@@ -320,7 +319,7 @@ class DistributedCraneGameAI(DistributedMinigameAI):
         tierLeftBound = self.ruleset.MODIFIER_TIER_RANGE[0]
         tierRightBound = self.ruleset.MODIFIER_TIER_RANGE[1]
         pool: list[CraneLeagueGlobals.CFORulesetModifierBase] = [c(random.randint(tierLeftBound, tierRightBound)) for c in
-                CraneLeagueGlobals.NON_SPECIAL_MODIFIER_CLASSES]
+                                                                 CraneLeagueGlobals.NON_SPECIAL_MODIFIER_CLASSES]
 
         alreadyApplied = [mod.MODIFIER_ENUM for mod in self.desiredModifiers]
         for choice in list(pool):
@@ -1254,9 +1253,9 @@ class DistributedCraneGameAI(DistributedMinigameAI):
 
         # Calculate how long we should wait to actually start the game.
         # If more than 1 player is present, we want to have a delay present for a cutscene to play.
-        delayTime = CraneGameGlobals.PREPARE_LATENCY_FACTOR
+        delayTime = CraneLeagueGlobals.PREPARE_LATENCY_FACTOR
         if len(self.getParticipantIdsNotSpectating()) != 1:
-            delayTime += CraneGameGlobals.PREPARE_DELAY
+            delayTime += CraneLeagueGlobals.PREPARE_DELAY
         taskMgr.doMethodLater(delayTime, self.gameFSM.request, self.uniqueName('start-game-task'), extraArgs=['play'])
         self.d_restart()
 

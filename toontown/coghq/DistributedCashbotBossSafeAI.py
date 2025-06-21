@@ -1,10 +1,8 @@
 from panda3d.core import *
 
-from toontown.coghq import CraneLeagueGlobals
-from toontown.coghq.DistributedCashbotBossHeavyCraneAI import DistributedCashbotBossHeavyCraneAI
+from ..minigame.craning import CraneLeagueGlobals
 from toontown.coghq.DistributedCashbotBossSideCraneAI import DistributedCashbotBossSideCraneAI
 from toontown.toonbase import ToontownGlobals
-from otp.otpbase import OTPGlobals
 from . import DistributedCashbotBossObjectAI
 from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SYNERGY_EFFECTS, STATUS_EFFECT_DURATIONS
 import math
@@ -226,7 +224,7 @@ class DistributedCashbotBossSafeAI(DistributedCashbotBossObjectAI.DistributedCas
                 self.boss.getBoss().addSafeHelmetCooldown(avId)
                 
         elif impact >= ToontownGlobals.CashbotBossSafeKnockImpact:
-            self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE,reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
+            self.boss.addScore(avId, self.boss.ruleset.POINTS_DESAFE, reason=CraneLeagueGlobals.ScoreReason.REMOVE_HELMET)
             boss = self.boss.getBoss()
             boss.heldObject.demand('Dropped', avId, self.boss.doId)
             boss.heldObject.avoidHelmet = 1

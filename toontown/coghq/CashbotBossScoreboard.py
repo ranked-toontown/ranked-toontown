@@ -1,10 +1,9 @@
 import dataclasses
 
 from direct.gui.DirectGui import *
-from panda3d.core import *
 
 from direct.showbase.DirectObject import DirectObject
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.suit.Suit import *
 from direct.task.Task import Task
 from direct.interval.IntervalGlobal import *

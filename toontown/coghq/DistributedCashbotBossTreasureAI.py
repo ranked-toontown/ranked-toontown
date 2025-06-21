@@ -1,6 +1,5 @@
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
 from toontown.safezone import DistributedSZTreasureAI, DistributedTreasureAI
-from toontown.toonbase import ToontownGlobals
 
 
 class DistributedCashbotBossTreasureAI(DistributedSZTreasureAI.DistributedSZTreasureAI):

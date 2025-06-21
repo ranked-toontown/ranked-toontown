@@ -2,7 +2,6 @@ import functools
 import random
 import math
 
-from direct.actor.Actor import Actor
 from direct.distributed import DistributedSmoothNode
 from direct.fsm import ClassicFSM
 from direct.fsm import State
@@ -14,31 +13,30 @@ from direct.showbase.MessengerGlobal import messenger
 from otp.otpbase.PythonUtil import reduceAngle
 from direct.task.TaskManagerGlobal import taskMgr
 from panda3d.core import CollisionPlane, Plane, Vec3, Point3, CollisionNode, NodePath, CollisionPolygon, BitMask32, \
-    VBase3, VBase4, CardMaker, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, CollisionSphere, CollisionHandlerQueue, CollisionTube, TextNode, Vec4
+    VBase3, VBase4, ColorBlendAttrib, GeomVertexData, GeomVertexWriter, Geom, GeomTrifans, GeomNode, GeomVertexFormat, CollisionRay, \
+    CollisionHandlerQueue, CollisionTube, TextNode, Vec4
 from panda3d.physics import LinearVectorForce, ForceNode, LinearEulerIntegrator, PhysicsManager
 
-from libotp import CFSpeech
 from libotp.nametag import NametagGlobals
 from otp.otpbase import OTPGlobals
-from toontown.coghq import CraneLeagueGlobals
+from toontown.minigame.craning import CraneLeagueGlobals
+from toontown.minigame.craning.CraneLeagueGlobals import RED_COUNTDOWN_COLOR, ORANGE_COUNTDOWN_COLOR, \
+    YELLOW_COUNTDOWN_COLOR
 from toontown.coghq.BossSpeedrunTimer import BossSpeedrunTimedTimer, BossSpeedrunTimer
 from toontown.coghq.CashbotBossScoreboard import CashbotBossScoreboard
 from toontown.coghq.CraneLeagueHeatDisplay import CraneLeagueHeatDisplay
 from toontown.minigame.DistributedMinigame import DistributedMinigame
-from toontown.minigame.craning import CraneGameGlobals
-from toontown.minigame.craning.CraneGameGlobals import RED_COUNTDOWN_COLOR, ORANGE_COUNTDOWN_COLOR, \
-    YELLOW_COUNTDOWN_COLOR
 from toontown.minigame.craning.CraneWalk import CraneWalk
 from toontown.toonbase import TTLocalizer, ToontownGlobals
 from toontown.minigame.craning.CraneGameSettingsPanel import CraneGameSettingsPanel
 from toontown.minigame.statuseffects.DistributedStatusEffectSystem import DistributedStatusEffectSystem
-from toontown.minigame.statuseffects.StatusEffectGlobals import StatusEffect, SAFE_ALLOWED_EFFECTS
 from direct.gui.DirectGui import DGG, DirectFrame
 from direct.gui.DirectScrolledList import DirectScrolledList
 from direct.gui.DirectLabel import DirectLabel
 from direct.gui.DirectButton import DirectButton
 from direct.showbase.ShowBaseGlobal import aspect2d
 from direct.task import Task
+from toontown.minigame.craning import CraneLeagueGlobals
 
 
 class DistributedCraneGame(DistributedMinigame):
@@ -438,14 +436,14 @@ class DistributedCraneGame(DistributedMinigame):
         # This is just an edge case to prevent the client from crashing if somehow everyone is spectating.
         if len(players) <= 0:
             return Sequence(
-                Wait(CraneGameGlobals.PREPARE_DELAY + CraneGameGlobals.PREPARE_LATENCY_FACTOR),
+                Wait(CraneLeagueGlobals.PREPARE_DELAY + CraneLeagueGlobals.PREPARE_LATENCY_FACTOR),
                 Func(self.gameFSM.request, 'play'),
             )
 
         # If this is a solo crane round, we are not going to play a cutscene. Get right into the action.
         if len(players) == 1:
             return Sequence(
-                Wait(CraneGameGlobals.PREPARE_LATENCY_FACTOR),
+                Wait(CraneLeagueGlobals.PREPARE_LATENCY_FACTOR),
                 Func(self.gameFSM.request, 'play'),
             )
 
@@ -453,7 +451,7 @@ class DistributedCraneGame(DistributedMinigame):
         toon = base.localAvatar if not self.localToonSpectating() else self.getParticipantsNotSpectating()[0]
         targetCameraPos = render.getRelativePoint(toon, Vec3(0, -10, toon.getHeight()))
         startCameraHpr = Point3(reduceAngle(camera.getH()), camera.getP(), camera.getR())
-        cameraTrack = LerpPosHprInterval(camera, CraneGameGlobals.PREPARE_DELAY / 2.5, Point3(*targetCameraPos), Point3(reduceAngle(toon.getH()), 0, 0), startPos=camera.getPos(), startHpr=startCameraHpr, blendType='easeInOut')
+        cameraTrack = LerpPosHprInterval(camera, CraneLeagueGlobals.PREPARE_DELAY / 2.5, Point3(*targetCameraPos), Point3(reduceAngle(toon.getH()), 0, 0), startPos=camera.getPos(), startHpr=startCameraHpr, blendType='easeInOut')
 
         # Setup a countdown track to display when the round will start. Also at the end, start the game.
         countdownTrack = Sequence()
@@ -462,9 +460,9 @@ class DistributedCraneGame(DistributedMinigame):
             countdownTrack.append(Func(self.__displayOverlayText, f"{secondsLeft}", color))
             countdownTrack.append(Func(base.playSfx, self.timerTickSfx))
             countdownTrack.append(Wait(1))
-        countdownTrack.append(Func(self.__displayOverlayText, 'GO!', CraneGameGlobals.GREEN_COUNTDOWN_COLOR))
+        countdownTrack.append(Func(self.__displayOverlayText, 'GO!', CraneLeagueGlobals.GREEN_COUNTDOWN_COLOR))
         countdownTrack.append(Func(base.playSfx, self.goSfx))
-        countdownTrack.append(Wait(CraneGameGlobals.PREPARE_LATENCY_FACTOR))
+        countdownTrack.append(Wait(CraneLeagueGlobals.PREPARE_LATENCY_FACTOR))
         countdownTrack.append(Func(self.gameFSM.request, 'play'))
 
         return Parallel(cameraTrack, countdownTrack)
@@ -553,7 +551,6 @@ class DistributedCraneGame(DistributedMinigame):
         panel = CraneGameSettingsPanel(self.getTitle(), self.rulesDoneEvent)
         # Create toggle button
         from direct.gui.DirectButton import DirectButton
-        from toontown.toonbase import TTLocalizer
         btnGeom = loader.loadModel('phase_3/models/gui/quit_button')
         
 
@@ -839,9 +836,7 @@ class DistributedCraneGame(DistributedMinigame):
             )
             
             self.currentModifiersList.addItem(itemFrame)
-        
-        # Get available modifiers (all modifiers not currently active)
-        from toontown.coghq import CraneLeagueGlobals
+
         currentModEnums = [mod.MODIFIER_ENUM for mod in self.modifiers]
         availableModClasses = []
         
@@ -901,9 +896,6 @@ class DistributedCraneGame(DistributedMinigame):
                 self.sendUpdate('addModifier', [modifierEnum, 1])
     
     def __modifierHasParameters(self, modifierEnum):
-        """Check if a modifier has configurable parameters (tiers)"""
-        from toontown.coghq import CraneLeagueGlobals
-        
         # Get the modifier class
         modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
         if not modifierClass:
@@ -935,8 +927,6 @@ class DistributedCraneGame(DistributedMinigame):
     
     def __showModifierConfigDialog(self, modifierEnum):
         """Show configuration dialog for a modifier"""
-        from toontown.coghq import CraneLeagueGlobals
-        
         # Get the modifier class
         modifierClass = CraneLeagueGlobals.CFORulesetModifierBase.MODIFIER_SUBCLASSES.get(modifierEnum)
         if not modifierClass:
@@ -1064,7 +1054,6 @@ class DistributedCraneGame(DistributedMinigame):
     
     def __createPercentageOptions(self, modifierEnum, modifierClass, buttonImage, statName):
         """Create percentage-based tier options"""
-        from toontown.coghq import CraneLeagueGlobals
         
         # Create sample modifiers to get percentage values
         tiers = [1, 2, 3, 4, 5]

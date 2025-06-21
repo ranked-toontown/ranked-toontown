@@ -1,4 +1,3 @@
-from toontown.coghq import CraneLeagueGlobals
 from toontown.safezone import DistributedSZTreasure
 from toontown.toonbase import ToontownGlobals
 from direct.interval.IntervalGlobal import *
