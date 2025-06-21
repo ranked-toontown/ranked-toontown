@@ -7,6 +7,7 @@ from otp.distributed.PotentialAvatar import PotentialAvatar
 from otp.otpgui.OTPDialog import OTPDialog, YesNo, CancelOnly
 from otp.uberdog.authentication import AuthenticationGlobals
 from toontown.toontowngui.TTDialog import TTDialog, TTGlobalDialog
+from panda3d.core import WindowProperties
 
 
 class GameServicesManager(DistributedObjectGlobal):
@@ -72,7 +73,22 @@ class GameServicesManager(DistributedObjectGlobal):
     def d_login(self, playToken):
         self.sendUpdate('login', [playToken])
 
+    def __bringToFront(self, wp):
+        wp.setZOrder(WindowProperties.ZTop)
+        base.win.requestProperties(wp)
+        base.graphicsEngine.openWindows()
+
+    def __bringToNormal(self, wp, task=None):
+        wp.setZOrder(WindowProperties.ZNormal)
+        base.win.requestProperties(wp)
+        base.graphicsEngine.openWindows()
+
     def acceptLogin(self):
+        # Bring window to foreground
+        wp = WindowProperties()
+        self.__bringToFront(wp)
+        taskMgr.doMethodLater(0.5, self.__bringToNormal, 'bringToNormal', extraArgs=[wp])
+
         messenger.send(self.doneEvent, [{'mode': 'success'}])
 
         if self.discordAuthChoice is not None:
