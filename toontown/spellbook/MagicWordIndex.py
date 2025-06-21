@@ -1940,6 +1940,15 @@ class EndCFO(MagicWord):
         if craneGame is None:
             return "You aren't in a crane round!"
 
+        # Check if this is a ranked game and if less than 2 minutes have elapsed
+        if craneGame.isRanked():
+            elapsed_seconds = globalClock.getFrameTime() - craneGame.battleThreeStart
+            if elapsed_seconds < 120:  # 2 minutes = 120 seconds
+                remaining_time = 120 - elapsed_seconds
+                minutes = int(remaining_time // 60)
+                seconds = int(remaining_time % 60)
+                return f"Cannot forfeit a ranked game until 2 minutes have elapsed. Time remaining: {minutes}m {seconds}s"
+
         # Forfeit: Set the invoker's score to ensure they come in last place
         context = craneGame.getScoringContext()
         _round = context.get_round(craneGame.currentRound)
